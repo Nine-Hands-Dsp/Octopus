@@ -1,4 +1,5 @@
 #pragma once
+#include <map>
 #include <juce_data_structures/juce_data_structures.h>
 #include "ChainHost.h"
 
@@ -23,6 +24,7 @@ public:
         juce::Array<int> stomp[kFs];        // blocs (positions dans entries) commandés par chaque footswitch en mode STOMP
         bool saved = false;
         juce::uint32 colour = 0;            // couleur du preset (0 = celle de son footswitch)
+        juce::StringArray onStates;         // "1" / "0" par effet : ON / OFF tel qu'enregistré (bypass de la pédale compris)
     };
 
     explicit OctopusEngine (ChainHost& host);
@@ -41,6 +43,13 @@ public:
     ChainHost& chainHost() noexcept { return host; }
 
     void toggle (int chainIndex);
+
+    // ---- bypass : celui de la pédale (son propre interrupteur, les queues de delay / reverb continuent) ou celui de REAPER
+    enum BypassPref { bypassAuto = 0, bypassPedal = 1, bypassReaper = 2 };
+    int  pedalBypassParam (int chainIndex, bool& invert);           // -1 : le plugin n'a pas d'interrupteur à lui
+    bool usesPedalBypass (int chainIndex);
+    int  bypassPref (const juce::String& plugin) const;
+    void setBypassPref (const juce::String& plugin, int pref);
     void setEnabled (int chainIndex, bool on);
     void remove (int chainIndex);
     void moveBlock (int chainIndex, int toBlockPos);                      // toBlockPos : position voulue parmi les blocs
@@ -150,6 +159,12 @@ private:
 
     juce::String msg;
     double msgUntil = 0.0;
+
+    struct BypassInfo { int param = -1; bool invert = false; };
+    std::map<juce::String, BypassInfo> bypassCache;      // par instance (guid)
+    std::map<juce::String, int> bypassPrefs;              // par plugin (nom d'origine)
+    void setOn (int chainIndex, bool on);
+    bool usesPedalBypassFor (const FxInfo& f, int chainIndex, bool& invert);                 // ON / OFF selon le mode de bypass du bloc (sans point d'annulation)
 
     juce::String signature() const;
     void changed();                                     // l'état sauvé a changé

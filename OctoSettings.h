@@ -24,4 +24,25 @@ namespace OctoSettings
         file().getParentDirectory().createDirectory();
         x.writeTo (file());
     }
+
+    // plugins favoris (nom complet donné par REAPER, ex. "VST3: Holyverb (Studio Wiga)"), communs à tous les projets
+    inline juce::StringArray favourites()
+    {
+        juce::StringArray out;
+        if (auto x = juce::XmlDocument::parse (file()))
+            if (auto* fav = x->getChildByName ("Favourites"))
+                for (auto* e : fav->getChildWithTagNameIterator ("Plugin"))
+                    out.addIfNotAlreadyThere (e->getStringAttribute ("name"));
+        return out;
+    }
+    inline void setFavourites (const juce::StringArray& names)
+    {
+        juce::XmlElement x ("OctopusSettings");
+        if (auto old = juce::XmlDocument::parse (file())) x = *old;
+        x.deleteAllChildElementsWithTagName ("Favourites");
+        auto* fav = x.createNewChildElement ("Favourites");
+        for (auto& n : names) fav->createNewChildElement ("Plugin")->setAttribute ("name", n);
+        file().getParentDirectory().createDirectory();
+        x.writeTo (file());
+    }
 }

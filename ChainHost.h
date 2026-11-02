@@ -161,14 +161,14 @@ public:
     juce::String paramName (int i, int p) override
     {
         if (isChroma (i)) { static const char* c[] = { "Mute", "Mode", "Reference A4" }; return c[juce::jlimit (0, 2, p)]; }
-        static const char* n[kDemoParams] = { "Level", "Tone", "Gain", "Mix", "Time", "Feedback", "Mode", "Tempo Sync", "Rate", "Depth",
+        static const char* n[kDemoParams] = { "Level", "Tone", "Gain", "Mix", "Time", "Feedback", "Mode", "Tempo Sync", "Rate", "Footswitch (On)",
                                               "MIDI Channel", "MIDI Pedal Invert", "MIDI CC 0|0", "Bypass", "Wet", "Delta" };
         return n[juce::jlimit (0, kDemoParams - 1, p)];
     }
     int paramSteps (int i, int p) override
     {
         if (isChroma (i)) return p == 0 ? 2 : (p == 1 ? 3 : 21);
-        return p == 6 ? 4 : (p == 7 || p == 11 || p == 13 ? 2 : (p == 10 ? 17 : 0));
+        return p == 6 ? 4 : (p == 7 || p == 9 || p == 11 || p == 13 ? 2 : (p == 10 ? 17 : 0));
     }
     juce::String paramText (int i, int p) override
     {
@@ -186,7 +186,7 @@ public:
     double getParam (int i, int p) override
     {
         auto k = chain[i].guid + "/" + juce::String (p);
-        double v = values.contains (k) ? (double) values[k] : 0.25 + 0.06 * (double) ((p * 7 + i * 3) % 10);
+        double v = values.contains (k) ? (double) values[k] : (p == 9 ? 1.0 : 0.25 + 0.06 * (double) ((p * 7 + i * 3) % 10));
         const int st = paramSteps (i, p);
         if (st >= 2) v = std::round (v * (st - 1)) / (st - 1);
         return v;

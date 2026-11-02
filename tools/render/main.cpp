@@ -1,3 +1,4 @@
+#include "../../OctoSettings.h"
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 using namespace juce;
@@ -82,6 +83,43 @@ int main (int argc, char** argv)
     e.paramInput (OctopusEngine::fsC, 1.0f);
     check (e.current() == 2, "paramètre fsC -> preset 1C");
 
+    // bypass de la pédale (son propre interrupteur) ou de REAPER
+    {
+        auto& h = e.chainHost();
+        int ec = -1, cc = -1;
+        for (int i = 0; i < e.chain().size(); ++i)
+        {
+            if (e.chain().getReference (i).name.contains ("ECHOFLEX")) ec = i;
+            if (OctopusEngine::isChroma (e.chain().getReference (i))) cc = i;
+        }
+        bool inv = false;
+        check (ec >= 0 && e.pedalBypassParam (ec, inv) == 9 && ! inv && e.usesPedalBypass (ec), "ECHOFLEX : interrupteur de la pédale trouvé (Footswitch (On)), « Bypass » de REAPER ignoré");
+        check (cc >= 0 && ! e.usesPedalBypass (cc), "CHROMA (sans interrupteur) : bypass de REAPER");
+        const String g = e.chain().getReference (ec).guid;
+        e.setEnabled (ec, true);
+        e.toggle (ec);
+        check (h.info (ec).enabled && h.getParam (ec, 9) < 0.5 && ! e.chain().getReference (ec).enabled, "OFF par la pédale : REAPER laisse tourner l'effet (les queues continuent), bloc affiché OFF");
+        e.save (12);                                         // 4A : ECHOFLEX éteint par sa pédale
+        e.toggle (ec);
+        check (h.getParam (ec, 9) > 0.5 && e.chain().getReference (ec).enabled, "ON par la pédale");
+        e.load (12);
+        int ec2 = -1;
+        for (int i = 0; i < e.chain().size(); ++i) if (e.chain().getReference (i).name.contains ("ECHOFLEX")) ec2 = i;
+        check (ec2 >= 0 && e.chain().getReference (ec2).guid == g && h.getParam (ec2, 9) < 0.5 && h.info (ec2).enabled,
+               "rappel du preset : interrupteur de la pédale remis sur OFF sans recharger le plugin");
+        e.setBypassPref (e.chain().getReference (ec2).original, OctopusEngine::bypassReaper);
+        check (! e.usesPedalBypass (ec2) && ! h.info (ec2).enabled && h.getParam (ec2, 9) > 0.5, "mode REAPER : l'effet reste OFF, coupé par REAPER, interrupteur de la pédale remis sur ON");
+        e.toggle (ec2);
+        check (h.info (ec2).enabled && e.chain().getReference (ec2).enabled, "mode REAPER : ON par REAPER");
+        auto st = e.toTree();
+        e.setBypassPref (e.chain().getReference (ec2).original, OctopusEngine::bypassAuto);
+        e.fromTree (st);
+        check (e.bypassPref (e.chain().getReference (ec2).original) == OctopusEngine::bypassReaper, "mode de bypass enregistré avec le projet");
+        e.setBypassPref (e.chain().getReference (ec2).original, OctopusEngine::bypassAuto);
+        e.clear (12);
+        e.load (2);
+    }
+
     // ---------------------------------------------------------------- captures
     std::unique_ptr<AudioProcessorEditor> edp (proc.createEditor());
     auto* ed = static_cast<OctopusEditor*> (edp.get());
@@ -115,7 +153,20 @@ int main (int argc, char** argv)
 
     e.setMode (OctopusEngine::presetMode);
     ed->showScreen (1, 3);
-    ed->screenSearch ({}, 1);
+    {
+        auto keep = OctoSettings::favourites();
+        OctoSettings::setFavourites ({});
+        ed->screenSearch ({}, 0);
+        ed->screenFavourite (2); ed->screenFavourite (5);
+        check (OctoSettings::favourites().size() == 2, "deux plugins ajoutés aux favoris");
+        shot ("octopus_add_stars");
+        ed->screenSearch ({}, 1);
+        shot ("octopus_add_favorites");
+        ed->screenFavourite (0);
+        check (OctoSettings::favourites().size() == 1, "favori retiré d'un clic sur l'étoile");
+        OctoSettings::setFavourites (keep);
+    }
+    ed->screenSearch ({}, 2);
     ed->screenPick (5); ed->screenPick (1); ed->screenPick (9);
     shot ("octopus_add_effect");
     ed->screenSearch ("rea", 0);

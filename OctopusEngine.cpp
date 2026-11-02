@@ -63,6 +63,15 @@ void OctopusEngine::refreshNow()
     {
         const int n = host.count();
         for (int i = 0; i < n; ++i) now.add (host.info (i));
+        // bypass de la pédale : un bloc dont l'interrupteur est coupé est affiché OFF
+        for (int i = 0; i < n; ++i)
+        {
+            auto& f = now.getReference (i);
+            if (f.isSelf || ! f.enabled) continue;
+            bool inv = false;
+            const bool pedal = usesPedalBypassFor (f, i, inv);
+            if (pedal) { const int p = bypassCache[f.guid].param; const bool v = host.getParam (i, p) >= 0.5; f.enabled = inv ? ! v : v; }
+        }
     }
     const auto st = host.statusText();
     const auto tn = r ? host.trackName() : juce::String();
@@ -102,11 +111,95 @@ int OctopusEngine::chainIndexForBlock (int blockPos) const
 }
 
 // ------------------------------------------------------------------ actions sur les blocs
+// ------------------------------------------------------------------ bypass de la pédale / de REAPER
+static bool isOnSwitchName (const juce::String& raw, bool& invert)
+{
+    const auto n = raw.trim().toLowerCase();
+    if (n == "bypass" || n.startsWith ("bypass ") || n == "bypassed") { invert = true; return true; }
+    invert = false;
+    static const char* on[] = { "on", "on/off", "on / off", "effect on", "fx on", "enable", "enabled", "active", "power", "footswitch", "effect" };
+    for (auto* o : on) if (n == o) return true;
+    return n.startsWith ("footswitch") || n.startsWith ("effect on") || n.startsWith ("on/off");
+}
+
+bool OctopusEngine::usesPedalBypassFor (const FxInfo& f, int i, bool& invert)
+{
+    auto it = bypassCache.find (f.guid);
+    if (it == bypassCache.end())
+    {
+        BypassInfo b;
+        const int n = host.numParams (i);
+        // REAPER ajoute « Bypass », « Wet », « Delta » à la fin de chaque effet : c'est son propre bypass, on l'ignore
+        int lim = n;
+        if (n >= 3 && host.paramName (i, n - 3) == "Bypass" && host.paramName (i, n - 2) == "Wet" && host.paramName (i, n - 1) == "Delta") lim = n - 3;
+        for (int p = 0; p < lim; ++p)
+        {
+            bool inv = false;
+            if (isOnSwitchName (host.paramName (i, p), inv) && host.paramSteps (i, p) == 2) { b.param = p; b.invert = inv; break; }
+        }
+        it = bypassCache.emplace (f.guid, b).first;
+    }
+    invert = it->second.invert;
+    if (it->second.param < 0) return false;
+    return bypassPref (f.original) != bypassReaper;
+}
+
+int OctopusEngine::pedalBypassParam (int i, bool& invert)
+{
+    if (! juce::isPositiveAndBelow (i, fx.size())) return -1;
+    usesPedalBypassFor (fx.getReference (i), i, invert);
+    return bypassCache[fx.getReference (i).guid].param;
+}
+
+bool OctopusEngine::usesPedalBypass (int i)
+{
+    bool inv = false;
+    return juce::isPositiveAndBelow (i, fx.size()) && usesPedalBypassFor (fx.getReference (i), i, inv);
+}
+
+int OctopusEngine::bypassPref (const juce::String& plugin) const
+{
+    auto it = bypassPrefs.find (plugin);
+    return it == bypassPrefs.end() ? bypassAuto : it->second;
+}
+
+void OctopusEngine::setBypassPref (const juce::String& plugin, int pref)
+{
+    // en changeant de mode, l'effet garde l'état affiché : on remet l'autre interrupteur sur ON
+    juce::Array<std::pair<int, bool>> states;
+    for (auto i : blk) if (fx.getReference (i).original == plugin) states.add ({ i, fx.getReference (i).enabled });
+    if (pref == bypassAuto) bypassPrefs.erase (plugin); else bypassPrefs[plugin] = pref;
+    host.beginUndo();
+    for (auto& s : states)
+    {
+        bool inv = false;
+        const int p = pedalBypassParam (s.first, inv);
+        if (p >= 0) host.setParam (s.first, p, (inv ? 0.0 : 1.0));           // interrupteur de la pédale sur ON
+        host.setEnabled (s.first, true);
+        setOn (s.first, s.second);
+    }
+    host.endUndo ("bypass mode " + FxCat::shortName (plugin));
+    refreshNow();
+    changed();
+}
+
+void OctopusEngine::setOn (int i, bool on)
+{
+    bool inv = false;
+    if (usesPedalBypass (i))
+    {
+        const int p = pedalBypassParam (i, inv);
+        if (! host.info (i).enabled) host.setEnabled (i, true);
+        host.setParam (i, p, (on != inv) ? 1.0 : 0.0);
+    }
+    else host.setEnabled (i, on);
+}
+
 void OctopusEngine::setEnabled (int i, bool on)
 {
     if (! ready || ! juce::isPositiveAndBelow (i, fx.size()) || fx.getReference (i).isSelf) return;
     host.beginUndo();
-    host.setEnabled (i, on);
+    setOn (i, on);
     host.endUndo (juce::String (on ? "enable " : "bypass ") + FxCat::shortName (fx.getReference (i).name));
     refreshNow();
 }
@@ -257,7 +350,7 @@ void OctopusEngine::press (int f)
             if (fx.getReference (i).guid == g) { idx.add (i); anyOn = anyOn || fx.getReference (i).enabled; }
     if (idx.isEmpty()) { say ("Footswitch " + juce::String::charToString ((juce::juce_wchar) ('A' + f)) + " : no block assigned (right-click a block)"); return; }
     host.beginUndo();
-    for (auto i : idx) host.setEnabled (i, ! anyOn);
+    for (auto i : idx) setOn (i, ! anyOn);
     host.endUndo ("footswitch " + juce::String::charToString ((juce::juce_wchar) ('A' + f)));
     refreshNow();
 }
@@ -338,6 +431,9 @@ bool OctopusEngine::save (int idx)
     p.entries.clear();
     for (auto& e : entries) p.entries.add (ChainChunk::forPreset (e));
     p.selfPos = selfPos;
+    p.onStates.clear();
+    for (auto i : blk) p.onStates.add (fx.getReference (i).enabled ? "1" : "0");
+    if (p.onStates.size() != p.entries.size()) p.onStates.clear();
     for (int f = 0; f < kFs; ++f)
     {
         p.stomp[f].clear();
@@ -393,6 +489,19 @@ bool OctopusEngine::load (int idx)
     juce::Array<int> reload;
     if (sameShape)
     {
+        // blocs au bypass de la pédale : on règle d'abord leur interrupteur sur l'état du preset, puis on compare
+        // les réglages (l'interrupteur fait partie de l'état du plugin) : s'ils sont égaux, pas de rechargement,
+        // et les queues de delay / reverb continuent
+        bool anyPedal = false;
+        for (int i = 0; i < now.size(); ++i)
+        {
+            const int ci = chainIdx (i);
+            if (! usesPedalBypass (ci)) continue;
+            const bool on = p.onStates.size() == p.entries.size() ? p.onStates[i] == "1" : ! ChainChunk::bypassed (p.entries[i]);
+            setOn (ci, on);
+            anyPedal = true;
+        }
+        if (anyPedal) { int s2 = 0; juce::StringArray again; if (host.capture (again, s2, err) && again.size() == now.size()) now = again; }
         for (int i = 0; i < now.size(); ++i)
         {
             if (ChainChunk::settings (now[i]) != ChainChunk::settings (p.entries[i])) { reload.add (i); continue; }
@@ -532,7 +641,8 @@ juce::ValueTree OctopusEngine::presetToTree (const Preset& p, int idx)
     t.setProperty ("idx", idx, nullptr);
     t.setProperty ("name", p.name, nullptr);
     t.setProperty ("self", p.selfPos, nullptr);
-    if (! p.saved) t.setProperty ("empty", true, nullptr);          // emplacement vide qui a seulement une couleur
+    if (! p.saved) t.setProperty ("empty", true, nullptr);
+    if (! p.onStates.isEmpty()) t.setProperty ("on", p.onStates.joinIntoString (""), nullptr);          // emplacement vide qui a seulement une couleur
     if (p.colour != 0) t.setProperty ("colour", juce::String::toHexString ((int) p.colour), nullptr);
     for (int f = 0; f < kFs; ++f)
     {
@@ -553,6 +663,7 @@ OctopusEngine::Preset OctopusEngine::presetFromTree (const juce::ValueTree& t)
 {
     Preset p;
     p.saved = ! (bool) t["empty"];
+    for (auto c : t["on"].toString()) p.onStates.add (juce::String::charToString (c));
     p.name = t["name"].toString();
     p.selfPos = (int) t["self"];
     if (t.hasProperty ("colour")) p.colour = (juce::uint32) t["colour"].toString().getHexValue64();
@@ -608,6 +719,13 @@ juce::ValueTree OctopusEngine::toTree() const
     root.setProperty ("latch", l.joinIntoString (","), nullptr);
     for (int f = 0; f < kFs; ++f) root.setProperty ("stompGuids" + juce::String (f), stompGuids[f].joinIntoString (";"), nullptr);
     for (int f = 0; f < kFs; ++f) root.setProperty ("fsColour" + juce::String (f), juce::String::toHexString ((int) fsCol[(size_t) f]), nullptr);
+    for (auto& bp : bypassPrefs)
+    {
+        juce::ValueTree b ("BYPASS");
+        b.setProperty ("plugin", bp.first, nullptr);
+        b.setProperty ("mode", bp.second, nullptr);
+        root.appendChild (b, nullptr);
+    }
     while (t.getNumChildren() > 0) { auto ch = t.getChild (0); t.removeChild (0, nullptr); root.appendChild (ch, nullptr); }
     return root;
 }
@@ -640,6 +758,12 @@ void OctopusEngine::fromTree (const juce::ValueTree& root)
     for (int f = 0; f < kFs; ++f)
     {
         const auto hex = root["fsColour" + juce::String (f)].toString();
+        if (f == 0)
+        {
+            bypassPrefs.clear();
+            for (auto c : root)
+                if (c.hasType ("BYPASS")) bypassPrefs[c["plugin"].toString()] = juce::jlimit (0, 2, (int) c["mode"]);
+        }
         fsCol[(size_t) f] = hex.isNotEmpty() ? (juce::uint32) hex.getHexValue64() : kDefaultFsColour;
     }
     ++gen;

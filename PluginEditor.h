@@ -20,6 +20,7 @@ public:
     void showScreen (int which, int arg = 0);
     void screenSearch (const juce::String& text, int chip);
     void screenPick (int visibleIndex);
+    void screenFavourite (int visibleIndex);   // étoile des favoris d'une ligne du navigateur
     void screenParamsMidi();
     bool testBlockClicks (int slot, const juce::Array<double>& downUpMs, double waitMs);
     void screenHover (juce::Point<float> screenUnits);

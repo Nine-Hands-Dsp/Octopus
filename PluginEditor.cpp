@@ -91,8 +91,9 @@ namespace
     };
     enum CardAction { cLoad, cSave, cRename, cCopy, cPaste, cClear, numCardActions };
     const char* const kCardText[numCardActions] = { "LOAD", "SAVE", "RENAME", "COPY", "PASTE", "CLEAR" };
-    const char* const kChips[] = { "All", "Studio Wiga", "VST3", "VST", "CLAP", "JS", "AU" };
-    constexpr int kNumChips = 7;
+    const char* const kChips[] = { "All", "Favorites", "Studio Wiga", "VST3", "VST", "CLAP", "JS", "AU" };
+    constexpr int kNumChips = 8;
+    constexpr int kChipFavourites = 1;
 
     struct Btn { Rectangle<float> r; int id; String text; bool active = false; bool enabled = true; };
 }
@@ -153,6 +154,7 @@ public:
     // ------------------------------------------------------------ public (outil de rendu, éditeur)
     void openBrowser (int blockPos)
     {
+        favs = OctoSettings::favourites();
         overlay = Overlay::browser;
         insertPos = blockPos;
         listScroll = 0;
@@ -1102,18 +1104,46 @@ private:
             if (type.endsWith ("I")) continue;                          // instruments (VSTi, VST3i, CLAPi, AUi)
             switch (chip)
             {
-                case 1: if (! FxCat::vendor (f.name).equalsIgnoreCase ("Studio Wiga")) continue; break;
-                case 2: if (type != "VST3") continue; break;
-                case 3: if (type != "VST" && type != "VST2") continue; break;
-                case 4: if (type != "CLAP") continue; break;
-                case 5: if (type != "JS") continue; break;
-                case 6: if (type != "AU") continue; break;
+                case 1: if (! favs.contains (f.name)) continue; break;
+                case 2: if (! FxCat::vendor (f.name).equalsIgnoreCase ("Studio Wiga")) continue; break;
+                case 3: if (type != "VST3") continue; break;
+                case 4: if (type != "VST" && type != "VST2") continue; break;
+                case 5: if (type != "CLAP") continue; break;
+                case 6: if (type != "JS") continue; break;
+                case 7: if (type != "AU") continue; break;
                 default: break;
             }
             if (q.isNotEmpty() && ! f.name.toLowerCase().contains (q)) continue;
             out.add (f);
         }
         return out;
+    }
+
+    // ---- favoris : étoile en bout de ligne (vide / pleine jaune), bouton Favorites dans les filtres
+    StringArray favs = OctoSettings::favourites();
+    static Rectangle<float> starRect (Rectangle<float> item) { return item.withTrimmedLeft (item.getWidth() - 34.0f).reduced (4.0f, 2.0f); }
+    void toggleFavourite (const InstalledFx& f)
+    {
+        favs = OctoSettings::favourites();                 // une autre fenêtre d'Octopus a pu les changer
+        if (favs.contains (f.name)) { favs.removeString (f.name); eng.say (FxCat::shortName (f.name) + " removed from favorites"); }
+        else { favs.add (f.name); eng.say (FxCat::shortName (f.name) + " added to favorites"); }
+        OctoSettings::setFavourites (favs);
+        if (chip == kChipFavourites) listScroll = jlimit (0, jmax (0, (filtered().size() + kListRows - 1) / kListRows - 2), listScroll);
+        askRepaint (screenPx());
+    }
+    static Path starPath (Rectangle<float> r)
+    {
+        Path p;
+        const auto c = r.getCentre();
+        const float ro = jmin (r.getWidth(), r.getHeight()) * 0.5f, ri = ro * 0.45f;
+        for (int k = 0; k < 10; ++k)
+        {
+            const float a = MathConstants<float>::pi * (-0.5f + (float) k / 5.0f), rr = (k % 2 == 0) ? ro : ri;
+            const Point<float> q (c.x + rr * std::cos (a), c.y + rr * std::sin (a) + ro * 0.06f);
+            if (k == 0) p.startNewSubPath (q); else p.lineTo (q);
+        }
+        p.closeSubPath();
+        return p;
     }
 
     static constexpr int kListRows = 12;
@@ -1131,7 +1161,9 @@ private:
         {
             g.setFont (font (tfMedium, 18.0f));
             g.setColour (kDim);
-            g.drawText (eng.installedList().isEmpty() ? "REAPER did not give its plug-in list (REAPER 7 needed)" : "No plug-in found",
+            g.drawText (eng.installedList().isEmpty() ? "REAPER did not give its plug-in list (REAPER 7 needed)"
+                        : chip == kChipFavourites && favs.isEmpty() ? CharPointer_UTF8 ("No favorite yet : click the \xe2\x98\x86 at the end of a plug-in line")
+                        : CharPointer_UTF8 ("No plug-in found"),
                         S (Rectangle<float> (16.0f, 230.0f, 1032.0f, 40.0f)), Justification::centred);
             return;
         }
@@ -1149,7 +1181,7 @@ private:
             {
                 g.setColour (kAccent);
                 g.drawRoundedRectangle (ir.reduced (S (0.6f)), S (6.0f), S (1.4f));
-                const auto badge = Rectangle<float> (S (24.0f), S (24.0f)).withCentre ({ ir.getRight() - S (186.0f), ir.getCentreY() });
+                const auto badge = Rectangle<float> (S (24.0f), S (24.0f)).withCentre ({ ir.getRight() - S (216.0f), ir.getCentreY() });
                 g.fillEllipse (badge);
                 g.setFont (font (tfBold, 14.0f));
                 g.setColour (kScrBg);
@@ -1161,12 +1193,24 @@ private:
             FxCat::drawIcon (g, kind, Rectangle<float> (S (22.0f), S (22.0f)).withCentre ({ ir.getX() + S (24.0f), ir.getCentreY() }), FxCat::colour (kind).brighter (0.3f), S (1.8f));
             g.setFont (font (tfMedium, 17.0f));
             g.setColour (kText);
-            g.drawText (FxCat::shortName (f.name), ir.withTrimmedLeft (S (44.0f)).withTrimmedRight (S (204.0f)), Justification::centredLeft, true);
+            g.drawText (FxCat::shortName (f.name), ir.withTrimmedLeft (S (44.0f)).withTrimmedRight (S (234.0f)), Justification::centredLeft, true);
             g.setFont (font (tfRegular, 13.5f));
             g.setColour (kDim);
             const auto vend = FxCat::vendor (f.name);
-            g.drawText (FxCat::typeOf (f.name) + (vend.isNotEmpty() ? "  " + vend : String()), ir.withTrimmedRight (S (10.0f)).removeFromRight (S (166.0f)),
+            g.drawText (FxCat::typeOf (f.name) + (vend.isNotEmpty() ? "  " + vend : String()), ir.withTrimmedRight (S (40.0f)).removeFromRight (S (166.0f)),
                         Justification::centredRight, true);
+            // étoile des favoris : pleine jaune ou vide
+            const auto star = starPath (S (starRect (itemRect (v)).withSizeKeepingCentre (17.0f, 17.0f)));   // étoile discrète
+            if (favs.contains (f.name))
+            {
+                g.setColour (Colour (0xffffd23f));
+                g.fillPath (star);
+            }
+            else
+            {
+                g.setColour (kDim.withAlpha (0.8f));
+                g.strokePath (star, PathStrokeType (S (1.2f), PathStrokeType::curved));
+            }
         }
         const int pages = (items.size() + kListRows - 1) / kListRows;
         if (pages > 2)
@@ -2091,6 +2135,7 @@ private:
                     const int i = listScroll * kListRows + v;
                     if (i >= items.size()) return;
                     const auto& fx = items.getReference (i);
+                    if (starRect (itemRect (v)).expanded (3.0f).contains (p)) { toggleFavourite (fx); return; }
                     if (e.getNumberOfClicks() >= 2) { if (pickedIndex (fx) < 0) picked.add (fx); addPicked(); }
                     else togglePick (fx);
                     return;
@@ -2431,6 +2476,15 @@ private:
         m.addSeparator();
         for (int k = 0; k < 4; ++k) assign.addItem (10 + k, "Footswitch " + fsLetter (k), true, eng.isAssigned (k, f.guid));
         m.addSubMenu ("Assign to footswitch (STOMP)", assign);
+        {
+            bool inv = false;
+            const bool hasPedal = eng.pedalBypassParam (i, inv) >= 0;
+            const bool pedal = eng.usesPedalBypass (i);
+            PopupMenu bm;
+            bm.addItem (30, hasPedal ? "Pedal bypass (delay / reverb trails go on)" : "Pedal bypass (not available for this plug-in)", hasPedal, pedal);
+            bm.addItem (31, "REAPER bypass (plug-in stops, saves CPU)", true, ! pedal);
+            m.addSubMenu ("Bypass mode", bm);
+        }
         m.addItem (4, "Process in parallel with previous", slot > 0, f.parallel > 0);
         m.addSeparator();
         moveM.addItem (20, "Move left", slot > 0);
@@ -2465,6 +2519,8 @@ private:
                 case 21: e.moveBlock (idx, b + 1); break;
                 case 22: e.moveBlock (idx, 0); break;
                 case 23: e.moveBlock (idx, n - 1); break;
+                case 30: e.setBypassPref (e.chain().getReference (idx).original, OctopusEngine::bypassPedal); break;
+                case 31: e.setBypassPref (e.chain().getReference (idx).original, OctopusEngine::bypassReaper); break;
                 default: if (r >= 10 && r < 14) e.toggleAssign (r - 10, guid); break;
             }
             juce::ignoreUnused (slot);
@@ -2767,6 +2823,12 @@ void OctopusEditor::showScreen (int which, int arg)
 
 void OctopusEditor::screenSearch (const String& t, int chip) { view->setChip (chip); view->setSearch (t); }
 void OctopusEditor::screenPick (int visibleIndex) { view->pickVisible (visibleIndex); }
+void OctopusEditor::screenFavourite (int visibleIndex)
+{
+    const auto items = view->filtered();
+    const int i = view->listScroll * PedalView::kListRows + visibleIndex;
+    if (isPositiveAndBelow (i, items.size())) view->toggleFavourite (items.getReference (i));
+}
 
 void OctopusEditor::screenParamsMidi() { view->toggleMidiView(); }
 
