@@ -99,7 +99,7 @@ namespace FxCat
         if (has ({ "verb", "hall", "plate", "shimmer", "room", "space", "ambien" }))                         return reverb;
         if (has ({ "chorus", "flang", "phase", "phaser", "vibrato", "tremolo", "rotary", "leslie", "small tone",
                   "wack", "pipeline", "vibe", "ensemble", "modul", "doubler" }) || word ({ "trem", "uni" }))  return mod;
-        if (has ({ "drive", "distort", "fuzz", "screamer", "doorn", "peachy", "thorn", "saturat", "crush",
+        if (has ({ "drive", "distort", "fuzz", "screamer", "doorn", "peachy", "thorn", "saturat", "crush", "pickle",
                   "klon", "muff", "boost", "tube", "overdrive", "exciter" }) || word ({ "od", "rat", "dist", "sat" })) return drive;
         if (has ({ "compress", "gate", "limit", "expander", "transient", "dynamic", "reacomp", "squeez", "sustain" })
             || word ({ "comp", "ngate" }))                                                                   return dynamics;
@@ -150,7 +150,7 @@ namespace FxCat
                 g.fillEllipse (b.withSizeKeepingCentre (w * 0.14f, w * 0.14f));
                 return;
             }
-            case drive:     // onde écrêtée
+            case drive:     // onde écrêtée (symbole fuzz / distorsion : Doorn, Peachy, Strong Pickle...)
             {
                 p.startNewSubPath (r.getX() + w * 0.08f, cy);
                 p.lineTo (r.getX() + w * 0.2f, cy - h * 0.26f); p.lineTo (r.getX() + w * 0.42f, cy - h * 0.26f);
