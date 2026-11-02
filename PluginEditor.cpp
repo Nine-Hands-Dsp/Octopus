@@ -1908,8 +1908,9 @@ private:
         const float rowH = jmin (68.0f, area / n);
         const float y0 = top + (area - rowH * n) * 0.5f;
         const float x0 = 166.0f, x1 = 800.0f;
-        const int segs = 25, mid = 12;
-        const float pitch = (x1 - x0) / segs, segW = pitch * 0.62f;
+        // résolution doublée : 49 graduations de 2 cents (au lieu de 25 de 4 cents), traits plus fins
+        const int segs = 49, mid = 24;
+        const float pitch = (x1 - x0) / segs, segW = pitch * 0.52f;
         g.setColour (TC::green().withAlpha (0.13f));
         for (float y = y0; y < y0 + rowH * n; y += 9.0f) g.fillRect (x0 + pitch * (mid + 0.5f) - 0.75f, y, 1.5f, 4.0f);
         for (int row = 0; row < n; ++row)
@@ -1923,11 +1924,11 @@ private:
             g.setFont (mono (jmin (46.0f, rowH * 0.72f)));
             g.setColour ((inTune ? TC::green() : TC::amber()).withAlpha (alpha));
             g.drawText (String (tuna::noteName (st.midi)), Rectangle<float> (28, cy - rowH * 0.5f, 132, rowH), Justification::centredLeft);
-            const int lit = st.measured ? jlimit (0, segs - 1, mid + (int) std::lround (st.cents / 4.0f)) : -1;
+            const int lit = st.measured ? jlimit (0, segs - 1, mid + (int) std::lround (st.cents / 2.0f)) : -1;
             const float h = rowH * 0.50f;
             for (int k = 0; k < segs; ++k)
             {
-                const float hh = (k == mid ? rowH * 0.66f : h);
+                const float hh = (k == mid ? rowH * 0.66f : ((k - mid) % 5 == 0 ? h * 1.18f : h));   // repère tous les 10 cents
                 Rectangle<float> r (x0 + pitch * k + (pitch - segW) * 0.5f, cy - hh * 0.5f, segW, hh);
                 if (k == lit) segment (g, r, (inTune ? TC::green() : TC::amber()).withAlpha (alpha), true);
                 else if (lit >= 0 && ((k > mid && k < lit) || (k < mid && k > lit))) segment (g, r, TC::amber().withAlpha (0.30f * alpha), false);
@@ -1964,16 +1965,17 @@ private:
         g.setFont (small);
         if (acc.isNotEmpty()) g.drawText (acc, Rectangle<float> (x + wL + 6, 128, wA + 6, 90), Justification::centredLeft);
         g.drawText (oct, Rectangle<float> (x + wL + 6, 240, wO + 6, 90), Justification::centredLeft);
-        const int segs = 41, mid = 20;
-        const float x0 = 64.0f, x1 = kTW - 64.0f, pitch = (x1 - x0) / segs, segW = pitch * 0.6f;
+        // résolution doublée : 81 graduations de 1,25 cent (au lieu de 41 de 2,5 cents), traits et aiguille plus fins
+        const int segs = 81, mid = 40;
+        const float x0 = 64.0f, x1 = kTW - 64.0f, pitch = (x1 - x0) / segs, segW = pitch * 0.5f;
         const float cy = 392.0f;
         for (int k = 0; k < segs; ++k)
         {
             if (k == mid) continue;
-            const float hh = (k - mid) % 4 == 0 ? 52.0f : 36.0f;
+            const float hh = (k - mid) % 8 == 0 ? 56.0f : ((k - mid) % 4 == 0 ? 44.0f : 32.0f);   // repères tous les 10 et 5 cents
             segment (g, Rectangle<float> (x0 + pitch * k + (pitch - segW) * 0.5f, cy - hh * 0.5f, segW, hh), TC::amberDim(), false);
         }
-        const float markW = segW * 1.1f, markH = 118.0f, curW = segW * 0.8f, curH = 88.0f;
+        const float markW = segW * 1.3f, markH = 118.0f, curW = segW * 1.0f, curH = 92.0f;
         const float centreX = x0 + pitch * (mid + 0.5f);
         const Rectangle<float> centre (centreX - markW * 0.5f, cy - markH * 0.5f, markW, markH);
         if (inTune) segment (g, centre, TC::green().withAlpha (alpha), true);
@@ -1983,7 +1985,7 @@ private:
             g.setColour (Colours::white.withAlpha (has ? 0.95f : 0.55f)); g.fillRoundedRectangle (centre, 2.5f);
             if (has)
             {
-                const float cx = centreX + jlimit (-50.0f, 50.0f, c) / 2.5f * pitch;
+                const float cx = centreX + jlimit (-50.0f, 50.0f, c) / 1.25f * pitch;
                 segment (g, Rectangle<float> (cx - curW * 0.5f, cy - curH * 0.5f, curW, curH), TC::amber().withAlpha (alpha), true);
             }
         }
@@ -2027,7 +2029,8 @@ private:
         {
             Graphics::ScopedSaveState ss (g);
             g.reduceClipRegion (area.toNearestInt());
-            const float bandH[3] = { 86.0f, 66.0f, 50.0f }, period[3] = { 96.0f, 48.0f, 24.0f };
+            // résolution doublée : bandes deux fois plus fines
+            const float bandH[3] = { 86.0f, 66.0f, 50.0f }, period[3] = { 48.0f, 24.0f, 12.0f };
             float y = area.getY() + 10.0f;
             for (int b = 0; b < 3; ++b)
             {
@@ -2042,9 +2045,9 @@ private:
                 y += bandH[b] + 9.0f;
             }
             g.setColour (Colours::black.withAlpha (0.55f));
-            g.fillRect (area.getCentreX() - 2.0f, area.getY(), 4.0f, area.getHeight());
+            g.fillRect (area.getCentreX() - 1.25f, area.getY(), 2.5f, area.getHeight());
             g.setColour (Colours::white.withAlpha (0.35f));
-            g.fillRect (area.getCentreX() - 0.75f, area.getY(), 1.5f, area.getHeight());
+            g.fillRect (area.getCentreX() - 0.5f, area.getY(), 1.0f, area.getHeight());
         }
         g.setFont (mono (26.0f));
         g.setColour (TC::grey().withAlpha (0.7f));

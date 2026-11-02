@@ -114,3 +114,4 @@ v1.3.8 : lettres A-D centrées entre l'écran et les footswitchs.
 v1.3.9 : lettres A-D alignées sur le centre de leur footswitch.
 v1.4.0 : couleur propre à chaque preset (clic sur l'étiquette en haut à gauche) ; en-tête PRESET, STOMP, SAVE, BANKS ; aluminium plus sombre ; cadre de l'écran redessiné, régulier tout autour (plus de grain à droite).
 v1.5.0 : plugins favoris dans la fenêtre d'ajout (bouton Favorites, petite étoile vide / jaune en bout de ligne, liste commune à tous les projets) ; bypass de la pédale (son propre interrupteur : les queues de delay / reverb continuent) quand le plugin en a un, sinon bypass de REAPER, au choix par plugin (clic droit > Bypass mode) ; rappel de preset sans rechargement avec le bypass de la pédale.
+v1.5.1 : accordeur CHROMA en résolution doublée : graduations et aiguille plus fines (MONO 1,25 cent, POLY 2 cents, STROBE bandes deux fois plus fines).
