@@ -17,6 +17,8 @@ struct FakeFx
     bool enabled = true, offline = false, open = false;
     int parallel = 0;
     std::vector<double> params { 0.5, 0.5, 0.5 };
+    juce::StringArray paramNames;             // noms réels des paramètres (sinon « Param n »)
+    std::vector<int> paramStepCount;          // 2 = interrupteur, 0 = continu (si paramNames est rempli)
     const double* token = nullptr;            // != nullptr : c'est un Octopus (paramètre 0 = jeton)
     int serial = 0;                           // identité de l'instance (pour vérifier qu'elle n'est pas recréée)
     int presetIdx = -1;                       // preset affiché par REAPER (-1 = réglages modifiés)
@@ -133,7 +135,8 @@ namespace api
     bool TrackFX_GetParamName (void* t, int fx, int p, char* b, int sz)
     {
         auto* f = fxAt (t, fx); if (! f) return false;
-        copyOut (f->token ? (p == 0 ? String ("Octopus ID") : "Footswitch " + String (p)) : "Param " + String (p), b, sz);
+        copyOut (f->token ? (p == 0 ? String ("Octopus ID") : "Footswitch " + String (p))
+                          : (p < f->paramNames.size() ? f->paramNames[p] : "Param " + String (p)), b, sz);
         return true;
     }
     bool TrackFX_GetFormattedParamValue (void* t, int fx, int p, char* b, int sz)
@@ -227,9 +230,14 @@ namespace api
     }
     void TrackFX_GetUserPresetFilename (void*, int, char* b, int sz) { copyOut (gUserIni.getFullPathName(), b, sz); }
     // paramètre 1 : 4 positions (0..3 par pas de 1) ; paramètre 2 : interrupteur ; paramètre 0 : continu
-    bool TrackFX_GetParameterStepSizes (void*, int, int p, double* st, double* sm, double* lg, bool* tog)
+    bool TrackFX_GetParameterStepSizes (void* t, int fx, int p, double* st, double* sm, double* lg, bool* tog)
     {
         *st = *sm = *lg = 0.0; *tog = false;
+        if (auto* f = fxAt (t, fx); f != nullptr && f->paramNames.size() > 0)
+        {
+            if (p < (int) f->paramStepCount.size() && f->paramStepCount[(size_t) p] == 2) { *tog = true; return true; }
+            return false;
+        }
         if (p == 1) { *st = 1.0; return true; }
         if (p == 2) { *tog = true; return true; }
         return false;
@@ -473,6 +481,39 @@ int main()
         const bool set = bridge.setFxState (hb, key, data);
         check (got && set && key == "vst_chunk" && std::abs (holy.params[0] - 0.12) < 1e-9 && std::abs (holy.params[2] - 0.56) < 1e-9 && holy.presetIdx == -1,
                "preset utilisateur d'Octopus : état du plugin lu (" + key + ") puis rétabli");
+    }
+
+    // ---- Eight Echo en STOMP : le footswitch coupe la pédale avec son propre interrupteur « Effect On »
+    //      (les répétitions continuent grâce au Carryover), jamais avec le bypass de REAPER (queue coupée net)
+    {
+        tr.fx.clear(); tr.rec.clear();
+        auto o = makeFx ("VST3: Octopus (Studio Wiga)"); o.token = &token; tr.fx.push_back (o);
+        auto ee = makeFx ("VST3: Eight Echo (Studio Wiga)");
+        // liste réelle vue par l'hôte (Eight Echo 1.8.3), puis les paramètres ajoutés par REAPER
+        ee.paramNames = { "E.Level", "Mix", "Feedback", "Time", "Mode", "Effect On", "Footswitch (hold)", "Tap / Loop Stop",
+                          "Twist / Loop Clear", "Carryover", "Stereo Mode", "Tap Division", "Long Delay (x2)", "Direct Mute",
+                          "Host Sync", "Expression", "Exp > E.Level", "Exp > Feedback", "Exp > Time", "Bypass", "Program",
+                          "Bypass", "Wet", "Delta" };
+        ee.paramStepCount = { 0, 0, 0, 0, 11, 2, 2, 2, 2, 2, 3, 7, 2, 2, 2, 0, 2, 2, 2, 2, 26, 2, 0, 2 };
+        ee.params.assign ((size_t) ee.paramNames.size(), 0.0);
+        ee.params[5] = 1.0; ee.params[9] = 1.0;                    // Effect On, Carryover
+        tr.fx.push_back (ee);
+        auto hv = makeFx ("VST3: Holyverb (Studio Wiga)"); tr.fx.push_back (hv);   // reverb ajoutée après le delay
+        eng.refreshNow();
+        const int eb = eng.blocks()[0];
+        bool inv = true;
+        check (eng.pedalBypassParam (eb, inv) == 5 && ! inv && eng.usesPedalBypass (eb), "Eight Echo : interrupteur de la pédale trouvé (Effect On)");
+        eng.setMode (OctopusEngine::stompMode);
+        eng.toggleAssign (0, tr.fx[1].guid);
+        eng.press (0);
+        check (tr.fx[1].enabled && tr.fx[1].params[5] < 0.5, "STOMP A : Eight Echo coupé par son interrupteur (REAPER le laisse tourner : la queue continue)");
+        eng.refreshNow();
+        check (! eng.fsLit (0), "STOMP A éteint à l'écran");
+        eng.press (0);
+        check (tr.fx[1].enabled && tr.fx[1].params[5] > 0.5, "STOMP A : Eight Echo rallumé");
+        eng.refreshNow();
+        check (eng.fsLit (0), "STOMP A allumé à l'écran");
+        eng.setMode (OctopusEngine::presetMode);
     }
 
     // la piste disparaît (supprimée) : plus prêt, pas de plantage
