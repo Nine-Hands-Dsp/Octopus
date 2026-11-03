@@ -14,7 +14,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHOTS, OUT = sys.argv[1], sys.argv[2]
-VERSION = "1.8.0"
+VERSION = "1.8.1"
 TMP = os.path.join(os.path.dirname(os.path.abspath(OUT)), "midi_guide_tmp"); os.makedirs(TMP, exist_ok=True)
 for n, f in (("Pop", "Poppins-Regular"), ("PopM", "Poppins-Medium"), ("PopB", "Poppins-Bold")):
     pdfmetrics.registerFont(TTFont(n, os.path.join(ROOT, "fonts", f + ".ttf")))
@@ -105,11 +105,11 @@ T = {
  t5="5. Double presses: E (A+B), B+C, F (C+D)",
  comb_cap="The three double presses printed on the pedal: 1 E = A+B (footswitch E: preset 1E... or its blocks), 2 B+C = tuner symbol (built-in tuner), 3 F = C+D (footswitch F).",
  s5=["Press two <b>neighbouring</b> switches together (less than 0.25 s apart): Octopus runs the action of the pair instead of the two footswitches.",
-     "<b>Right-click the B+C marking</b> to choose its action: <i>Tuner (CHROMA)</i>, <i>Bank down</i>, <i>Bank up</i>, <i>PRESET / STOMP mode</i>, <i>Send a MIDI CC</i> (CC 0-127) or <i>Nothing</i>. <i>Test now</i> runs it at once.",
+     "<b>Right-click the B+C marking</b> to choose its action: <i>Tuner (CHROMA)</i>, <i>Bank down</i>, <i>Bank up</i>, <i>PRESET / STOMP mode</i>, <i>Send a MIDI CC</i> (CC 0-127) or <i>Nothing</i>. <i>Color &amp; Glow...</i> sets the colour and halo of the tuner symbol.",
      "<b>E</b> (A+B) and <b>F</b> (C+D) are two more footswitches, exactly like A-D (same right-click menu): in PRESET mode they recall presets E and F of the bank, in STOMP mode they switch their blocks; B+C opens the tuner (tuner symbol, lit green while tuning). Hover the marking to see its action on the status line.",
      "<b>Nothing to learn for E, F and B+C</b>: E is the CC of A and the CC of B received together, F those of C and D, B+C those of B and C. Learn A, B, C and D (step 4) and the double presses work at once; the E / F and B+C menus show the CCs used. Learning <i>Tuner on / off</i> with the CC of a footswitch is refused, so that footswitch keeps its CC.",
      "A <i>Send a MIDI CC</i> pair sends the CC with value 127 then 0, on channel 1, to the effects after Octopus. To use it in a plug-in: in REAPER, open the plug-in, click its parameter, <b>Param &gt; Learn</b>, then press the pair (or click the marking).",
-     "With the mouse: click the marking (or Shift + click a footswitch). A footswitch that belongs to an active pair waits 0.25 s for its neighbour; the others act at once. Set a pair to <i>Nothing</i> to remove that short wait."],
+     "With the mouse: click the marking (or Shift + click a footswitch). Every footswitch acts at once, without waiting: if its neighbour follows within 0.25 s, the first press is undone and the pair acts instead."],
  tun_cap="B+C: Octopus becomes the tuner (CHROMA screen and engine), without a CHROMA plug-in in the chain.",
  t6="6. Check and solve",
  s6=["<b>Check what the pedal sends</b>: arm a track with the pedal as input, record a few seconds while pressing the switches, open the MIDI item and choose <b>View &gt; Mode: Event List</b>. A double press must show the two CCs at the same time (a few milliseconds apart).",
@@ -150,11 +150,11 @@ T = {
  t5="5. Doubles appuis : E (A+B), B+C, F (C+D)",
  comb_cap="Les trois doubles appuis sérigraphiés sur la pédale : 1 E = A+B (footswitch E : preset 1E... ou ses blocs), 2 B+C = symbole de l'accordeur (accordeur intégré), 3 F = C+D (footswitch F).",
  s5=["Appuyez sur deux commutateurs <b>voisins</b> ensemble (à moins de 0,25 s d'écart) : Octopus exécute l'action de la paire au lieu des deux footswitchs.",
-     "<b>Clic droit sur le marquage B+C</b> pour choisir son action : <i>Tuner (CHROMA)</i>, <i>Bank down</i>, <i>Bank up</i>, <i>PRESET / STOMP mode</i>, <i>Send a MIDI CC</i> (CC 0-127) ou <i>Nothing</i>. <i>Test now</i> l'exécute tout de suite.",
+     "<b>Clic droit sur le marquage B+C</b> pour choisir son action : <i>Tuner (CHROMA)</i>, <i>Bank down</i>, <i>Bank up</i>, <i>PRESET / STOMP mode</i>, <i>Send a MIDI CC</i> (CC 0-127) ou <i>Nothing</i>. <i>Color &amp; Glow...</i> règle la couleur et le halo du symbole de l'accordeur.",
      "<b>E</b> (A+B) et <b>F</b> (C+D) sont deux footswitchs de plus, exactement comme A-D (même menu au clic droit) : en mode PRESET ils rappellent les presets E et F de la bank, en mode STOMP ils basculent leurs blocs ; B+C ouvre l'accordeur (symbole de l'accordeur, allumé en vert pendant l'accordage). Survolez le marquage pour voir son action sur la ligne d'état.",
      "<b>Rien à apprendre pour E, F et B+C</b> : E correspond au CC de A et au CC de B reçus ensemble, F à ceux de C et D, B+C à ceux de B et C. Apprenez A, B, C et D (étape 4) et les doubles appuis fonctionnent tout de suite ; les menus de E / F et de B+C affichent les CC utilisés. Apprendre <i>Tuner on / off</i> avec le CC d'un footswitch est refusé : ce footswitch garde son CC.",
      "Une paire réglée sur <i>Send a MIDI CC</i> envoie le CC en 127 puis 0, canal 1, aux effets placés après Octopus. Pour l'utiliser dans un plugin : dans REAPER, ouvrez le plugin, cliquez sur son paramètre, <b>Param &gt; Learn</b>, puis faites le double appui (ou cliquez sur le marquage).",
-     "À la souris : clic sur le marquage (ou Maj + clic sur un footswitch). Un footswitch qui fait partie d'une paire active attend 0,25 s son voisin ; les autres agissent tout de suite. Réglez une paire sur <i>Nothing</i> pour supprimer ce court délai."],
+     "À la souris : clic sur le marquage (ou Maj + clic sur un footswitch). Chaque footswitch agit tout de suite, sans attente : si son voisin suit dans les 0,25 s, le premier appui est annulé et c'est la paire qui agit."],
  tun_cap="B+C : Octopus devient l'accordeur (écran et moteur de CHROMA), sans plugin CHROMA dans la chaîne.",
  t6="6. Vérifier et dépanner",
  s6=["<b>Voir ce qu'envoie le pédalier</b> : armez une piste avec le pédalier en entrée, enregistrez quelques secondes en appuyant sur les commutateurs, ouvrez l'item MIDI et choisissez <b>View &gt; Mode: Event List</b>. Un double appui doit montrer les deux CC au même instant (quelques millisecondes d'écart).",

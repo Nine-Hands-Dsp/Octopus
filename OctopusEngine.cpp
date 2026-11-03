@@ -52,12 +52,7 @@ void OctopusEngine::tick()
 {
     // relecture de la chaîne ~7 fois par seconde : ce que l'utilisateur fait directement dans REAPER apparaît aussi
     if (++tickCount % 4 == 0) refreshNow();
-    if (pendingFs >= 0 && juce::Time::getMillisecondCounterHiRes() - pendingAt >= kComboMs)
-    {
-        const int f = pendingFs;                          // pas de deuxième footswitch : action normale
-        pendingFs = -1;
-        press (f);
-    }
+    if (pendingFs >= 0 && juce::Time::getMillisecondCounterHiRes() - pendingAt >= kComboMs) pendingFs = -1;   // plus de double appui possible
     if (! msg.isEmpty() && juce::Time::getMillisecondCounterHiRes() >= msgUntil) { msg = {}; ++gen; }
 }
 
@@ -408,7 +403,8 @@ void OctopusEngine::triggerCombo (int k)
     }
 }
 
-// appui sur un footswitch : s'il fait partie d'un double appui actif, il attend kComboMs le footswitch voisin
+// appui sur un footswitch : il agit tout de suite (aucune attente) ; si son voisin arrive dans les kComboMs,
+// le premier appui est annulé et c'est l'action du double appui qui est faite (E, F, accordeur...)
 void OctopusEngine::pressFs (int f)
 {
     if (! juce::isPositiveAndBelow (f, 4)) return;          // footswitchs physiques A-D (E / F : leurs doubles appuis)
@@ -418,14 +414,40 @@ void OctopusEngine::pressFs (int f)
         const int k = juce::jmin (pendingFs, f);
         if (comboAction (k) != comboNone)
         {
-            pendingFs = -1;                               // double appui : ni l'un ni l'autre, l'action du combo
+            pendingFs = -1;
+            revertProvisional (k);
             triggerCombo (k);
             return;
         }
     }
-    if (pendingFs >= 0 && pendingFs != f) { const int p = pendingFs; pendingFs = -1; press (p); }
-    if (! inCombo (f)) { press (f); return; }             // pas de double appui possible : action immédiate
-    pendingFs = f; pendingAt = now;
+    // mémorise ce qu'il faudrait défaire si ce premier appui devient un double appui
+    provPrevCur = cur;
+    provRestorable = cur >= 0 && ! modified() && presets[(size_t) cur].saved;
+    provStates.clear();
+    if (md == stompMode)
+        for (auto& g : stompGuids[f])
+            for (auto& x : fx) if (x.guid == g) provStates.push_back ({ g, x.enabled });
+    press (f);
+    pendingFs = inCombo (f) ? f : -1;
+    pendingAt = now;
+}
+
+void OctopusEngine::revertProvisional (int comboK)
+{
+    if (md == stompMode)
+    {
+        if (provStates.empty()) return;
+        host.beginUndo();
+        for (auto& [g, on] : provStates)
+            for (int i = 0; i < fx.size(); ++i)
+                if (fx.getReference (i).guid == g && fx.getReference (i).enabled != on) setOn (i, on);
+        host.endUndo ("double press");
+        refreshNow();
+        return;
+    }
+    // PRESET : E / F chargent leur propre preset juste après ; pour les autres actions, le preset d'avant revient
+    if (keyOfCombo (comboK) >= 0) return;
+    if (provRestorable && provPrevCur >= 0 && provPrevCur != cur) load (provPrevCur);
 }
 
 void OctopusEngine::toggleTuner()

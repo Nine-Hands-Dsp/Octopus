@@ -380,8 +380,7 @@ public:
             m.addItem (390, "MIDI : B + C pressed together (" + ccTxt (eng.ccOf (1)) + " + " + ccTxt (eng.ccOf (2)) + ")", false);
         }
         m.addSeparator();
-        m.addItem (310, "Tuner symbol colour and glow...");
-        m.addItem (300, "Test now", a != OctopusEngine::comboNone);
+        m.addItem (310, "Color & Glow...");
         SafePointer<PedalView> sp (this);
         m.showMenuAsync (PopupMenu::Options(), [sp, k, key] (int r)
         {
@@ -2295,6 +2294,11 @@ private:
             return;
         }
 
+        // lettres A-D au-dessus des footswitchs : clic droit = menu de leur footswitch (Color & Glow...)
+        if (e.mods.isPopupMenu())
+            for (int lf = 0; lf < 4; ++lf)
+                if (Rectangle<float> (40.0f, 40.0f).withCentre (ledPos (lf)).contains (unit)) { footswitchMenu (lf); return; }
+
         // footswitchs
         const int f = fsAt (unit);
         if (f >= 0)
@@ -2306,7 +2310,7 @@ private:
                 const int k = (f < 3 && eng.comboAction (f) != OctopusEngine::comboNone) ? f : f - 1;
                 if (k >= 0 && eng.comboAction (k) != OctopusEngine::comboNone) eng.triggerCombo (k);
             }
-            else eng.pressFs (f);                          // comme Echoflex : action dès l'appui (B et C : après 0,25 s, pour B+C)
+            else eng.pressFs (f);                          // comme Echoflex : action dès l'appui (double appui : le premier est annulé)
             askRepaint (r (Rectangle<float> (L::fsSprite, L::fsSprite).withCentre ({ L::fsX[f], L::fsY })).toNearestInt());
             askRepaint (screenPx());
             return;
@@ -2633,10 +2637,10 @@ private:
     }
 
     // couleur d'un footswitch (lettre lumineuse et case de l'écran, en mode PRESET)
-    void colourMenu (int f)
+    void colourMenu (int f, Rectangle<float> near = {})
     {
         openPicker ("Footswitch " + fsLetter (f) + " colour", Colour (eng.fsColour (f)),
-                    S (colourBtnRect (f)), true,
+                    near.isEmpty() ? S (colourBtnRect (f)) : near, true,
                     [this, f] (Colour c) { eng.setFsColour (f, c.getARGB()); },
                     [this, f] { eng.setFsColour (f, OctopusEngine::kDefaultFsColour); });
     }
@@ -2800,18 +2804,27 @@ private:
                               + ccTxt (eng.ccOf (f0)) + " + " + ccTxt (eng.ccOf (f0 + 1)) + ")", false);
         }
         midiSubmenu (m);
-        addSizeMenu (m);
+        m.addSeparator();
+        m.addItem (395, "Color & Glow...");                // couleur du footswitch et opacité du halo (pas de taille du plugin ici)
+        const auto near = fsMenuNear (f);
         SafePointer<PedalView> sp (this);
-        m.showMenuAsync (PopupMenu::Options(), [sp, f, idx] (int r)
+        m.showMenuAsync (PopupMenu::Options(), [sp, f, idx, near] (int r)
         {
             if (sp == nullptr || r <= 0) return;
             auto& e = sp->eng;
+            if (r == 395) { sp->colourMenu (f, near); return; }
             if (r == 1) sp->confirmSave (idx);
             else if (r == 2) e.load (idx);
             else if (r == 3) e.clearAssign (f);
             else if (r >= 100 && r < 100 + e.blocks().size()) e.toggleAssign (f, e.chain().getReference (e.blocks()[r - 100]).guid);
-            else if (! sp->handleMidi (r)) sp->handleSize (r);
+            else sp->handleMidi (r);
         });
+    }
+    // où ouvrir le nuancier d'un footswitch : près de son footswitch (A-D), de son marquage (E / F)
+    Rectangle<float> fsMenuNear (int f) const
+    {
+        if (f >= 4) return r (comboRect (f == 4 ? 0 : 2));
+        return r (Rectangle<float> (L::fsSprite, L::fsSprite).withCentre ({ L::fsX[f], L::fsY }));
     }
 
     void midiSubmenu (PopupMenu& m)

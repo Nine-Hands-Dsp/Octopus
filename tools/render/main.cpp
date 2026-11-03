@@ -77,15 +77,14 @@ int main (int argc, char** argv)
     check (e.ccOf (OctopusEngine::fsB) == 80, "MIDI learn footswitch B = CC 80");
     e.midiCc (1, 80, 0);
     e.midiCc (1, 80, 127);
-    check (e.current() != 1, "B attend 0,25 s (pour reconnaître B+C)");
+    check (e.current() == 1, "CC 80 (momentané) -> preset 1B tout de suite, sans attente");
     Thread::sleep (270); e.tick();
-    check (e.current() == 1, "CC 80 (momentané) -> preset 1B");
     e.midiProgram (1, 0);
     check (e.current() == 0, "Program Change 1 -> preset 1A");
     e.paramInput (OctopusEngine::fsC, 0.0f);
     e.paramInput (OctopusEngine::fsC, 1.0f);
+    check (e.current() == 2, "paramètre fsC -> preset 1C tout de suite");
     Thread::sleep (270); e.tick();
-    check (e.current() == 2, "paramètre fsC -> preset 1C");
 
     // bypass de la pédale (son propre interrupteur) ou de REAPER
     {
@@ -307,6 +306,18 @@ int main (int argc, char** argv)
         e.pressFs (2); e.pressFs (1);
         pump (5);
         check (! proc.chroma().on, "B+C de nouveau : retour à la chaîne");
+        {
+            Thread::sleep (270); e.tick();
+            const int c0 = e.current();
+            e.pressFs (1);
+            check (e.current() == e.bank() * OctopusEngine::kSlots + 1 || c0 == e.bank() * OctopusEngine::kSlots + 1, "B seul en PRESET : 1B tout de suite");
+            e.pressFs (2);
+            pump (5);
+            check (proc.chroma().on && e.current() == c0, "B+C en PRESET : accordeur, et le preset d'avant revient");
+            e.pressFs (1); e.pressFs (2);
+            pump (5);
+            Thread::sleep (270); e.tick();
+        }
 
         // E (A+B) et F (C+D) : footswitchs comme A-D (presets 1E / 1F en mode PRESET, effets en STOMP)
         {
@@ -345,9 +356,17 @@ int main (int argc, char** argv)
             e.clearAssign (4); e.clearAssign (5);
             e.toggleAssign (4, g5); e.toggleAssign (4, g6);
             const bool was = e.chain().getReference (e.blocks()[e.blockOf (g5)]).enabled;
-            e.pressFs (0); e.pressFs (1);
+            e.clearAssign (0);
+            const auto gA = e.chain().getReference (e.blocks()[2]).guid;
+            e.toggleAssign (0, gA);
+            const bool wasA = e.chain().getReference (e.blocks()[e.blockOf (gA)]).enabled;
+            Thread::sleep (270); e.tick();
+            e.pressFs (0);
+            check (e.chain().getReference (e.blocks()[e.blockOf (gA)]).enabled != wasA, "A seul en STOMP : agit tout de suite");
+            e.pressFs (1);
             pump (3);
             check (e.chain().getReference (e.blocks()[e.blockOf (g5)]).enabled != was, "A+B en STOMP : E bascule ses effets");
+            check (e.chain().getReference (e.blocks()[e.blockOf (gA)]).enabled == wasA, "A+B en STOMP : le premier appui sur A est annulé");
             e.learnTarget = OctopusEngine::fsA; e.midiCc (1, 40, 127); e.midiCc (1, 40, 0);
             e.learnTarget = OctopusEngine::fsB; e.midiCc (1, 41, 127); e.midiCc (1, 41, 0);
             check (e.ccOf (OctopusEngine::fsA) == 40 && e.ccOf (OctopusEngine::fsB) == 41, "MIDI learn de A et B : CC 40 / 41");

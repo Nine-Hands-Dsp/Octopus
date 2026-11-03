@@ -183,7 +183,11 @@ private:
 
     juce::String msg;
     double msgUntil = 0.0;
-    int pendingFs = -1; double pendingAt = 0.0;          // footswitch en attente (double appui possible)
+    int pendingFs = -1; double pendingAt = 0.0;          // dernier footswitch appuyé (son voisin peut encore en faire un double appui)
+    // un appui agit tout de suite ; si le voisin arrive à temps, ce premier appui est annulé avant l'action du double appui
+    int provPrevCur = -1; bool provRestorable = false;
+    std::vector<std::pair<juce::String, bool>> provStates;  // STOMP : état des blocs avant le premier appui
+    void revertProvisional (int comboK);
     std::array<int, kCombos> comboAct { comboCc, comboTuner, comboCc };      // E (A+B) = CC 26, B+C = CHROMA, F (C+D) = CC 28
     std::array<int, kCombos> comboCcNum { 26, 27, 28 };
     bool inCombo (int f) const;                          // ce footswitch fait partie d'un double appui actif
