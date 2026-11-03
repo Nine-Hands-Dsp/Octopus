@@ -2310,7 +2310,7 @@ private:
                 const int k = (f < 3 && eng.comboAction (f) != OctopusEngine::comboNone) ? f : f - 1;
                 if (k >= 0 && eng.comboAction (k) != OctopusEngine::comboNone) eng.triggerCombo (k);
             }
-            else eng.pressFs (f);                          // comme Echoflex : action dès l'appui (B et C : après 0,14 s, pour B+C)
+            else eng.pressFs (f);                          // comme Echoflex : action dès l'appui (B et C : après 0,25 s, pour B+C)
             askRepaint (r (Rectangle<float> (L::fsSprite, L::fsSprite).withCentre ({ L::fsX[f], L::fsY })).toNearestInt());
             askRepaint (screenPx());
             return;

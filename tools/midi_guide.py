@@ -14,7 +14,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHOTS, OUT = sys.argv[1], sys.argv[2]
-VERSION = "1.7.1"
+VERSION = "1.7.2"
 TMP = os.path.join(os.path.dirname(os.path.abspath(OUT)), "midi_guide_tmp"); os.makedirs(TMP, exist_ok=True)
 for n, f in (("Pop", "Poppins-Regular"), ("PopM", "Poppins-Medium"), ("PopB", "Poppins-Bold")):
     pdfmetrics.registerFont(TTFont(n, os.path.join(ROOT, "fonts", f + ".ttf")))
@@ -103,13 +103,13 @@ T = {
      "<i>Reset MIDI</i> in the same menu clears every assignment."],
  t5="5. Double presses: E (A+B), B+C, F (C+D)",
  comb_cap="The three double presses printed on the pedal: 1 E = A+B (default CC 26), 2 B+C = tuner symbol (built-in tuner), 3 F = C+D (default CC 28).",
- s5=["Press two <b>neighbouring</b> switches together (less than 0.14 s apart): Octopus runs the action of the pair instead of the two footswitches.",
+ s5=["Press two <b>neighbouring</b> switches together (less than 0.25 s apart): Octopus runs the action of the pair instead of the two footswitches.",
      "<b>Right-click the marking</b> between the two footswitches to choose: <i>Tuner (CHROMA)</i>, <i>Bank down</i>, <i>Bank up</i>, <i>PRESET / STOMP mode</i>, <i>Send a MIDI CC</i> (CC 0-127) or <i>Nothing</i>. <i>Test now</i> runs it at once.",
      "<b>E</b> (A+B) and <b>F</b> (C+D) work like two extra footswitches: by default E sends <b>CC 26</b> and F sends <b>CC 28</b>; B+C opens the tuner (tuner symbol, lit green while tuning). Hover the marking to see its action on the status line.",
      "<b>E and F switch effects</b>: right-click the E or F cell on the screen (after A-D) &gt; <i>Switch effects</i> and tick the effects: E or F then switches them ON / OFF in PRESET and STOMP modes, and its marking lights up in their colour. Their effects are saved with each preset.",
      "<b>Nothing to learn for E, F and B+C</b>: E is the CC of A and the CC of B received together, F those of C and D, B+C those of B and C. Learn A, B, C and D (step 4) and the double presses work at once; the E / F and B+C menus show the CCs used. Learning <i>Tuner on / off</i> with the CC of a footswitch is refused, so that footswitch keeps its CC.",
      "A <i>Send a MIDI CC</i> pair sends the CC with value 127 then 0, on channel 1, to the effects after Octopus. To use it in a plug-in: in REAPER, open the plug-in, click its parameter, <b>Param &gt; Learn</b>, then press the pair (or click the marking).",
-     "With the mouse: click the marking (or Shift + click a footswitch). A footswitch that belongs to an active pair waits 0.14 s for its neighbour; the others act at once. Set a pair to <i>Nothing</i> to remove that short wait."],
+     "With the mouse: click the marking (or Shift + click a footswitch). A footswitch that belongs to an active pair waits 0.25 s for its neighbour; the others act at once. Set a pair to <i>Nothing</i> to remove that short wait."],
  tun_cap="B+C: Octopus becomes the tuner (CHROMA screen and engine), without a CHROMA plug-in in the chain.",
  t6="6. Check and solve",
  s6=["<b>Check what the pedal sends</b>: arm a track with the pedal as input, record a few seconds while pressing the switches, open the MIDI item and choose <b>View &gt; Mode: Event List</b>. A double press must show the two CCs at the same time (a few milliseconds apart).",
@@ -148,13 +148,13 @@ T = {
      "<i>Reset MIDI</i>, dans le même menu, efface toutes les affectations."],
  t5="5. Doubles appuis : E (A+B), B+C, F (C+D)",
  comb_cap="Les trois doubles appuis sérigraphiés sur la pédale : 1 E = A+B (par défaut CC 26), 2 B+C = symbole de l'accordeur (accordeur intégré), 3 F = C+D (par défaut CC 28).",
- s5=["Appuyez sur deux commutateurs <b>voisins</b> ensemble (à moins de 0,14 s d'écart) : Octopus exécute l'action de la paire au lieu des deux footswitchs.",
+ s5=["Appuyez sur deux commutateurs <b>voisins</b> ensemble (à moins de 0,25 s d'écart) : Octopus exécute l'action de la paire au lieu des deux footswitchs.",
      "<b>Clic droit sur le marquage</b> entre les deux footswitchs pour choisir : <i>Tuner (CHROMA)</i>, <i>Bank down</i>, <i>Bank up</i>, <i>PRESET / STOMP mode</i>, <i>Send a MIDI CC</i> (CC 0-127) ou <i>Nothing</i>. <i>Test now</i> l'exécute tout de suite.",
      "<b>E</b> (A+B) et <b>F</b> (C+D) fonctionnent comme deux footswitchs de plus : par défaut, E envoie le <b>CC 26</b> et F le <b>CC 28</b> ; B+C ouvre l'accordeur (symbole de l'accordeur, allumé en vert pendant l'accordage). Survolez le marquage pour voir son action sur la ligne d'état.",
      "<b>E et F basculent des effets</b> : clic droit sur la case E ou F de l'écran (après A-D) &gt; <i>Switch effects</i> et cochez les effets : E ou F les allume / coupe alors en mode PRESET comme en STOMP, et son marquage s'éclaire dans leur couleur. Leurs effets sont enregistrés avec chaque preset.",
      "<b>Rien à apprendre pour E, F et B+C</b> : E correspond au CC de A et au CC de B reçus ensemble, F à ceux de C et D, B+C à ceux de B et C. Apprenez A, B, C et D (étape 4) et les doubles appuis fonctionnent tout de suite ; les menus de E / F et de B+C affichent les CC utilisés. Apprendre <i>Tuner on / off</i> avec le CC d'un footswitch est refusé : ce footswitch garde son CC.",
      "Une paire réglée sur <i>Send a MIDI CC</i> envoie le CC en 127 puis 0, canal 1, aux effets placés après Octopus. Pour l'utiliser dans un plugin : dans REAPER, ouvrez le plugin, cliquez sur son paramètre, <b>Param &gt; Learn</b>, puis faites le double appui (ou cliquez sur le marquage).",
-     "À la souris : clic sur le marquage (ou Maj + clic sur un footswitch). Un footswitch qui fait partie d'une paire active attend 0,14 s son voisin ; les autres agissent tout de suite. Réglez une paire sur <i>Nothing</i> pour supprimer ce court délai."],
+     "À la souris : clic sur le marquage (ou Maj + clic sur un footswitch). Un footswitch qui fait partie d'une paire active attend 0,25 s son voisin ; les autres agissent tout de suite. Réglez une paire sur <i>Nothing</i> pour supprimer ce court délai."],
  tun_cap="B+C : Octopus devient l'accordeur (écran et moteur de CHROMA), sans plugin CHROMA dans la chaîne.",
  t6="6. Vérifier et dépanner",
  s6=["<b>Voir ce qu'envoie le pédalier</b> : armez une piste avec le pédalier en entrée, enregistrez quelques secondes en appuyant sur les commutateurs, ouvrez l'item MIDI et choisissez <b>View &gt; Mode: Event List</b>. Un double appui doit montrer les deux CC au même instant (quelques millisecondes d'écart).",

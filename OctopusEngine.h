@@ -87,7 +87,7 @@ public:
     std::function<bool()> isInternalTunerOn;
     std::function<void (int cc)> onSendCc;               // le processeur envoie CC (127 puis 0) aux effets suivants
     std::function<void()> onInternalTuner;  // le processeur allume / éteint son accordeur intégré
-    static constexpr double kComboMs = 140.0;
+    static constexpr double kComboMs = 250.0;                    // 0,25 s : laisse le temps aux deux pieds (ou au pédalier MIDI)
     juce::String fsTitle (int fs) const;    // "1A" / "DRIVE"
     juce::String fsText (int fs) const;     // nom du preset / des blocs commandés
     bool fsLit (int fs) const;

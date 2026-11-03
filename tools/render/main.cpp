@@ -77,14 +77,14 @@ int main (int argc, char** argv)
     check (e.ccOf (OctopusEngine::fsB) == 80, "MIDI learn footswitch B = CC 80");
     e.midiCc (1, 80, 0);
     e.midiCc (1, 80, 127);
-    check (e.current() != 1, "B attend 0,14 s (pour reconnaître B+C)");
-    Thread::sleep (160); e.tick();
+    check (e.current() != 1, "B attend 0,25 s (pour reconnaître B+C)");
+    Thread::sleep (270); e.tick();
     check (e.current() == 1, "CC 80 (momentané) -> preset 1B");
     e.midiProgram (1, 0);
     check (e.current() == 0, "Program Change 1 -> preset 1A");
     e.paramInput (OctopusEngine::fsC, 0.0f);
     e.paramInput (OctopusEngine::fsC, 1.0f);
-    Thread::sleep (160); e.tick();
+    Thread::sleep (270); e.tick();
     check (e.current() == 2, "paramètre fsC -> preset 1C");
 
     // bypass de la pédale (son propre interrupteur) ou de REAPER
