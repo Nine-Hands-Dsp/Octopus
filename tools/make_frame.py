@@ -152,9 +152,9 @@ alu = alu * bevel_shade + bevel_spec * np.array([0.97, 1.0, 1.05])
 big = big * (1 - face[..., None]) + alu * face[..., None]
 out = Image.fromarray(np.dstack([np.clip(big, 0, 255), alpha * 255]).astype(np.uint8), "RGBA")
 
-# logo Studio Wiga net, à la place de celui de la photo (x 64..235, centré à y 53.5)
+# logo Studio Wiga net, à la place de celui de la photo : bord gauche à x 64, centré à y 53.5, 30 % plus petit (120 de large)
 logo = Image.open(os.path.join(ROOT, "design", "logo_studio_wiga_blanc.png")).convert("RGBA")
-lw = int(171 * AS); lh = round(logo.height * lw / logo.width)
+lw = int(171 * 0.70 * AS); lh = round(logo.height * lw / logo.width)
 logo = logo.resize((lw, lh), Image.LANCZOS)
 la = np.asarray(logo).astype(np.float64); la[..., 3] *= 0.95
 out.alpha_composite(Image.fromarray(la.astype(np.uint8), "RGBA"), (int(64 * AS), int(53.5 * AS) - lh // 2))
