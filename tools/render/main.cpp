@@ -311,10 +311,16 @@ int main (int argc, char** argv)
         e.setEnabled (ci, false);
         pump (5);
         check (! proc.chroma().on, "CHROMA éteint : retour à la chaîne");
-        // accordeur intégré : B+C sans bloc CHROMA allumé
+        // accordeur intégré, commandé par MIDI learn (B+C ne l'ouvre plus)
         e.pressFs (1); e.pressFs (2);
         pump (5);
-        check (proc.chroma().on && proc.chroma().internal, "B+C : accordeur intégré d'Octopus, sans bloc CHROMA");
+        check (! proc.chroma().on, "B+C n'ouvre plus l'accordeur");
+        Thread::sleep (270); e.tick();
+        e.learnTarget = OctopusEngine::tunerToggle; e.midiCc (1, 90, 127); e.midiCc (1, 90, 0);
+        check (e.ccOf (OctopusEngine::tunerToggle) == 90, "MIDI learn de l'accordeur : CC 90");
+        e.midiCc (1, 90, 127); e.midiCc (1, 90, 0);
+        pump (5);
+        check (proc.chroma().on && proc.chroma().internal, "CC 90 : accordeur intégré d'Octopus, sans bloc CHROMA");
         play (82.41 * std::pow (2.0, 5.0 / 1200.0), 2.0);
         shot ("octopus_tuner_builtin");
         proc.chromaSetMute (true);
@@ -324,40 +330,19 @@ int main (int argc, char** argv)
             proc.processBlock (b, m);
             check (b.getMagnitude (0, 256) == 0.0f, "accordeur intégré MUTE : sortie silencieuse");
         }
-        e.pressFs (2); e.pressFs (1);
+        e.midiCc (1, 90, 127); e.midiCc (1, 90, 0);
         pump (5);
-        check (! proc.chroma().on, "B+C de nouveau : retour à la chaîne");
+        check (! proc.chroma().on, "CC 90 de nouveau : retour à la chaîne");
         {
             Thread::sleep (270); e.tick();
             const int c0 = e.current();
-            e.pressFs (1);
-            check (e.current() == e.bank() * OctopusEngine::kSlots + 1 || c0 == e.bank() * OctopusEngine::kSlots + 1, "B seul en PRESET : 1B tout de suite");
-            e.pressFs (2);
+            e.midiCc (1, 90, 127); e.midiCc (1, 90, 0);
             pump (5);
-            check (proc.chroma().on, "B+C en PRESET : accordeur tout de suite (comme A+B / C+D)");
+            check (proc.chroma().on && e.current() == c0, "accordeur par MIDI : preset inchangé");
             e.pressFs (1);
             pump (5);
-            check (! proc.chroma().on && e.current() == c0, "accordeur ouvert : un footswitch le ferme et le preset d'avant revient");
-            e.pressFs (2);
-            check (e.current() == c0, "le voisin du double appui qui ferme l'accordeur ne fait rien");
-            Thread::sleep (270); e.tick();
-            // MIDI : B+C mesuré à l'heure d'arrivée des CC, même si le chargement de 1B a pris du temps
-            e.learnTarget = OctopusEngine::fsB; e.midiCc (1, 51, 127); e.midiCc (1, 51, 0);
-            e.learnTarget = OctopusEngine::fsC; e.midiCc (1, 52, 127); e.midiCc (1, 52, 0);
-            Thread::sleep (270); e.tick();
-            const double t0 = Time::getMillisecondCounterHiRes();
-            e.eventMs = t0;         e.midiCc (1, 51, 127);
-            Thread::sleep (300);                                             // chargement long simulé
-            e.eventMs = t0 + 60.0;  e.midiCc (1, 52, 127);
-            e.eventMs = -1.0;
-            e.midiCc (1, 51, 0); e.midiCc (1, 52, 0);
-            pump (5);
-            check (proc.chroma().on, "B+C par MIDI après un chargement long : accordeur");
-            Thread::sleep (270); e.tick();
-            e.midiCc (1, 51, 127); e.midiCc (1, 52, 127); e.midiCc (1, 51, 0); e.midiCc (1, 52, 0);
-            pump (5);
-            check (! proc.chroma().on, "B+C par MIDI de nouveau : accordeur fermé");
-            e.clearCc (OctopusEngine::fsB); e.clearCc (OctopusEngine::fsC);
+            check (! proc.chroma().on && e.current() == c0, "accordeur ouvert : un footswitch le ferme, sans changer de preset");
+            e.clearCc (OctopusEngine::tunerToggle);
             Thread::sleep (270); e.tick();
             // vrai chemin MIDI (processBlock -> file -> timer) : A+B et C+D comme sur le pédalier
             {
@@ -456,15 +441,6 @@ int main (int argc, char** argv)
             e.learnTarget = OctopusEngine::tunerToggle; e.midiCc (1, 41, 127);
             check (e.ccOf (OctopusEngine::fsB) == 41 && e.ccOf (OctopusEngine::tunerToggle) < 0, "learn de l'accordeur avec le CC de B : B garde son CC");
             e.midiCc (1, 41, 0); pump (12);
-            {
-                const bool t0 = e.tunerOn();
-                e.midiCc (1, 41, 127); e.midiCc (1, 42, 127); e.midiCc (1, 41, 0); e.midiCc (1, 42, 0);
-                pump (3);
-                check (e.tunerOn() != t0, "B+C par MIDI : CC de B + CC de C ensemble ouvrent l'accordeur");
-                e.midiCc (1, 41, 127); e.midiCc (1, 42, 127); e.midiCc (1, 41, 0); e.midiCc (1, 42, 0);
-                pump (3);
-                check (e.tunerOn() == t0, "B+C par MIDI de nouveau : retour à la chaîne");
-            }
             e.clearCc (OctopusEngine::fsA); e.clearCc (OctopusEngine::fsB); e.clearCc (OctopusEngine::fsC);
             auto st2 = e.toTree(); e.clearAssign (4); e.fromTree (st2);
             check (e.isAssigned (4, g5) && e.isAssigned (4, g6), "effets de E enregistrés avec le projet");

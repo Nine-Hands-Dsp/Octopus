@@ -315,7 +315,7 @@ public:
         for (int k = 0; k < OctopusEngine::kCombos; ++k)
         {
             const int key = OctopusEngine::keyOfCombo (k);
-            const bool icon = key < 0 && eng.comboAction (k) == OctopusEngine::comboTuner;
+            const bool icon = key < 0;                              // entre B et C : toujours le symbole de l'accordeur
             const auto word = key < 0 && ! icon ? eng.comboLabel (k) : String();
             if (key < 0 && ! icon && word.isEmpty()) continue;
             const auto fWord = Font (FontOptions (tfBold).withHeight (15.0f * s)).withExtraKerningFactor (0.18f);
@@ -342,51 +342,18 @@ public:
     void comboMenu (int k)
     {
         if (OctopusEngine::keyOfCombo (k) >= 0) { footswitchMenu (OctopusEngine::keyOfCombo (k)); return; }   // E / F : menu de A-D
+        // symbole de l'accordeur : plus de double appui B+C, l'accordeur se commande par MIDI learn (ou un clic)
         PopupMenu m;
-        m.addSectionHeader ("Double press B+C");
-        const int a = eng.comboAction (k);
-        for (int i : { (int) OctopusEngine::comboNone, (int) OctopusEngine::comboTuner, (int) OctopusEngine::comboMode })   // ni bank -, ni bank +, ni CC
-            m.addItem (1 + i, OctopusEngine::comboActionName (i), true, a == i);
-        const int key = OctopusEngine::keyOfCombo (k);
-        if (key >= 0)                                    // E / F : un vrai footswitch, avec ses effets et son MIDI learn
-        {
-            PopupMenu fxM;
-            for (int b = 0; b < eng.blocks().size(); ++b)
-            {
-                const auto& fx = eng.chain().getReference (eng.blocks()[b]);
-                fxM.addItem (400 + b, FxCat::shortName (fx.name), true, eng.isAssigned (key, fx.guid));
-            }
-            if (eng.blocks().isEmpty()) fxM.addItem (399, "(no effect in the chain)", false);
-            fxM.addSeparator();
-            fxM.addItem (398, "Clear", eng.fsText (key) != "-" && a == OctopusEngine::comboStomp);
-            m.addSubMenu ("Switch effects (in PRESET and STOMP modes)", fxM, true, nullptr, a == OctopusEngine::comboStomp);
-            m.addSeparator();
-            // MIDI : E = les CC de A et de B reçus ensemble, F = ceux de C et de D (rien à apprendre en plus)
-            const int f0 = key == 4 ? 0 : 2, c0 = eng.ccOf (f0), c1 = eng.ccOf (f0 + 1);
-            const auto ccTxt = [] (int c) { return c >= 0 ? "CC " + String (c) : String ("not learned"); };
-            m.addItem (390, "MIDI : " + fsLetter (key) + " = " + fsLetter (f0) + " + " + fsLetter (f0 + 1) + " pressed together ("
-                              + ccTxt (c0) + " + " + ccTxt (c1) + ")", false);
-        }
-        if (key < 0)                                     // B+C : les CC de B et de C reçus ensemble
-        {
-            const auto ccTxt = [] (int c) { return c >= 0 ? "CC " + String (c) : String ("not learned"); };
-            m.addSeparator();
-            m.addItem (390, "MIDI : B + C pressed together (" + ccTxt (eng.ccOf (1)) + " + " + ccTxt (eng.ccOf (2)) + ")", false);
-        }
+        m.addSectionHeader ("Tuner");
+        addLearnItems (m, OctopusEngine::tunerToggle);
         m.addSeparator();
         m.addItem (310, "Color & Glow");
         SafePointer<PedalView> sp (this);
-        m.showMenuAsync (PopupMenu::Options(), [sp, k, key] (int r)
+        m.showMenuAsync (PopupMenu::Options(), [sp, k] (int r)
         {
             if (sp == nullptr || r <= 0) return;
-            auto& e = sp->eng;
             if (r == 310) { sp->tunerColourMenu (sp->r (comboRect (k))); return; }
-            if (r == 300) e.triggerCombo (k);
-            else if (r >= 400 && r < 400 + e.blocks().size()) e.toggleAssign (key, e.chain().getReference (e.blocks()[r - 400]).guid);
-            else if (r == 398) { e.clearAssign (key); e.setCombo (k, OctopusEngine::comboNone); }
-            else if (sp->handleMidi (r)) {}
-            else if (r >= 100 && r < 228) sp->eng.setCombo (k, OctopusEngine::comboCc, r - 100);
-            else if (r >= 1 && r <= OctopusEngine::comboCc) sp->eng.setCombo (k, r - 1);
+            sp->handleMidi (r);
             sp->askRepaint (sp->getLocalBounds());
         });
     }
@@ -2384,8 +2351,8 @@ private:
         if (const int k = comboAt (unit); k >= 0)
         {
             if (e.mods.isPopupMenu()) comboMenu (k);
-            else if (eng.comboAction (k) != OctopusEngine::comboNone) eng.triggerCombo (k);
-            else comboMenu (k);
+            else if (OctopusEngine::keyOfCombo (k) < 0) eng.toggleTuner();     // clic sur le symbole : accordeur on / off
+            else eng.triggerCombo (k);
             return;
         }
 
@@ -3068,7 +3035,7 @@ private:
         {
             bool lit = false;
             Colour col;
-            if (f == kTunerLed) { lit = eng.isReady() && eng.comboAction (1) == OctopusEngine::comboTuner && eng.tunerOn(); col = tunerColour(); }
+            if (f == kTunerLed) { lit = eng.isReady() && eng.tunerOn(); col = tunerColour(); }
             else
             {
                 lit = eng.isReady() && eng.fsLit (f);

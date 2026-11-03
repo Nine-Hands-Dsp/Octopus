@@ -358,6 +358,7 @@ juce::String OctopusEngine::comboTitle (int k) const
     const juce::String key = k == 0 ? "E (A+B)" : k == 2 ? "F (C+D)" : "B+C";
     const int a = comboAction (k);
     if (k != 1) return juce::String (k == 0 ? "E" : "F") + " (" + comboName (k) + ") : " + fsTitle (keyOfCombo (k)) + "  " + fsText (keyOfCombo (k));
+    if (k == 1) return "Tuner" + (cc[(size_t) tunerToggle] >= 0 ? "  (CC " + juce::String (cc[(size_t) tunerToggle]) + ")" : juce::String ("  (MIDI learn : right-click)"));
     return key + " : " + (a == comboCc ? "CC " + juce::String (comboCcNumber (k)) : comboActionName (a));
 }
 
@@ -978,7 +979,7 @@ void OctopusEngine::fromTree (const juce::ValueTree& root)
             for (int k = 0; k < kCombos; ++k)
             {
                 if (root.hasProperty ("combo" + juce::String (k))) comboAct[(size_t) k] = juce::jlimit (0, numComboActions - 1, (int) root["combo" + juce::String (k)]);
-                if (k == 1 && comboAct[1] != comboNone && comboAct[1] != comboTuner && comboAct[1] != comboMode) comboAct[1] = comboTuner;   // B+C : bank / CC retirés du menu
+                if (k == 1) comboAct[1] = comboNone;          // B+C n'ouvre plus l'accordeur : il se commande par MIDI learn
                 if (root.hasProperty ("comboCc" + juce::String (k))) comboCcNum[(size_t) k] = juce::jlimit (0, 127, (int) root["comboCc" + juce::String (k)]);
             }
             bypassPrefs.clear();
