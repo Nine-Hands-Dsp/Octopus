@@ -359,6 +359,36 @@ int main (int argc, char** argv)
             check (! proc.chroma().on, "B+C par MIDI de nouveau : accordeur fermé");
             e.clearCc (OctopusEngine::fsB); e.clearCc (OctopusEngine::fsC);
             Thread::sleep (270); e.tick();
+            // vrai chemin MIDI (processBlock -> file -> timer) : A+B et C+D comme sur le pédalier
+            {
+                auto sendCc = [&] (std::initializer_list<std::pair<int, int>> ccs, int gapSamples)
+                {
+                    AudioBuffer<float> buf (2, 512); buf.clear(); MidiBuffer mb;
+                    int pos = 0;
+                    for (auto [n, v] : ccs) { mb.addEvent (MidiMessage::controllerEvent (1, n, v), pos); pos += gapSamples; }
+                    proc.processBlock (buf, mb);
+                };
+                e.learnTarget = OctopusEngine::fsA; e.midiCc (1, 61, 127); e.midiCc (1, 61, 0);
+                e.learnTarget = OctopusEngine::fsB; e.midiCc (1, 62, 127); e.midiCc (1, 62, 0);
+                e.learnTarget = OctopusEngine::fsC; e.midiCc (1, 63, 127); e.midiCc (1, 63, 0);
+                e.learnTarget = OctopusEngine::fsD; e.midiCc (1, 64, 127); e.midiCc (1, 64, 0);
+                Thread::sleep (300); pump (3);
+                const int bk = e.bank() * OctopusEngine::kSlots;
+                e.load (bk + 2); pump (3); Thread::sleep (300); pump (3);
+                sendCc ({ { 61, 127 }, { 62, 127 } }, 64);  pump (3);
+                sendCc ({ { 61, 0 }, { 62, 0 } }, 64);      pump (3);
+                check (e.current() == bk + 4, "MIDI réel A+B (même bloc audio) : preset E (" + OctopusEngine::label (e.current()) + ")");
+                Thread::sleep (300); pump (3);
+                sendCc ({ { 63, 127 } }, 0); pump (1); Thread::sleep (60); sendCc ({ { 64, 127 } }, 0); pump (3);
+                sendCc ({ { 63, 0 }, { 64, 0 } }, 64); pump (3);
+                check (e.current() == bk + 5, "MIDI réel C puis D 60 ms après : preset F (" + OctopusEngine::label (e.current()) + ")");
+                Thread::sleep (300); pump (3);
+                sendCc ({ { 61, 127 } }, 0); pump (1); sendCc ({ { 61, 0 } }, 0); pump (1); Thread::sleep (400); pump (2);
+                sendCc ({ { 62, 127 } }, 0); pump (1); sendCc ({ { 62, 0 } }, 0); pump (3);
+                check (e.current() == bk + 1, "MIDI réel A puis B 0,4 s après : preset B seul (" + OctopusEngine::label (e.current()) + ")");
+                for (int t : { 0, 1, 2, 3 }) e.clearCc (t);
+                Thread::sleep (300); pump (3);
+            }
         }
 
         // E (A+B) et F (C+D) : footswitchs comme A-D (presets 1E / 1F en mode PRESET, effets en STOMP)
