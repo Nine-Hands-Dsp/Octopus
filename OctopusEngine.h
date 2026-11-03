@@ -189,6 +189,8 @@ private:
     int provPrevCur = -1; bool provRestorable = false;
     std::vector<std::pair<juce::String, bool>> provStates;  // STOMP : état des blocs avant le premier appui
     void revertProvisional (int comboK);
+    int tunerReturn = -1, nextTunerReturn = -1;            // preset à rappeler en fermant l'accordeur (B+C = « G »)
+    double swallowUntil = 0.0;                            // l'accordeur vient d'être fermé par un footswitch : son voisin ne fait rien
     std::array<int, kCombos> comboAct { comboCc, comboTuner, comboCc };      // E (A+B) = CC 26, B+C = CHROMA, F (C+D) = CC 28
     std::array<int, kCombos> comboCcNum { 26, 27, 28 };
     bool inCombo (int f) const;                          // ce footswitch fait partie d'un double appui actif

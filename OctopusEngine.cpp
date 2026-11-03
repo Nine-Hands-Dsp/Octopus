@@ -409,6 +409,15 @@ void OctopusEngine::pressFs (int f)
 {
     if (! juce::isPositiveAndBelow (f, 4)) return;          // footswitchs physiques A-D (E / F : leurs doubles appuis)
     const double now = eventMs > 0.0 ? eventMs : juce::Time::getMillisecondCounterHiRes();
+    // accordeur ouvert : un footswitch (ou un double appui) le ferme, sans changer de preset ni de bloc
+    if (juce::Time::getMillisecondCounterHiRes() < swallowUntil) return;
+    if (tunerOn())
+    {
+        pendingFs = -1;
+        toggleTuner();
+        swallowUntil = juce::Time::getMillisecondCounterHiRes() + kComboMs;
+        return;
+    }
     if (pendingFs >= 0 && std::abs (pendingFs - f) == 1 && now - pendingAt < kComboMs)
     {
         const int k = juce::jmin (pendingFs, f);
@@ -448,14 +457,22 @@ void OctopusEngine::revertProvisional (int comboK)
         refreshNow();
         return;
     }
-    // PRESET : E / F chargent leur propre preset juste après ; pour les autres actions, le preset d'avant revient
+    // PRESET : E / F chargent leur propre preset juste après. B+C (« G », l'accordeur) agit tout de suite, comme E / F :
+    // le preset d'avant n'est rappelé qu'en fermant l'accordeur (pas de second chargement au moment du double appui)
     if (keyOfCombo (comboK) >= 0) return;
+    if (comboAction (comboK) == comboTuner)
+    {
+        nextTunerReturn = provRestorable && provPrevCur >= 0 && provPrevCur != cur ? provPrevCur : -1;
+        return;
+    }
     if (provRestorable && provPrevCur >= 0 && provPrevCur != cur) load (provPrevCur);
 }
 
 void OctopusEngine::toggleTuner()
 {
     if (! ready) { say (status); return; }
+    const bool closing = tunerOn();
+    if (! closing) { tunerReturn = nextTunerReturn; nextTunerReturn = -1; }
     // un bloc CHROMA allumé dans la chaîne : B+C l'éteint (retour à la chaîne)
     const int ci = chromaIndex();
     if (ci >= 0)
@@ -465,10 +482,17 @@ void OctopusEngine::toggleTuner()
         host.endUndo ("tuner off");
         refreshNow();
         say ("Tuner off");
-        return;
     }
     // sinon : l'accordeur intégré d'Octopus (moteur de CHROMA), sans plugin CHROMA dans la chaîne
-    if (onInternalTuner) onInternalTuner();
+    else if (onInternalTuner) onInternalTuner();
+    // accordeur ouvert par B+C depuis un autre preset : en le fermant, ce preset revient
+    if (closing && tunerReturn >= 0)
+    {
+        const int r = tunerReturn;
+        tunerReturn = -1;
+        if (r != cur) load (r);
+    }
+    else if (closing) tunerReturn = -1;
 }
 
 void OctopusEngine::press (int f)

@@ -173,7 +173,9 @@ int main (int argc, char** argv)
     ed->screenPick (5); ed->screenPick (1); ed->screenPick (9);
     shot ("octopus_add_effect");
     ed->screenHover ({ 16.0f + 200.0f, 182.0f + 34.0f * 3.0f + 15.0f });      // survol d'un plugin Studio Wiga : sa description
-    shot ("octopus_add_hover");
+    shot ("octopus_add_hover_early");                                         // tout de suite : pas encore de bulle
+    Thread::sleep (850);
+    shot ("octopus_add_hover");                                              // au bout de 0,8 s : la bulle
     ed->screenHover ({ 2.0f, 2.0f });
     ed->screenSearch ("rea", 0);
     shot ("octopus_add_search");
@@ -329,9 +331,12 @@ int main (int argc, char** argv)
             check (e.current() == e.bank() * OctopusEngine::kSlots + 1 || c0 == e.bank() * OctopusEngine::kSlots + 1, "B seul en PRESET : 1B tout de suite");
             e.pressFs (2);
             pump (5);
-            check (proc.chroma().on && e.current() == c0, "B+C en PRESET : accordeur, et le preset d'avant revient");
-            e.pressFs (1); e.pressFs (2);
+            check (proc.chroma().on, "B+C en PRESET : accordeur tout de suite (comme A+B / C+D)");
+            e.pressFs (1);
             pump (5);
+            check (! proc.chroma().on && e.current() == c0, "accordeur ouvert : un footswitch le ferme et le preset d'avant revient");
+            e.pressFs (2);
+            check (e.current() == c0, "le voisin du double appui qui ferme l'accordeur ne fait rien");
             Thread::sleep (270); e.tick();
             // MIDI : B+C mesuré à l'heure d'arrivée des CC, même si le chargement de 1B a pris du temps
             e.learnTarget = OctopusEngine::fsB; e.midiCc (1, 51, 127); e.midiCc (1, 51, 0);

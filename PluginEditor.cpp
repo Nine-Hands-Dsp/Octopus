@@ -323,7 +323,7 @@ public:
             const int led = key >= 0 ? key : kTunerLed;
             const auto p = markPath (k, icon, ww);
             if (icon) drawLitPath (g, markPath (k, true, -1.0f), 0.0f, ledColour[led]);      // traits de l'accordeur : jamais allumés
-            drawLitPath (g, p, ledLevel[led], ledColour[led], icon ? tunerHaloPc : -1);
+            drawLitPath (g, p, ledLevel[led], ledColour[led]);   // B+C (« G ») : même halo que les lettres (Letter glow)
             if (hoverCombo == k) { g.setColour (Colours::white.withAlpha (0.28f)); g.fillPath (p); }
             if (word.isNotEmpty())
             {
@@ -1348,10 +1348,14 @@ private:
         for (auto& x : d) if (n.contains (x.first)) return x.second;
         return {};
     }
-    // bulle au survol d'un plugin Studio Wiga (VST3) dans la fenêtre d'ajout
+    // bulle au survol d'un plugin Studio Wiga (VST3) dans la fenêtre d'ajout, au bout de 0,8 s sur la même ligne
+    static constexpr double kTipDelayMs = 800.0;
+    double hoverItemMs = 0.0;
+    bool tipShown = false;
     void drawFxTooltip (Graphics& g)
     {
         if (overlay != Overlay::browser || hoverItem < 0) return;
+        if (Time::getMillisecondCounterHiRes() - hoverItemMs < kTipDelayMs) return;      // la bulle n'apparaît qu'au bout de 0,8 s
         const auto items = filtered();
         const int i = listScroll * kListRows + hoverItem;
         if (! isPositiveAndBelow (i, items.size())) return;
@@ -2345,6 +2349,7 @@ private:
             for (int k = 0; k < params.size(); ++k) if (paramCell (k).contains (p)) { hp = k; break; }
         if (hb != hoverBtn || hs != hoverSlot || hi != hoverItem || hf != hoverFooter || hp != hoverParam)
         {
+            if (hi != hoverItem) { hoverItemMs = Time::getMillisecondCounterHiRes(); tipShown = false; }   // la bulle attend 0,8 s
             hoverBtn = hb; hoverSlot = hs; hoverItem = hi; hoverFooter = hf; hoverParam = hp;
             askRepaint (screenPx());
         }
@@ -2721,8 +2726,8 @@ private:
         openPicker ("Tuner symbol colour", tunerColour(), near, true,
                     [this] (Colour c) { tunerCol = c.getARGB(); OctoSettings::setTuner (tunerCol, tunerHaloPc); },
                     [this] { tunerCol = 0; OctoSettings::setTuner (0, tunerHaloPc); },
-                    tunerHaloPc,
-                    [this] (int pc) { tunerHaloPc = pc; OctoSettings::setTuner (tunerCol, pc); askRepaint (getLocalBounds()); });
+                    haloPc,                                       // GLOW : le Letter glow commun (lettres, marquages et accordeur)
+                    [this] (int pc) { setHalo (pc, false); });
     }
 
     // couleur d'un footswitch (lettre lumineuse et case de l'écran, en mode PRESET)
@@ -3010,6 +3015,11 @@ private:
         const double now = Time::getMillisecondCounterHiRes();
         auto* ed = findParentComponentOfClass<OctopusEditor>();
         if (ed != nullptr) ed->checkRenderer();
+        if (overlay == Overlay::browser && hoverItem >= 0 && ! tipShown && now - hoverItemMs >= kTipDelayMs)
+        {
+            tipShown = true;                                   // 0,8 s sur la même ligne : la bulle apparaît
+            askRepaint (screenPx());
+        }
 
         if (resizeSettle > 0 && --resizeSettle == 0) rebuildCaches();
         else if (resizeSettle == 0 && now - lastScaleCheckMs > 250.0)
