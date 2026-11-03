@@ -346,7 +346,7 @@ juce::String OctopusEngine::comboName (int k)
 
 juce::String OctopusEngine::comboActionName (int a)
 {
-    static const char* n[numComboActions] = { "Nothing", "Tuner (CHROMA)", "Bank down", "Bank up", "PRESET / STOMP mode", "Send a MIDI CC", "Switch effects" };
+    static const char* n[numComboActions] = { "Nothing", "Tuner (CHROMA)", "Bank down", "Bank up", "PRESET / STOMP mode", "Send a MIDI CC", "Switch effects", "Footswitch" };
     return n[juce::jlimit (0, numComboActions - 1, a)];
 }
 
@@ -362,7 +362,8 @@ juce::String OctopusEngine::comboTitle (int k) const
 {
     const juce::String key = k == 0 ? "E (A+B)" : k == 2 ? "F (C+D)" : "B+C";
     const int a = comboAction (k);
-    return key + " : " + (a == comboCc ? "CC " + juce::String (comboCcNumber (k)) : a == comboStomp ? fsText (keyOfCombo (k)) : comboActionName (a));
+    if (k != 1) return juce::String (k == 0 ? "E" : "F") + " (" + comboName (k) + ") : " + fsTitle (keyOfCombo (k)) + "  " + fsText (keyOfCombo (k));
+    return key + " : " + (a == comboCc ? "CC " + juce::String (comboCcNumber (k)) : comboActionName (a));
 }
 
 juce::String OctopusEngine::comboLabel (int k) const
@@ -383,7 +384,7 @@ juce::String OctopusEngine::comboLabel (int k) const
 
 bool OctopusEngine::inCombo (int f) const
 {
-    return (f >= 1 && comboAct[(size_t) (f - 1)] != comboNone) || (f <= 2 && comboAct[(size_t) f] != comboNone);
+    return (f >= 1 && comboAction (f - 1) != comboNone) || (f <= 2 && comboAction (f) != comboNone);
 }
 
 void OctopusEngine::triggerCombo (int k)
@@ -400,7 +401,8 @@ void OctopusEngine::triggerCombo (int k)
             say (comboTitle (k) + " sent");
             break;
         case comboStomp:
-            if (keyOfCombo (k) >= 0) switchGroup (keyOfCombo (k));
+        case comboKey:
+            if (keyOfCombo (k) >= 0) press (keyOfCombo (k));     // E / F : comme A-D (preset en mode PRESET, effets en STOMP)
             break;
         default: break;
     }
@@ -409,12 +411,12 @@ void OctopusEngine::triggerCombo (int k)
 // appui sur un footswitch : s'il fait partie d'un double appui actif, il attend kComboMs le footswitch voisin
 void OctopusEngine::pressFs (int f)
 {
-    if (! juce::isPositiveAndBelow (f, kFs)) return;
+    if (! juce::isPositiveAndBelow (f, 4)) return;          // footswitchs physiques A-D (E / F : leurs doubles appuis)
     const double now = juce::Time::getMillisecondCounterHiRes();
     if (pendingFs >= 0 && std::abs (pendingFs - f) == 1 && now - pendingAt < kComboMs)
     {
         const int k = juce::jmin (pendingFs, f);
-        if (comboAct[(size_t) k] != comboNone)
+        if (comboAction (k) != comboNone)
         {
             pendingFs = -1;                               // double appui : ni l'un ni l'autre, l'action du combo
             triggerCombo (k);
@@ -475,11 +477,6 @@ void OctopusEngine::switchGroup (int f)
 
 juce::String OctopusEngine::fsTitle (int f) const
 {
-    if (const int k = comboOfKey (f); k >= 0)
-    {
-        if (comboAction (k) == comboStomp && ! stompGuids[f].isEmpty()) return juce::String (FxCat::label (fsKind (f))).toUpperCase();
-        return comboName (k) + " DOUBLE PRESS";
-    }
     if (md == presetMode) return label (viewBank * kSlots + f);
     if (stompGuids[f].isEmpty()) return "STOMP " + juce::String::charToString ((juce::juce_wchar) ('A' + f));
     const int k = fsKind (f);
@@ -488,9 +485,7 @@ juce::String OctopusEngine::fsTitle (int f) const
 
 juce::String OctopusEngine::fsText (int f) const
 {
-    if (const int k = comboOfKey (f); k >= 0 && comboAction (k) != comboStomp)
-        return comboAction (k) == comboCc ? "Send CC " + juce::String (comboCcNumber (k)) : comboAction (k) == comboNone ? juce::String ("-") : comboActionName (comboAction (k));
-    if (f < kFs && md == presetMode) return displayName (viewBank * kSlots + f);
+    if (md == presetMode) return displayName (viewBank * kSlots + f);
     juce::StringArray names;
     for (auto& g : stompGuids[f])
     {
@@ -502,17 +497,7 @@ juce::String OctopusEngine::fsText (int f) const
 
 bool OctopusEngine::fsLit (int f) const
 {
-    if (const int k = comboOfKey (f); k >= 0)
-    {
-        switch (comboAction (k))
-        {
-            case comboTuner: return tunerOn();
-            case comboCc:    return juce::Time::getMillisecondCounterHiRes() < comboFlash[(size_t) k];
-            case comboStomp: break;
-            default:         return false;
-        }
-    }
-    else if (md == presetMode) return cur == viewBank * kSlots + f;
+    if (md == presetMode) return cur == viewBank * kSlots + f;
     for (auto& g : stompGuids[f])
     {
         const int b = blockOf (g);
@@ -538,7 +523,6 @@ void OctopusEngine::toggleAssign (int f, const juce::String& guid)
     else
     {
         stompGuids[f].add (guid);
-        if (const int k = comboOfKey (f); k >= 0) comboAct[(size_t) k] = comboStomp;     // E / F : affecter un effet = le commander
     }
     changed();
 }
@@ -778,8 +762,8 @@ void OctopusEngine::midiCc (int, int number, int value)
 
 void OctopusEngine::midiProgram (int, int program)
 {
-    if (! programChange || ! juce::isPositiveAndBelow (program, kPresets)) return;
-    load (program);
+    if (! programChange || ! juce::isPositiveAndBelow (program, kBanks * 4)) return;
+    load ((program / 4) * kSlots + program % 4);             // PC 1-64 = 1A-1D ... 16A-16D, comme un pédalier de 4 commutateurs
 }
 
 void OctopusEngine::paramInput (int t, float v)
@@ -834,10 +818,16 @@ OctopusEngine::Preset OctopusEngine::presetFromTree (const juce::ValueTree& t)
     return p;
 }
 
+int OctopusEngine::presetIndexFromTree (const juce::ValueTree& c, int version)
+{
+    const int i = (int) c["idx"];
+    return version >= 2 ? i : (i / 4) * kSlots + i % 4;      // ancien format : 4 presets par bank (1A-1D) -> mêmes lettres
+}
+
 juce::ValueTree OctopusEngine::banksTree() const
 {
     juce::ValueTree t ("OCTOPUS_BANKS");
-    t.setProperty ("version", 1, nullptr);
+    t.setProperty ("version", 2, nullptr);                    // 2 : 6 presets par bank (A-F)
     for (int i = 0; i < kPresets; ++i)
         if (presets[(size_t) i].saved || presets[(size_t) i].colour != 0) t.appendChild (presetToTree (presets[(size_t) i], i), nullptr);
     return t;
@@ -847,10 +837,11 @@ bool OctopusEngine::importBanks (const juce::ValueTree& t)
 {
     if (! t.hasType ("OCTOPUS_BANKS") && ! t.hasType ("OCTOPUS")) return false;
     for (auto& p : presets) p = Preset();
+    const int ver = (int) t.getProperty ("version", 1);
     for (auto c : t)
         if (c.hasType ("PRESET"))
         {
-            const int i = (int) c["idx"];
+            const int i = presetIndexFromTree (c, ver);
             if (juce::isPositiveAndBelow (i, kPresets)) presets[(size_t) i] = presetFromTree (c);
         }
     cur = -1; sigLoaded = {};
@@ -864,7 +855,7 @@ juce::ValueTree OctopusEngine::toTree() const
     auto t = banksTree();
     t = t.createCopy();
     juce::ValueTree root ("OCTOPUS");
-    root.setProperty ("version", 1, nullptr);
+    root.setProperty ("version", 2, nullptr);
     root.setProperty ("mode", (int) md, nullptr);
     root.setProperty ("bank", viewBank, nullptr);
     root.setProperty ("current", cur, nullptr);
@@ -896,15 +887,19 @@ void OctopusEngine::fromTree (const juce::ValueTree& root)
 {
     if (! root.hasType ("OCTOPUS")) return;
     for (auto& p : presets) p = Preset();
+    const int ver = (int) root.getProperty ("version", 1);
     for (auto c : root)
         if (c.hasType ("PRESET"))
         {
-            const int i = (int) c["idx"];
+            const int i = presetIndexFromTree (c, ver);
             if (juce::isPositiveAndBelow (i, kPresets)) presets[(size_t) i] = presetFromTree (c);
         }
     md = (int) root["mode"] == 1 ? stompMode : presetMode;
     viewBank = juce::jlimit (0, kBanks - 1, (int) root["bank"]);
-    cur = juce::jlimit (-1, kPresets - 1, (int) root.getProperty ("current", -1));
+    {
+        const int c0 = (int) root.getProperty ("current", -1);
+        cur = juce::jlimit (-1, kPresets - 1, c0 < 0 || ver >= 2 ? c0 : (c0 / 4) * kSlots + c0 % 4);
+    }
     sigLoaded = root["sig"].toString();
     programChange = (bool) root.getProperty ("pc", true);
     auto c = juce::StringArray::fromTokens (root["cc"].toString(), ",", "");

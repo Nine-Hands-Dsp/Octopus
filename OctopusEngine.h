@@ -9,7 +9,7 @@
 class OctopusEngine
 {
 public:
-    static constexpr int kBanks = 16, kSlots = 4, kPresets = kBanks * kSlots, kFs = 4, kKeys = 6;   // kKeys : A B C D + E F (doubles appuis A+B / C+D)
+    static constexpr int kBanks = 16, kSlots = 6, kPresets = kBanks * kSlots, kFs = 6, kKeys = kFs;   // A B C D E F (E = A+B, F = C+D) ; 6 presets par bank
     enum Mode { presetMode = 0, stompMode = 1 };
 
     // commandes pilotables en MIDI (CC appris) ou par les paramètres du plugin
@@ -71,11 +71,11 @@ public:
     void toggleTuner();                     // accordeur intégré d'Octopus (un bloc CHROMA allumé est éteint)
 
     // ---- doubles appuis : A+B, B+C, C+D (deux footswitchs voisins à moins de kComboMs)
-    enum ComboAction { comboNone = 0, comboTuner, comboBankDown, comboBankUp, comboMode, comboCc, comboStomp, numComboActions };
+    enum ComboAction { comboNone = 0, comboTuner, comboBankDown, comboBankUp, comboMode, comboCc, comboStomp, comboKey, numComboActions };   // comboKey : footswitch E / F
     static constexpr int kCombos = 3;                    // 0 = A+B, 1 = B+C, 2 = C+D
     static juce::String comboName (int k);               // "A+B"
     static juce::String comboActionName (int a);
-    int  comboAction (int k) const { return comboAct[(size_t) juce::jlimit (0, kCombos - 1, k)]; }
+    int  comboAction (int k) const { return k == 1 ? comboAct[1] : (int) comboKey; }     // A+B = E, C+D = F : toujours des footswitchs
     int  comboCcNumber (int k) const { return comboCcNum[(size_t) juce::jlimit (0, kCombos - 1, k)]; }
     void setCombo (int k, int action, int ccNumber = -1);
     juce::String comboLabel (int k) const;               // texte sérigraphié entre les deux footswitchs : E, CHROMA, F
@@ -175,7 +175,7 @@ private:
     juce::Array<InstalledFx> installedCache;
     bool installedLoaded = false;
 
-    std::array<juce::uint32, kFs> fsCol { kDefaultFsColour, kDefaultFsColour, kDefaultFsColour, kDefaultFsColour };
+    std::array<juce::uint32, kFs> fsCol { kDefaultFsColour, kDefaultFsColour, kDefaultFsColour, kDefaultFsColour, kDefaultFsColour, kDefaultFsColour };
     std::array<int, numTargets> cc;
     std::array<bool, numTargets> latch;
     std::array<bool, numTargets> ccPrev, paramPrev;
@@ -201,4 +201,5 @@ private:
     void input (int target, bool on, std::array<bool, numTargets>& prev, bool first);
     static juce::ValueTree presetToTree (const Preset& p, int idx);
     static Preset presetFromTree (const juce::ValueTree& t);
+    static int presetIndexFromTree (const juce::ValueTree& c, int version);   // version 1 : 4 presets par bank
 };

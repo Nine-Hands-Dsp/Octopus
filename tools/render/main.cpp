@@ -231,6 +231,11 @@ int main (int argc, char** argv)
     shot ("octopus_colour_picker_fs");
     for (auto* c : ed->getChildren()) if (auto* l = dynamic_cast<OctoPickerLayer*> (c)) l->dismiss();
     pump (6);
+    ed->showScreen (8, 0);
+    pump (6);
+    shot ("octopus_colour_picker_tuner");
+    for (auto* c : ed->getChildren()) if (auto* l = dynamic_cast<OctoPickerLayer*> (c)) l->dismiss();
+    pump (6);
     ed->showScreen (0);
 
     // accordeur : bloc CHROMA allumé, guitare 7 cordes (G1 joué 8 cents bas)
@@ -303,49 +308,52 @@ int main (int argc, char** argv)
         pump (5);
         check (! proc.chroma().on, "B+C de nouveau : retour à la chaîne");
 
-        // doubles appuis A+B (CC 26 vers les effets suivants) et C+D (bank suivante)
-        e.setCombo (0, OctopusEngine::comboCc, 26);
-        e.setCombo (2, OctopusEngine::comboBankUp);
+        // E (A+B) et F (C+D) : footswitchs comme A-D (presets 1E / 1F en mode PRESET, effets en STOMP)
         {
-            MidiBuffer drain; AudioBuffer<float> b0 (2, 256); proc.processBlock (b0, drain);
-        }
-        e.pressFs (0); e.pressFs (1);
-        AudioBuffer<float> b (2, 256); MidiBuffer m;
-        proc.processBlock (b, m);
-        bool on26 = false, off26 = false;
-        for (const auto ev : m)
-        {
-            const auto msg = ev.getMessage();
-            if (msg.isController() && msg.getControllerNumber() == 26) { if (msg.getControllerValue() == 127) on26 = true; else if (msg.getControllerValue() == 0) off26 = true; }
-        }
-        check (on26 && off26, "A+B : CC 26 (127 puis 0) envoyé aux effets suivants");
-        const int bank0 = e.bank();
-        e.pressFs (3); e.pressFs (2);
-        check (e.bank() == (bank0 + 1) % OctopusEngine::kBanks || e.bank() == bank0 + 1, "C+D : bank suivante");
-        e.bankStep (-1);
-        auto st = e.toTree(); e.setCombo (0, OctopusEngine::comboNone); e.fromTree (st);
-        check (e.comboAction (0) == OctopusEngine::comboCc && e.comboCcNumber (0) == 26, "doubles appuis enregistrés avec le projet");
-        e.setCombo (2, OctopusEngine::comboCc, 28);
-        shot ("octopus_combos");
-        e.setCombo (0, OctopusEngine::comboCc, 26); e.setCombo (2, OctopusEngine::comboCc, 28);
-
-        // E et F : vrais footswitchs (effets affectés, dans les deux modes) et MIDI learn
-        {
-            const auto g5 = e.chain().getReference (e.blocks()[5]).guid, g6 = e.chain().getReference (e.blocks()[6]).guid;
-            e.toggleAssign (4, g5); e.toggleAssign (4, g6);
-            check (e.comboAction (0) == OctopusEngine::comboStomp, "E : affecter un effet le fait commander");
-            const int b5 = e.blockOf (g5);
-            const bool was = e.chain().getReference (e.blocks()[b5]).enabled;
+            const int bk = e.bank() * OctopusEngine::kSlots;
+            e.load (bk + 2);
+            check (e.save (bk + 4) && OctopusEngine::label (bk + 4) == "1E", "preset enregistré sous 1E");
+            e.rename (bk + 4, "Solo Wah");
+            e.load (bk);
+            pump (3);
             e.pressFs (0); e.pressFs (1);
             pump (3);
-            check (e.chain().getReference (e.blocks()[e.blockOf (g5)]).enabled != was, "A+B : E bascule ses effets (mode PRESET)");
+            check (e.current() == bk + 4 && e.fsLit (4) && ! e.fsLit (0), "A+B en PRESET : charge 1E, A s'éteint");
+            e.pressFs (3); e.pressFs (2);
+            pump (3);
+            check (e.current() == bk + 5 && e.blocks().isEmpty() && ! e.fsLit (4), "C+D en PRESET : 1F (vide) chargé");
+            e.load (bk + 4);
+            pump (3);
+            // ancien format (4 presets par bank) : 2B (ancien n° 5) reste 2B (nouveau n° 7)
+            {
+                auto t = e.toTree(); t.setProperty ("version", 1, nullptr);
+                for (auto c : t) if (c.hasType ("PRESET") && (int) c["idx"] == bk + 4) c.setProperty ("idx", 5, nullptr);
+                OctopusEngine e2 (e.chainHost());
+                e2.fromTree (t);
+                check (e2.preset (7).saved && e2.preset (7).name == "Solo Wah", "ancien projet (4 presets par bank) : 2B reste 2B");
+            }
+            e.setProgramChange (true);
+            e.midiProgram (1, 1);
+            check (e.current() == bk + 1, "Program Change 2 = 1B");
+            e.load (bk + 4);
+            pump (3);
+            shot ("octopus_combos");
+        }
+        e.setMode (OctopusEngine::stompMode);
+        {
+            const auto g5 = e.chain().getReference (e.blocks()[5]).guid, g6 = e.chain().getReference (e.blocks()[6]).guid;
+            e.clearAssign (4); e.clearAssign (5);
+            e.toggleAssign (4, g5); e.toggleAssign (4, g6);
+            const bool was = e.chain().getReference (e.blocks()[e.blockOf (g5)]).enabled;
+            e.pressFs (0); e.pressFs (1);
+            pump (3);
+            check (e.chain().getReference (e.blocks()[e.blockOf (g5)]).enabled != was, "A+B en STOMP : E bascule ses effets");
             e.learnTarget = OctopusEngine::fsA; e.midiCc (1, 40, 127); e.midiCc (1, 40, 0);
             e.learnTarget = OctopusEngine::fsB; e.midiCc (1, 41, 127); e.midiCc (1, 41, 0);
             check (e.ccOf (OctopusEngine::fsA) == 40 && e.ccOf (OctopusEngine::fsB) == 41, "MIDI learn de A et B : CC 40 / 41");
             e.midiCc (1, 40, 127); e.midiCc (1, 41, 127); e.midiCc (1, 40, 0); e.midiCc (1, 41, 0);
             pump (3);
             check (e.chain().getReference (e.blocks()[e.blockOf (g5)]).enabled == was, "E par MIDI : CC de A + CC de B ensemble rebasculent ses effets");
-            check (e.ccOf (OctopusEngine::fsA) == 40, "A garde son CC");
             {
                 auto t = e.toTree(); t.setProperty ("cc", "-1,41,,,,,,,40,", nullptr); e.fromTree (t);      // ancien learn de E qui avait pris le CC de A
                 check (e.ccOf (OctopusEngine::fsA) == 40 && e.ccOf (OctopusEngine::fsE) < 0, "CC appris sur E en 1.7.0 rendu à A");
@@ -366,17 +374,19 @@ int main (int argc, char** argv)
                 pump (3);
                 check (e.tunerOn() == t0, "B+C par MIDI de nouveau : retour à la chaîne");
             }
-            e.clearCc (OctopusEngine::fsC);
-            e.clearCc (OctopusEngine::fsA); e.clearCc (OctopusEngine::fsB);
+            e.clearCc (OctopusEngine::fsA); e.clearCc (OctopusEngine::fsB); e.clearCc (OctopusEngine::fsC);
             auto st2 = e.toTree(); e.clearAssign (4); e.fromTree (st2);
             check (e.isAssigned (4, g5) && e.isAssigned (4, g6), "effets de E enregistrés avec le projet");
             if (! e.chain().getReference (e.blocks()[e.blockOf (g5)]).enabled) { e.pressFs (0); e.pressFs (1); pump (3); }
             e.toggleAssign (5, e.chain().getReference (e.blocks()[9]).guid);
             pump (8);
             shot ("octopus_keys_ef");
+            ed->showScreen (7, 25); pump (3); shot ("octopus_glow_25");
+            ed->showScreen (7, 175); pump (3); shot ("octopus_glow_175");
+            ed->showScreen (7, 100); pump (3);
             e.clearAssign (4); e.clearAssign (5);
-            e.setCombo (0, OctopusEngine::comboCc, 26); e.setCombo (2, OctopusEngine::comboCc, 28);
         }
+        e.setMode (OctopusEngine::presetMode);
     }
 
     ed->setScaleIndex (0);

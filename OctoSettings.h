@@ -25,6 +25,43 @@ namespace OctoSettings
         x.writeTo (file());
     }
 
+    // halo des lettres lumineuses et du symbole de l'accordeur, en % (100 = normal), commun à toutes les fenêtres
+    inline int haloPercent()
+    {
+        if (auto x = juce::XmlDocument::parse (file()))
+            return juce::jlimit (0, 200, x->getIntAttribute ("halo", 100));
+        return 100;
+    }
+    inline void setHaloPercent (int pc)
+    {
+        juce::XmlElement x ("OctopusSettings");
+        if (auto old = juce::XmlDocument::parse (file())) x = *old;
+        x.setAttribute ("halo", juce::jlimit (0, 200, pc));
+        file().getParentDirectory().createDirectory();
+        x.writeTo (file());
+    }
+
+    // symbole de l'accordeur (B+C) : couleur (0 = vert de CHROMA) et opacité de son halo en %
+    inline juce::uint32 tunerColour()
+    {
+        if (auto x = juce::XmlDocument::parse (file())) return (juce::uint32) x->getStringAttribute ("tunerColour", "0").getHexValue64();
+        return 0;
+    }
+    inline int tunerHalo()
+    {
+        if (auto x = juce::XmlDocument::parse (file())) return juce::jlimit (0, 200, x->getIntAttribute ("tunerHalo", 100));
+        return 100;
+    }
+    inline void setTuner (juce::uint32 colour, int halo)
+    {
+        juce::XmlElement x ("OctopusSettings");
+        if (auto old = juce::XmlDocument::parse (file())) x = *old;
+        x.setAttribute ("tunerColour", juce::String::toHexString ((juce::int64) colour));
+        x.setAttribute ("tunerHalo", juce::jlimit (0, 200, halo));
+        file().getParentDirectory().createDirectory();
+        x.writeTo (file());
+    }
+
     // plugins favoris (nom complet donné par REAPER, ex. "VST3: Holyverb (Studio Wiga)"), communs à tous les projets
     inline juce::StringArray favourites()
     {

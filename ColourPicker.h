@@ -3,7 +3,8 @@
 #include "OctoSettings.h"
 
 // Nuancier d'Octopus : couleurs rapides, rangée « MY COLOURS » (clic sur un emplacement vide = enregistre la couleur,
-// clic droit = efface), teinte, saturation et luminosité. La couleur s'applique en direct
+// clic droit = efface), teinte, saturation et luminosité, puis l'opacité du halo (GLOW : seulement la lumière autour
+// des lettres / du symbole de l'accordeur, pas la couleur). La couleur s'applique en direct
 // (étiquette, lettre, anneau, case), OK ferme ; « Default » rend la couleur par défaut quand elle existe.
 class OctoColourPicker : public juce::Component
 {
@@ -18,6 +19,8 @@ public:
     std::function<void (juce::Colour)> onChange;
     std::function<void()> onDefault;
     std::function<void()> onClose;
+    std::function<void (int)> onGlow;                   // opacité du halo en % (0-200, 100 = normal)
+    void setGlow (int pc) { glow = juce::jlimit (0.0f, 1.0f, (float) pc / 200.0f); repaint(); }
 
     void setUserForTest (const juce::Array<juce::uint32>& u, int hover) { user = u; hoverUser = hover; repaint(); }
     juce::Colour colour() const { return juce::Colour::fromHSV (hue, sat, bri, 1.0f); }
@@ -77,15 +80,15 @@ public:
         }
 
         // barres teinte / saturation / luminosité
-        const char* names[3] = { "HUE", "SATURATION", "BRIGHTNESS" };
-        const float vals[3] = { hue, sat, bri };
-        for (int b = 0; b < 3; ++b)
+        const char* names[4] = { "HUE", "SATURATION", "BRIGHTNESS", "GLOW (HALO OPACITY)" };
+        const float vals[4] = { hue, sat, bri, glow };
+        for (int b = 0; b < 4; ++b)
         {
             const auto br = R (bar (b));
             g.setColour (Colour (0xff8d96a4));
             g.setFont (FontOptions (10.5f * k, Font::bold));
             g.drawText (names[b], R (bar (b).translated (0.0f, -15.0f).withHeight (13.0f)), Justification::centredLeft);
-            g.drawText (String (roundToInt (vals[b] * (b == 0 ? 360.0f : 100.0f))) + (b == 0 ? String (CharPointer_UTF8 ("\xc2\xb0")) : String (" %")),
+            g.drawText (String (roundToInt (vals[b] * (b == 0 ? 360.0f : b == 3 ? 200.0f : 100.0f))) + (b == 0 ? String (CharPointer_UTF8 ("\xc2\xb0")) : String (" %")),
                         R (bar (b).translated (0.0f, -15.0f).withHeight (13.0f)), Justification::centredRight);
             Path clip; clip.addRoundedRectangle (br, br.getHeight() * 0.5f);
             g.saveState();
@@ -99,8 +102,10 @@ public:
             else if (b == 1)
                 g.setGradientFill (ColourGradient (Colour::fromHSV (hue, 0.0f, jmax (0.35f, bri), 1.0f), br.getX(), 0.0f,
                                                    Colour::fromHSV (hue, 1.0f, jmax (0.35f, bri), 1.0f), br.getRight(), 0.0f, false));
-            else
+            else if (b == 2)
                 g.setGradientFill (ColourGradient (Colours::black, br.getX(), 0.0f, Colour::fromHSV (hue, sat, 1.0f, 1.0f), br.getRight(), 0.0f, false));
+            else                                       // halo : de rien à une lumière forte de la couleur choisie
+                g.setGradientFill (ColourGradient (Colour (0xff1a1e26), br.getX(), 0.0f, colour().interpolatedWith (Colours::white, 0.25f), br.getRight(), 0.0f, false));
             g.fillRect (br);
             g.restoreState();
             g.setColour (Colours::white.withAlpha (0.12f));
@@ -108,7 +113,8 @@ public:
             // curseur
             const float x = br.getX() + vals[b] * br.getWidth();
             const auto knob = Rectangle<float> (br.getHeight() + 4.0f * k, br.getHeight() + 4.0f * k).withCentre ({ jlimit (br.getX() + 4.0f * k, br.getRight() - 4.0f * k, x), br.getCentreY() });
-            g.setColour (b == 0 ? Colour::fromHSV (hue, 1.0f, 1.0f, 1.0f) : b == 1 ? Colour::fromHSV (hue, sat, jmax (0.35f, bri), 1.0f) : colour());
+            g.setColour (b == 0 ? Colour::fromHSV (hue, 1.0f, 1.0f, 1.0f) : b == 1 ? Colour::fromHSV (hue, sat, jmax (0.35f, bri), 1.0f)
+                                : b == 3 ? Colour (0xff1a1e26).interpolatedWith (colour(), glow) : colour());
             g.fillEllipse (knob);
             g.setColour (Colours::white);
             g.drawEllipse (knob, 2.0f * k);
@@ -117,7 +123,13 @@ public:
         }
 
         // aperçu + code + boutons
-        const auto pv = R (14, 220, 92, 34);
+        // repère du halo par défaut (100 %)
+        {
+            const auto br = R (bar (3));
+            g.setColour (Colours::white.withAlpha (0.35f));
+            g.fillRect (Rectangle<float> (1.0f * k, br.getHeight() + 6.0f * k).withCentre ({ br.getCentreX(), br.getCentreY() }));
+        }
+        const auto pv = R (14, 264, 92, 34);
         g.setColour (colour());
         g.fillRoundedRectangle (pv, 6.0f * k);
         g.setColour (Colours::white.withAlpha (0.2f));
@@ -143,7 +155,7 @@ public:
                 else { setHsv (juce::Colour (user[i])); changed(); }
                 return;
             }
-        for (int b = 0; b < 3; ++b)
+        for (int b = 0; b < 4; ++b)
             if (bar (b).expanded (6.0f, 8.0f).contains (p)) { drag = b; mouseDrag (e); return; }
         if (hasDefault && defaultRect().contains (p)) { if (onDefault) onDefault(); close(); return; }
         if (okRect().contains (p)) close();
@@ -160,17 +172,24 @@ public:
         if (drag < 0) return;
         const auto br = bar (drag);
         const float v = juce::jlimit (0.0f, 1.0f, (e.position.x / k - br.getX()) / br.getWidth());
+        if (drag == 3)
+        {
+            glow = std::abs (v - 0.5f) < 0.02f ? 0.5f : v;   // aimanté sur 100 %
+            if (onGlow) onGlow (juce::roundToInt (glow * 200.0f));
+            repaint();
+            return;
+        }
         if (drag == 0) hue = juce::jmin (v, 0.9999f); else if (drag == 1) sat = v; else bri = v;
         changed();
     }
 
 private:
-    static constexpr float kW = 320.0f, kH = 268.0f;
+    static constexpr float kW = 320.0f, kH = 312.0f;
     static constexpr int kNumQuick = 11;
     static constexpr juce::uint32 kQuick[kNumQuick] = { 0xff6fc8ff, 0xff3ce0e8, 0xff45e070, 0xffb6e83a, 0xffffe23a, 0xffffb547,
                                                        0xffff7a2e, 0xffff4040, 0xffff5fb4, 0xffb07aff, 0xfff2f4f8 };
     juce::String title;
-    float k = 1.0f, hue = 0.0f, sat = 1.0f, bri = 1.0f;
+    float k = 1.0f, hue = 0.0f, sat = 1.0f, bri = 1.0f, glow = 0.5f;
     bool hasDefault = false;
     int drag = -1, hoverUser = -1;
     juce::Array<juce::uint32> user = OctoSettings::userColours();
@@ -180,8 +199,8 @@ private:
     static juce::Rectangle<float> swatch (int i) { return { 16.0f + 27.0f * (float) i, 36.0f, 20.0f, 20.0f }; }
     static juce::Rectangle<float> bar (int b) { return { 16.0f, 128.0f + 34.0f * (float) b, kW - 32.0f, 12.0f }; }
     static juce::Rectangle<float> userSlot (int i) { return { 16.0f + 27.0f * (float) i, 80.0f, 20.0f, 20.0f }; }
-    static juce::Rectangle<float> okRect() { return { kW - 14.0f - 70.0f, 220.0f, 70.0f, 34.0f }; }
-    static juce::Rectangle<float> defaultRect() { return { kW - 14.0f - 70.0f - 8.0f - 96.0f, 220.0f, 96.0f, 34.0f }; }
+    static juce::Rectangle<float> okRect() { return { kW - 14.0f - 70.0f, 264.0f, 70.0f, 34.0f }; }
+    static juce::Rectangle<float> defaultRect() { return { kW - 14.0f - 70.0f - 8.0f - 96.0f, 264.0f, 96.0f, 34.0f }; }
 
     void button (juce::Graphics& g, juce::Rectangle<float> u, const juce::String& t, bool primary) const
     {
