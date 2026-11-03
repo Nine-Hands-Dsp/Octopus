@@ -16,7 +16,7 @@ namespace
 
     // ---- couleurs de l'écran
     const Colour kScrBg (0xff0a0c10), kScrPanel (0xff13161c), kScrPanel2 (0xff1a1e26), kLine (0xff59616e),
-                 kText (0xffeef1f5), kDim (0xff8d96a4), kFaint (0xff3a414d), kAccent (0xff4fc3f7), kAmber (0xffffb547),
+                 kText (0xffeef1f5), kDim (0xff8d96a4), kFaint (0xff3a414d), kAccent (0xff4fc3f7), kAmber (0xffffb547), kStompOrange (0xffff8c3a),
                  kPresetLed (0xff6fc8ff);
 
     // ---- écran : repère local (unités), origine = coin haut gauche de la vitre (1064 x 624)
@@ -1049,9 +1049,11 @@ private:
     {
         const auto rr = S (b.r);
         const bool hov = hoverBtn == b.id && b.enabled;
-        g.setColour (b.active ? kAccent.withAlpha (0.22f) : (hov ? kScrPanel2.brighter (0.15f) : kScrPanel2));
+        const bool stomp = b.id == bModeStomp;                  // STOMP : nuance d'orange, au survol et sélectionné
+        const auto acc = stomp ? kStompOrange : kAccent;
+        g.setColour (b.active ? acc.withAlpha (0.22f) : (hov ? (stomp ? kScrPanel2.interpolatedWith (acc, 0.14f) : kScrPanel2.brighter (0.15f)) : kScrPanel2));
         g.fillRoundedRectangle (rr, S (7.0f));
-        g.setColour (b.active ? kAccent : (hov ? kDim : kFaint));
+        g.setColour (b.active ? acc : (hov ? (stomp ? acc.withAlpha (0.85f) : kDim) : kFaint));
         g.drawRoundedRectangle (rr.reduced (S (0.6f)), S (7.0f), S (1.2f));
         g.setFont (font (tfBold, textSize));
         g.setColour (! b.enabled ? kFaint : (b.active ? kText : kText.withAlpha (0.85f)));

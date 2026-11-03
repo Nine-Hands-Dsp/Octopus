@@ -143,6 +143,9 @@ int main (int argc, char** argv)
     e.save (3); e.rename (3, "Doom Drop G");
     e.load (0);
     shot ("octopus_preset");
+    ed->screenHover ({ 840.0f, 37.0f });                                      // survol de STOMP : orange
+    shot ("octopus_stomp_hover");
+    ed->screenHover ({ 2.0f, 2.0f });
     e.toggle (e.blocks()[4]);
     ed->screenHover ({ 108.0f + 150.0f * 2.0f, 80.0f + 36.0f });
     shot ("octopus_edited_hover");
