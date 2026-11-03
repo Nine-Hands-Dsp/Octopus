@@ -9,11 +9,11 @@
 class OctopusEngine
 {
 public:
-    static constexpr int kBanks = 16, kSlots = 4, kPresets = kBanks * kSlots, kFs = 4;
+    static constexpr int kBanks = 16, kSlots = 4, kPresets = kBanks * kSlots, kFs = 4, kKeys = 6;   // kKeys : A B C D + E F (doubles appuis A+B / C+D)
     enum Mode { presetMode = 0, stompMode = 1 };
 
     // commandes pilotables en MIDI (CC appris) ou par les paramètres du plugin
-    enum Target { fsA, fsB, fsC, fsD, bankDown, bankUp, modeToggle, tunerToggle, numTargets };
+    enum Target { fsA, fsB, fsC, fsD, bankDown, bankUp, modeToggle, tunerToggle, fsE, fsF, numTargets };
     static juce::String targetName (int t);
 
     struct Preset
@@ -21,7 +21,7 @@ public:
         juce::String name;
         juce::StringArray entries;          // effets au format texte de REAPER (sans Octopus, sans FXID)
         int selfPos = 0;                    // position d'Octopus parmi eux
-        juce::Array<int> stomp[kFs];        // blocs (positions dans entries) commandés par chaque footswitch en mode STOMP
+        juce::Array<int> stomp[kKeys];      // blocs (positions dans entries) commandés par chaque footswitch (A-D en STOMP, E / F)
         bool saved = false;
         juce::uint32 colour = 0;            // couleur du preset (0 = celle de son footswitch)
         juce::StringArray onStates;         // "1" / "0" par effet : ON / OFF tel qu'enregistré (bypass de la pédale compris)
@@ -71,7 +71,7 @@ public:
     void toggleTuner();                     // accordeur intégré d'Octopus (un bloc CHROMA allumé est éteint)
 
     // ---- doubles appuis : A+B, B+C, C+D (deux footswitchs voisins à moins de kComboMs)
-    enum ComboAction { comboNone = 0, comboTuner, comboBankDown, comboBankUp, comboMode, comboCc, numComboActions };
+    enum ComboAction { comboNone = 0, comboTuner, comboBankDown, comboBankUp, comboMode, comboCc, comboStomp, numComboActions };
     static constexpr int kCombos = 3;                    // 0 = A+B, 1 = B+C, 2 = C+D
     static juce::String comboName (int k);               // "A+B"
     static juce::String comboActionName (int a);
@@ -81,6 +81,10 @@ public:
     juce::String comboLabel (int k) const;               // texte sérigraphié entre les deux footswitchs : E, CHROMA, F
     juce::String comboTitle (int k) const;               // "E (A+B) : CC 26"
     void triggerCombo (int k);
+    static int keyOfCombo (int k) { return k == 0 ? 4 : k == 2 ? 5 : -1; }     // E = 4, F = 5
+    static int comboOfKey (int f) { return f == 4 ? 0 : f == 5 ? 2 : -1; }
+    bool tunerOn() const { return chromaIndex() >= 0 || (isInternalTunerOn && isInternalTunerOn()); }
+    std::function<bool()> isInternalTunerOn;
     std::function<void (int cc)> onSendCc;               // le processeur envoie CC (127 puis 0) aux effets suivants
     std::function<void()> onInternalTuner;  // le processeur allume / éteint son accordeur intégré
     static constexpr double kComboMs = 140.0;
@@ -103,7 +107,7 @@ public:
     void setPresetColour (int idx, juce::uint32 c) { presets[(size_t) juce::jlimit (0, kPresets - 1, idx)].colour = c; changed(); }
     static constexpr juce::uint32 kDefaultFsColour = 0xff6fc8ff;
 
-    bool isAssigned (int fs, const juce::String& guid) const { return stompGuids[fs].contains (guid); }
+    bool isAssigned (int fs, const juce::String& guid) const { return juce::isPositiveAndBelow (fs, kKeys) && stompGuids[fs].contains (guid); }
     void toggleAssign (int fs, const juce::String& guid);
     void clearAssign (int fs);
 
@@ -163,7 +167,9 @@ private:
     Preset clip; bool hasClip = false;
     int cur = -1, viewBank = 0;
     Mode md = presetMode;
-    juce::StringArray stompGuids[kFs];
+    juce::StringArray stompGuids[kKeys];
+    void switchGroup (int f);                            // bascule les blocs commandés par ce footswitch
+    std::array<double, kCombos> comboFlash {};           // E / F s'allument un instant quand ils envoient leur CC
     juce::String sigLoaded;
     bool sigPending = false;
     juce::Array<InstalledFx> installedCache;

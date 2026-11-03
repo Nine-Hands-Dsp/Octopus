@@ -12,7 +12,7 @@ OctopusEngine::OctopusEngine (ChainHost& h) : host (h)
 
 juce::String OctopusEngine::targetName (int t)
 {
-    static const char* n[numTargets] = { "Footswitch A", "Footswitch B", "Footswitch C", "Footswitch D", "Bank down", "Bank up", "PRESET / STOMP mode", "Tuner on / off" };
+    static const char* n[numTargets] = { "Footswitch A", "Footswitch B", "Footswitch C", "Footswitch D", "Bank down", "Bank up", "PRESET / STOMP mode", "Tuner on / off", "Footswitch E (A+B)", "Footswitch F (C+D)" };
     return n[juce::jlimit (0, numTargets - 1, t)];
 }
 
@@ -346,7 +346,7 @@ juce::String OctopusEngine::comboName (int k)
 
 juce::String OctopusEngine::comboActionName (int a)
 {
-    static const char* n[numComboActions] = { "Nothing", "Tuner (CHROMA)", "Bank down", "Bank up", "PRESET / STOMP mode", "Send a MIDI CC" };
+    static const char* n[numComboActions] = { "Nothing", "Tuner (CHROMA)", "Bank down", "Bank up", "PRESET / STOMP mode", "Send a MIDI CC", "Switch effects" };
     return n[juce::jlimit (0, numComboActions - 1, a)];
 }
 
@@ -362,7 +362,7 @@ juce::String OctopusEngine::comboTitle (int k) const
 {
     const juce::String key = k == 0 ? "E (A+B)" : k == 2 ? "F (C+D)" : "B+C";
     const int a = comboAction (k);
-    return key + " : " + (a == comboCc ? "CC " + juce::String (comboCcNumber (k)) : comboActionName (a));
+    return key + " : " + (a == comboCc ? "CC " + juce::String (comboCcNumber (k)) : a == comboStomp ? fsText (keyOfCombo (k)) : comboActionName (a));
 }
 
 juce::String OctopusEngine::comboLabel (int k) const
@@ -376,6 +376,7 @@ juce::String OctopusEngine::comboLabel (int k) const
         case comboBankUp:   return "BANK +";
         case comboMode:     return "MODE";
         case comboCc:       return "CC " + juce::String (comboCcNumber (k));
+        case comboStomp:    return "FX";
         default:            return {};
     }
 }
@@ -395,7 +396,11 @@ void OctopusEngine::triggerCombo (int k)
         case comboMode:     setMode (md == presetMode ? stompMode : presetMode); break;
         case comboCc:
             if (onSendCc) onSendCc (comboCcNumber (k));
+            comboFlash[(size_t) juce::jlimit (0, kCombos - 1, k)] = juce::Time::getMillisecondCounterHiRes() + 260.0;
             say (comboTitle (k) + " sent");
+            break;
+        case comboStomp:
+            if (keyOfCombo (k) >= 0) switchGroup (keyOfCombo (k));
             break;
         default: break;
     }
@@ -449,13 +454,19 @@ void OctopusEngine::press (int f)
         load (idx);
         return;
     }
-    // STOMP : bascule le groupe de blocs commandés (tous OFF si l'un est ON, sinon tous ON)
+    switchGroup (f);
+}
+
+// bascule le groupe de blocs commandés (tous OFF si l'un est ON, sinon tous ON) : A-D en STOMP, E / F dans les deux modes
+void OctopusEngine::switchGroup (int f)
+{
+    if (! juce::isPositiveAndBelow (f, kKeys)) return;
     juce::Array<int> idx;
     bool anyOn = false;
     for (auto& g : stompGuids[f])
         for (int i = 0; i < fx.size(); ++i)
             if (fx.getReference (i).guid == g) { idx.add (i); anyOn = anyOn || fx.getReference (i).enabled; }
-    if (idx.isEmpty()) { say ("Footswitch " + juce::String::charToString ((juce::juce_wchar) ('A' + f)) + " : no block assigned (right-click a block)"); return; }
+    if (idx.isEmpty()) { say ("Footswitch " + juce::String::charToString ((juce::juce_wchar) ('A' + f)) + " : no effect assigned (right-click its box on the screen)"); return; }
     host.beginUndo();
     for (auto i : idx) setOn (i, ! anyOn);
     host.endUndo ("footswitch " + juce::String::charToString ((juce::juce_wchar) ('A' + f)));
@@ -464,6 +475,11 @@ void OctopusEngine::press (int f)
 
 juce::String OctopusEngine::fsTitle (int f) const
 {
+    if (const int k = comboOfKey (f); k >= 0)
+    {
+        if (comboAction (k) == comboStomp && ! stompGuids[f].isEmpty()) return juce::String (FxCat::label (fsKind (f))).toUpperCase();
+        return comboName (k) + " DOUBLE PRESS";
+    }
     if (md == presetMode) return label (viewBank * kSlots + f);
     if (stompGuids[f].isEmpty()) return "STOMP " + juce::String::charToString ((juce::juce_wchar) ('A' + f));
     const int k = fsKind (f);
@@ -472,7 +488,9 @@ juce::String OctopusEngine::fsTitle (int f) const
 
 juce::String OctopusEngine::fsText (int f) const
 {
-    if (md == presetMode) return displayName (viewBank * kSlots + f);
+    if (const int k = comboOfKey (f); k >= 0 && comboAction (k) != comboStomp)
+        return comboAction (k) == comboCc ? "Send CC " + juce::String (comboCcNumber (k)) : comboAction (k) == comboNone ? juce::String ("-") : comboActionName (comboAction (k));
+    if (f < kFs && md == presetMode) return displayName (viewBank * kSlots + f);
     juce::StringArray names;
     for (auto& g : stompGuids[f])
     {
@@ -484,7 +502,17 @@ juce::String OctopusEngine::fsText (int f) const
 
 bool OctopusEngine::fsLit (int f) const
 {
-    if (md == presetMode) return cur == viewBank * kSlots + f;
+    if (const int k = comboOfKey (f); k >= 0)
+    {
+        switch (comboAction (k))
+        {
+            case comboTuner: return tunerOn();
+            case comboCc:    return juce::Time::getMillisecondCounterHiRes() < comboFlash[(size_t) k];
+            case comboStomp: break;
+            default:         return false;
+        }
+    }
+    else if (md == presetMode) return cur == viewBank * kSlots + f;
     for (auto& g : stompGuids[f])
     {
         const int b = blockOf (g);
@@ -505,15 +533,19 @@ int OctopusEngine::fsKind (int f) const
 
 void OctopusEngine::toggleAssign (int f, const juce::String& guid)
 {
-    if (! juce::isPositiveAndBelow (f, kFs) || guid.isEmpty()) return;
+    if (! juce::isPositiveAndBelow (f, kKeys) || guid.isEmpty()) return;
     if (stompGuids[f].contains (guid)) stompGuids[f].removeString (guid);
-    else stompGuids[f].add (guid);
+    else
+    {
+        stompGuids[f].add (guid);
+        if (const int k = comboOfKey (f); k >= 0) comboAct[(size_t) k] = comboStomp;     // E / F : affecter un effet = le commander
+    }
     changed();
 }
 
 void OctopusEngine::clearAssign (int f)
 {
-    if (juce::isPositiveAndBelow (f, kFs)) { stompGuids[f].clear(); changed(); }
+    if (juce::isPositiveAndBelow (f, kKeys)) { stompGuids[f].clear(); changed(); }
 }
 
 // ------------------------------------------------------------------ banks / presets
@@ -541,7 +573,7 @@ bool OctopusEngine::save (int idx)
     p.onStates.clear();
     for (auto i : blk) p.onStates.add (fx.getReference (i).enabled ? "1" : "0");
     if (p.onStates.size() != p.entries.size()) p.onStates.clear();
-    for (int f = 0; f < kFs; ++f)
+    for (int f = 0; f < kKeys; ++f)
     {
         p.stomp[f].clear();
         for (auto& g : stompGuids[f]) { const int b = blockOf (g); if (b >= 0) p.stomp[f].add (b); }
@@ -632,7 +664,7 @@ bool OctopusEngine::load (int idx)
 
     refreshNow();
     // footswitchs du mode STOMP : positions du preset -> blocs réellement présents
-    for (int f = 0; f < kFs; ++f)
+    for (int f = 0; f < kKeys; ++f)
     {
         stompGuids[f].clear();
         for (auto b : p.stomp[f])
@@ -695,6 +727,8 @@ void OctopusEngine::resetMidi()
 void OctopusEngine::trigger (int t)
 {
     if (t >= fsA && t <= fsD) pressFs (t - fsA);
+    else if (t == fsE) triggerCombo (0);
+    else if (t == fsF) triggerCombo (2);
     else if (t == tunerToggle) toggleTuner();
     else if (t == bankDown) bankStep (-1);
     else if (t == bankUp) bankStep (1);
@@ -752,7 +786,7 @@ juce::ValueTree OctopusEngine::presetToTree (const Preset& p, int idx)
     if (! p.saved) t.setProperty ("empty", true, nullptr);
     if (! p.onStates.isEmpty()) t.setProperty ("on", p.onStates.joinIntoString (""), nullptr);          // emplacement vide qui a seulement une couleur
     if (p.colour != 0) t.setProperty ("colour", juce::String::toHexString ((int) p.colour), nullptr);
-    for (int f = 0; f < kFs; ++f)
+    for (int f = 0; f < kKeys; ++f)
     {
         juce::StringArray s;
         for (auto b : p.stomp[f]) s.add (juce::String (b));
@@ -775,7 +809,7 @@ OctopusEngine::Preset OctopusEngine::presetFromTree (const juce::ValueTree& t)
     p.name = t["name"].toString();
     p.selfPos = (int) t["self"];
     if (t.hasProperty ("colour")) p.colour = (juce::uint32) t["colour"].toString().getHexValue64();
-    for (int f = 0; f < kFs; ++f)
+    for (int f = 0; f < kKeys; ++f)
     {
         auto s = juce::StringArray::fromTokens (t["stomp" + juce::String (f)].toString(), ",", "");
         for (auto& x : s) if (x.isNotEmpty()) p.stomp[f].add (x.getIntValue());
@@ -825,7 +859,7 @@ juce::ValueTree OctopusEngine::toTree() const
     for (int i = 0; i < numTargets; ++i) { c.add (juce::String (cc[(size_t) i])); l.add (latch[(size_t) i] ? "1" : "0"); }
     root.setProperty ("cc", c.joinIntoString (","), nullptr);
     root.setProperty ("latch", l.joinIntoString (","), nullptr);
-    for (int f = 0; f < kFs; ++f) root.setProperty ("stompGuids" + juce::String (f), stompGuids[f].joinIntoString (";"), nullptr);
+    for (int f = 0; f < kKeys; ++f) root.setProperty ("stompGuids" + juce::String (f), stompGuids[f].joinIntoString (";"), nullptr);
     for (int f = 0; f < kFs; ++f) root.setProperty ("fsColour" + juce::String (f), juce::String::toHexString ((int) fsCol[(size_t) f]), nullptr);
     for (int k = 0; k < kCombos; ++k)
     {
@@ -865,7 +899,7 @@ void OctopusEngine::fromTree (const juce::ValueTree& root)
         cc[(size_t) i] = i < c.size() && c[i].isNotEmpty() ? c[i].getIntValue() : -1;
         latch[(size_t) i] = i < l.size() && l[i] == "1";
     }
-    for (int f = 0; f < kFs; ++f)
+    for (int f = 0; f < kKeys; ++f)
         stompGuids[f] = juce::StringArray::fromTokens (root["stompGuids" + juce::String (f)].toString(), ";", "");
     for (auto& s : stompGuids) s.removeEmptyStrings();
     for (int f = 0; f < kFs; ++f)

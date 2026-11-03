@@ -1,3 +1,4 @@
+#include "../../ColourPicker.h"
 #include "../../OctoSettings.h"
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
@@ -225,6 +226,11 @@ int main (int argc, char** argv)
     shot ("octopus_banks");
     ed->showScreen (0);
     shot ("octopus_fs_colours");
+    ed->showScreen (6, 2);
+    pump (6);
+    shot ("octopus_colour_picker_fs");
+    for (auto* c : ed->getChildren()) if (auto* l = dynamic_cast<OctoPickerLayer*> (c)) l->dismiss();
+    pump (6);
     ed->showScreen (0);
 
     // accordeur : bloc CHROMA allumé, guitare 7 cordes (G1 joué 8 cents bas)
@@ -323,6 +329,30 @@ int main (int argc, char** argv)
         shot ("octopus_combos");
         e.setCombo (0, OctopusEngine::comboCc, 26); e.setCombo (2, OctopusEngine::comboCc, 28);
 
+        // E et F : vrais footswitchs (effets affectés, dans les deux modes) et MIDI learn
+        {
+            const auto g5 = e.chain().getReference (e.blocks()[5]).guid, g6 = e.chain().getReference (e.blocks()[6]).guid;
+            e.toggleAssign (4, g5); e.toggleAssign (4, g6);
+            check (e.comboAction (0) == OctopusEngine::comboStomp, "E : affecter un effet le fait commander");
+            const int b5 = e.blockOf (g5);
+            const bool was = e.chain().getReference (e.blocks()[b5]).enabled;
+            e.pressFs (0); e.pressFs (1);
+            pump (3);
+            check (e.chain().getReference (e.blocks()[e.blockOf (g5)]).enabled != was, "A+B : E bascule ses effets (mode PRESET)");
+            e.learnTarget = OctopusEngine::fsE; e.midiCc (1, 40, 127); e.midiCc (1, 40, 0);
+            check (e.ccOf (OctopusEngine::fsE) == 40, "MIDI learn de E : CC 40");
+            e.midiCc (1, 40, 127); e.midiCc (1, 40, 0);
+            pump (3);
+            check (e.chain().getReference (e.blocks()[e.blockOf (g5)]).enabled == was, "E par MIDI : effets rebasculés");
+            auto st2 = e.toTree(); e.clearAssign (4); e.fromTree (st2);
+            check (e.isAssigned (4, g5) && e.isAssigned (4, g6), "effets de E enregistrés avec le projet");
+            if (! e.chain().getReference (e.blocks()[e.blockOf (g5)]).enabled) { e.pressFs (0); e.pressFs (1); pump (3); }
+            e.toggleAssign (5, e.chain().getReference (e.blocks()[9]).guid);
+            pump (8);
+            shot ("octopus_keys_ef");
+            e.clearAssign (4); e.clearAssign (5); e.clearCc (OctopusEngine::fsE);
+            e.setCombo (0, OctopusEngine::comboCc, 26); e.setCombo (2, OctopusEngine::comboCc, 28);
+        }
     }
 
     ed->setScaleIndex (0);
@@ -360,6 +390,19 @@ int main (int argc, char** argv)
                && e.presetColour (3) == e.fsColour (3), "couleur propre d'un preset enregistrée et relue");
         e.load (2);
         shot ("octopus_preset_colour");
+        ed->showScreen (5, 2);
+        pump (2);
+        for (auto* c : ed->getChildren())
+            if (auto* l = dynamic_cast<OctoPickerLayer*> (c))
+            {
+                Array<juce::uint32> u; u.insertMultiple (0, 0u, 11);
+                u.set (0, 0xffc0392b); u.set (1, 0xff7f5af0); u.set (2, 0xff2ec4b6);
+                l->colourPicker().setUserForTest (u, 3);
+            }
+        pump (6);
+        shot ("octopus_colour_picker_preset");
+        for (auto* c : ed->getChildren()) if (auto* l = dynamic_cast<OctoPickerLayer*> (c)) l->dismiss();
+        pump (6);
         e.setPresetColour (2, 0); e.setPresetColour (6, 0);
     }
 

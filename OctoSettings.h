@@ -45,4 +45,27 @@ namespace OctoSettings
         file().getParentDirectory().createDirectory();
         x.writeTo (file());
     }
+
+    // couleurs enregistrées dans le nuancier (11 emplacements, 0 = vide), communes à tous les projets
+    inline juce::Array<juce::uint32> userColours()
+    {
+        juce::Array<juce::uint32> out;
+        out.insertMultiple (0, 0u, 11);
+        if (auto x = juce::XmlDocument::parse (file()))
+        {
+            auto t = juce::StringArray::fromTokens (x->getStringAttribute ("userColours"), ",", "");
+            for (int i = 0; i < juce::jmin (11, t.size()); ++i) out.set (i, (juce::uint32) t[i].getHexValue64());
+        }
+        return out;
+    }
+    inline void setUserColours (const juce::Array<juce::uint32>& c)
+    {
+        juce::XmlElement x ("OctopusSettings");
+        if (auto old = juce::XmlDocument::parse (file())) x = *old;
+        juce::StringArray t;
+        for (auto v : c) t.add (v == 0 ? juce::String ("0") : juce::String::toHexString ((juce::int64) v));
+        x.setAttribute ("userColours", t.joinIntoString (","));
+        file().getParentDirectory().createDirectory();
+        x.writeTo (file());
+    }
 }

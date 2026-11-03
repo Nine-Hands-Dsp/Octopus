@@ -4,7 +4,7 @@
  #include "ReaperBridge.h"
 #endif
 
-const char* const OctopusProcessor::kTargetIds[OctopusEngine::numTargets] = { "fsA", "fsB", "fsC", "fsD", "bankDown", "bankUp", "mode", "tuner" };
+const char* const OctopusProcessor::kTargetIds[OctopusEngine::numTargets] = { "fsA", "fsB", "fsC", "fsD", "bankDown", "bankUp", "mode", "tuner", "fsE", "fsF" };
 
 juce::AudioProcessorValueTreeState::ParameterLayout OctopusProcessor::layout()
 {
@@ -46,6 +46,7 @@ OctopusProcessor::OctopusProcessor (bool demoChain)
     engine->onStateChanged = [this] { storeEngineState(); };
     engine->onTokenClash = [this] { newToken(); };
     engine->onInternalTuner = [this] { toggleInternalTuner(); };
+    engine->isInternalTunerOn = [this] { return innerOn.load(); };
     engine->onSendCc = [this] (int cc)
     {
         const auto w = outFifo.write (1);

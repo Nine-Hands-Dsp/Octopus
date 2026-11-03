@@ -3,6 +3,7 @@
 #include "Layout.h"
 #include "UserFxPresets.h"
 #include "OctoSettings.h"
+#include "ColourPicker.h"
 #include <BinaryData.h>
 
 using namespace juce;
@@ -26,7 +27,7 @@ namespace
     constexpr float kGridTop = 106.0f, kRowPitch = 140.0f, kColPitch = 140.0f, kColX0 = (kSW - kColPitch * (float) (kCols - 1)) * 0.5f;   // grille centrée
     constexpr float kTile = 70.0f, kTileDy = 40.0f;              // carré du bloc, centre à rowTop + kTileDy
     // cases des footswitchs : même écart entre elles et avec les bords de l'écran, décollées du bas
-    constexpr float kFooterY = 547.0f, kFooterH = 58.0f, kFooterGap = 16.0f, kFooterW = (kSW - 5.0f * kFooterGap) / 4.0f;
+    constexpr float kFooterY = 547.0f, kFooterH = 58.0f, kFooterGap = 14.0f, kFooterSplit = 12.0f, kFooterW = (kSW - 7.0f * kFooterGap - kFooterSplit) / 6.0f;   // A B C D | E F
     constexpr float kFooterLine = 528.0f;                                       // trait au-dessus des cases
     const Rectangle<float> kOverlay (0.0f, kHeaderH, kSW, kSH - kHeaderH);
 
@@ -259,26 +260,78 @@ public:
     }
 
     // sérigraphie des doubles appuis : trait fin entre deux footswitchs voisins, l'action au milieu (CHROMA, BANK +, CC 26...)
-    static Rectangle<float> comboRect (int k) { const float xl = L::fsX[k] + 54.0f, xr = L::fsX[k + 1] - 54.0f; return { xl, L::fsY - 14.0f, xr - xl, 28.0f }; }
+    // Sérigraphie des doubles appuis, dessin de l'utilisateur : entre A et B  ] E [ , entre C et D  ] F [ ,
+    // entre B et C  — ı|ı — (accordeur). Traits, lettre et pictogramme forment une seule LED : gris gravé éteint,
+    // couleur de l'effet commandé allumé (vert de CHROMA pour l'accordeur).
+    static constexpr float kMarkW = 1.4f;                 // épaisseur des traits (unités)
+    static Point<float> markCentre (int k) { return { (L::fsX[k] + L::fsX[k + 1]) * 0.5f, L::fsY }; }
+    static Rectangle<float> comboRect (int k) { const auto c = markCentre (k); return { c.x - 100.0f, c.y - 30.0f, 200.0f, 60.0f }; }
+
+    // contour en unités, relatif au centre entre les deux footswitchs (relevé sur le dessin fourni)
+    static Path markOutline (int k, bool tunerIcon, float wordW)
+    {
+        Path p;
+        auto poly = [&p] (std::initializer_list<Point<float>> pts)
+        {
+            bool first = true;
+            for (auto q : pts) { if (first) p.startNewSubPath (q); else p.lineTo (q); first = false; }
+        };
+        const float T = 27.0f, st = 16.0f, nt = 4.4f, dx = -2.0f;
+        if (k == 0 || k == 2)
+        {
+            poly ({ { -98.0f + dx, -T }, { -15.8f + dx, -T }, { -15.8f + dx, T }, { -98.0f + dx, T } });          // ]
+            if (k == 0)                                                                                               // E [
+                poly ({ { 102.0f + dx, -T }, { 16.8f + dx, -T }, { 16.8f + dx, -st }, { -3.1f + dx, -st }, { -3.1f + dx, -nt },
+                        { 15.3f + dx, -nt }, { 15.3f + dx, nt }, { -3.1f + dx, nt }, { -3.1f + dx, st }, { 16.8f + dx, st },
+                        { 16.8f + dx, T }, { 102.0f + dx, T } });
+            else                                                                                                      // F [
+                poly ({ { 102.0f + dx, -T }, { 16.8f + dx, -T }, { 16.8f + dx, -st }, { -3.1f + dx, -st }, { -3.1f + dx, -nt },
+                        { 15.3f + dx, -nt }, { 15.3f + dx, nt }, { -3.1f + dx, nt }, { -3.1f + dx, T }, { 102.0f + dx, T } });
+            return p;
+        }
+        if (tunerIcon && wordW >= 0.0f)
+        {
+            static constexpr float hRel[5] = { 0.37f, 0.54f, 1.0f, 0.54f, 0.37f };
+            const float H = 39.0f, step = 11.5f;
+            for (int b = 0; b < 5; ++b)
+                poly ({ { (float) (b - 2) * step, -H * hRel[b] * 0.5f }, { (float) (b - 2) * step, H * hRel[b] * 0.5f } });
+            return p;                                     // le pictogramme seul (la LED) ; ses traits sont dessinés à part, jamais allumés
+        }
+        const float h = tunerIcon ? 35.0f : wordW * 0.5f + 10.0f;  // traits de chaque côté du pictogramme ou du mot
+        poly ({ { -88.0f, 0.0f }, { -h, 0.0f } });
+        poly ({ { h, 0.0f }, { 88.0f, 0.0f } });
+        return p;
+    }
+    Path markPath (int k, bool tunerIcon, float wordW) const
+    {
+        Path stroked;
+        PathStrokeType (kMarkW * s, PathStrokeType::mitered, PathStrokeType::square)
+            .createStrokedPath (stroked, markOutline (k, tunerIcon, wordW), AffineTransform::scale (s).translated (r (markCentre (k))));
+        return stroked;
+    }
+
     void drawComboMark (Graphics& g)
     {
-        const auto ink = Colour (0xffb9c0ca).withAlpha (0.78f);
-        const auto fWord = Font (FontOptions (tfBold).withHeight (15.0f * s)).withExtraKerningFactor (0.18f);
         for (int k = 0; k < OctopusEngine::kCombos; ++k)
         {
-            const auto word = eng.comboLabel (k);
-            if (word.isEmpty()) continue;
-            const bool letter = word.length() == 1;                     // E et F : lettre seule, un peu plus grande
-            const auto f = letter ? Font (FontOptions (tfBold).withHeight (24.0f * s)) : fWord;
-            const bool idle = eng.comboAction (k) == OctopusEngine::comboNone;
-            const auto cr = comboRect (k);
-            const float y = L::fsY, xl = cr.getX(), xr = cr.getRight(), cx = cr.getCentreX();
-            const float tw = GlyphArrangement::getStringWidth (f, word) / s, gap = 10.0f;
-            g.setColour (hoverCombo == k ? Colour (0xffe4e8ee) : ink.withMultipliedAlpha (idle ? 0.45f : 1.0f));
-            g.fillRoundedRectangle (r (Rectangle<float> (xl, y - 0.8f, cx - tw * 0.5f - gap - xl, 1.6f)), 0.8f * s);
-            g.fillRoundedRectangle (r (Rectangle<float> (cx + tw * 0.5f + gap, y - 0.8f, xr - (cx + tw * 0.5f + gap), 1.6f)), 0.8f * s);
-            g.setFont (f);
-            g.drawText (word, r (Rectangle<float> (cx - tw * 0.5f - 4.0f, y - 12.0f, tw + 8.0f, 24.0f)), Justification::centred, false);
+            const int key = OctopusEngine::keyOfCombo (k);
+            const bool icon = key < 0 && eng.comboAction (k) == OctopusEngine::comboTuner;
+            const auto word = key < 0 && ! icon ? eng.comboLabel (k) : String();
+            if (key < 0 && ! icon && word.isEmpty()) continue;
+            const auto fWord = Font (FontOptions (tfBold).withHeight (15.0f * s)).withExtraKerningFactor (0.18f);
+            const float ww = word.isEmpty() ? 0.0f : GlyphArrangement::getStringWidth (fWord, word) / s;
+            const int led = key >= 0 ? key : kTunerLed;
+            const auto p = markPath (k, icon, ww);
+            if (icon) drawLitPath (g, markPath (k, true, -1.0f), 0.0f, ledColour[led]);      // traits de l'accordeur : jamais allumés
+            drawLitPath (g, p, ledLevel[led], ledColour[led]);
+            if (hoverCombo == k) { g.setColour (Colours::white.withAlpha (0.28f)); g.fillPath (p); }
+            if (word.isNotEmpty())
+            {
+                const auto c = markCentre (k);
+                g.setColour (Colour (0xffb9c0ca).withAlpha (0.78f));
+                g.setFont (fWord);
+                g.drawText (word, r (Rectangle<float> (c.x - ww * 0.5f - 4.0f, c.y - 12.0f, ww + 8.0f, 24.0f)), Justification::centred, false);
+            }
         }
     }
     int comboAt (Point<float> unit) const
@@ -299,13 +352,33 @@ public:
             ccM.addSubMenu ("CC " + String (g0) + " - " + String (g0 + 31), sub);
         }
         m.addSubMenu ("Send a MIDI CC to the following effects" + (a == OctopusEngine::comboCc ? "  (CC " + String (eng.comboCcNumber (k)) + ")" : String()), ccM, true, nullptr, a == OctopusEngine::comboCc);
+        const int key = OctopusEngine::keyOfCombo (k);
+        if (key >= 0)                                    // E / F : un vrai footswitch, avec ses effets et son MIDI learn
+        {
+            PopupMenu fxM;
+            for (int b = 0; b < eng.blocks().size(); ++b)
+            {
+                const auto& fx = eng.chain().getReference (eng.blocks()[b]);
+                fxM.addItem (400 + b, FxCat::shortName (fx.name), true, eng.isAssigned (key, fx.guid));
+            }
+            if (eng.blocks().isEmpty()) fxM.addItem (399, "(no effect in the chain)", false);
+            fxM.addSeparator();
+            fxM.addItem (398, "Clear", eng.fsText (key) != "-" && a == OctopusEngine::comboStomp);
+            m.addSubMenu ("Switch effects (in PRESET and STOMP modes)", fxM, true, nullptr, a == OctopusEngine::comboStomp);
+            m.addSeparator();
+            addLearnItems (m, key == 4 ? OctopusEngine::fsE : OctopusEngine::fsF);
+        }
         m.addSeparator();
         m.addItem (300, "Test now", a != OctopusEngine::comboNone);
         SafePointer<PedalView> sp (this);
-        m.showMenuAsync (PopupMenu::Options(), [sp, k] (int r)
+        m.showMenuAsync (PopupMenu::Options(), [sp, k, key] (int r)
         {
             if (sp == nullptr || r <= 0) return;
-            if (r == 300) sp->eng.triggerCombo (k);
+            auto& e = sp->eng;
+            if (r == 300) e.triggerCombo (k);
+            else if (r >= 400 && r < 400 + e.blocks().size()) e.toggleAssign (key, e.chain().getReference (e.blocks()[r - 400]).guid);
+            else if (r == 398) { e.clearAssign (key); e.setCombo (k, OctopusEngine::comboNone); }
+            else if (sp->handleMidi (r)) {}
             else if (r >= 100 && r < 228) sp->eng.setCombo (k, OctopusEngine::comboCc, r - 100);
             else if (r >= 1 && r <= OctopusEngine::comboCc) sp->eng.setCombo (k, r - 1);
             sp->askRepaint (sp->getLocalBounds());
@@ -329,8 +402,10 @@ private:
 
     // état affiché
     int drawnGen = -1;
-    float ledLevel[4];
-    Colour ledColour[4] { kPresetLed, kPresetLed, kPresetLed, kPresetLed };
+    // éclairage : 0-3 = A B C D, 4 = E, 5 = F, 6 = pictogramme de l'accordeur (B+C)
+    static constexpr int kLeds = 7, kTunerLed = 6;
+    float ledLevel[kLeds] {};
+    Colour ledColour[kLeds] { kPresetLed, kPresetLed, kPresetLed, kPresetLed, kPresetLed, kPresetLed, kPresetLed };
     int pressedFs = -1;
 
     Overlay overlay = Overlay::none;
@@ -395,8 +470,21 @@ private:
     Point<float> toLocal (Point<float> px) const { return (px / s - L::glass.getPosition()) / L::kG; }
     Rectangle<int> screenPx() const { return r (L::glass).toNearestInt().expanded (2); }
 
-    Point<float> ledPos (int f) const { return { L::ledXs[f] + L::ledDx, L::ledY }; }
-    Rectangle<float> glowRect (int f) const { return Rectangle<float> (128.0f, 128.0f).withCentre (ledPos (f)); }
+    Point<float> ledPos (int f) const
+    {
+        if (f >= 4) return { (L::fsX[f == 4 ? 0 : f == 5 ? 2 : 1] + L::fsX[f == 4 ? 1 : f == 5 ? 3 : 2]) * 0.5f, L::fsY };   // E, F, accordeur : entre deux footswitchs
+        return { L::ledXs[f] + L::ledDx, L::ledY };
+    }
+    // couleur de E / F : celle du premier effet commandé, sinon celle des footswitchs ; vert de CHROMA pour l'accordeur
+    Colour keyColour (int f) const
+    {
+        const int k = OctopusEngine::comboOfKey (f);
+        if (k >= 0 && eng.comboAction (k) == OctopusEngine::comboTuner) return TC::green();
+        const int kind = eng.fsKind (f);
+        if (k >= 0 && eng.comboAction (k) == OctopusEngine::comboStomp && kind >= 0) return FxCat::colour (kind);
+        return Colour (OctopusEngine::kDefaultFsColour);
+    }
+    Rectangle<float> glowRect (int f) const { return Rectangle<float> (f >= 4 ? 240.0f : 128.0f, f >= 4 ? 100.0f : 128.0f).withCentre (ledPos (f)); }
 
     float physScale() const
     {
@@ -542,6 +630,11 @@ private:
         const auto c = r (c0);
         const auto b = p.getBounds();
         p.applyTransform (AffineTransform::translation (c.x - b.getCentreX(), c.y - b.getCentreY()));
+        drawLitPath (g, p, lvl, col);
+    }
+
+    void drawLitPath (Graphics& g, const Path& p, float lvl, Colour col)
+    {
         const auto pb = p.getBounds();
 
         // gravure : arête claire en bas à droite, ombre en haut à gauche dans le creux
@@ -1069,42 +1162,43 @@ private:
         g.setColour (kFaint.withAlpha (0.45f));
         g.fillRect (S (Rectangle<float> (0.0f, kFooterLine, kSW, 1.0f)));
         const bool inPresetMode = eng.mode() == OctopusEngine::presetMode;
-        for (int f = 0; f < 4; ++f)
+        for (int f = 0; f < OctopusEngine::kKeys; ++f)
         {
             const auto cell = footerCell (f);
             const auto c = S (cell);
             const bool lit = eng.fsLit (f);
             const int kind = eng.fsKind (f);
-            const auto col = inPresetMode ? Colour (eng.presetColour (eng.bank() * OctopusEngine::kSlots + f)) : (kind >= 0 ? FxCat::colour (kind) : kDim);
+            const auto col = f >= 4 ? keyColour (f)
+                           : inPresetMode ? Colour (eng.presetColour (eng.bank() * OctopusEngine::kSlots + f)) : (kind >= 0 ? FxCat::colour (kind) : kDim);
             const bool hov = hoverFooter == f;
             g.setColour (lit ? col.withAlpha (0.16f) : (hov ? kScrPanel2.brighter (0.1f) : kScrPanel));
             g.fillRoundedRectangle (c, S (9.0f));
             g.setColour (lit ? col : kFaint.withAlpha (hov ? 1.0f : 0.7f));
             g.drawRoundedRectangle (c.reduced (S (0.6f)), S (9.0f), S (lit ? 2.0f : 1.2f));
             // lettre du footswitch
-            const auto letter = S (Rectangle<float> (cell.getX() + 8.0f, cell.getY() + 13.0f, 36.0f, 36.0f));
+            const auto letter = S (Rectangle<float> (cell.getX() + 8.0f, cell.getY() + 13.0f, 34.0f, 34.0f));
             g.setColour (lit ? col : kScrPanel2.brighter (0.2f));
             g.fillRoundedRectangle (letter, S (6.0f));
             g.setFont (font (tfBold, 20.0f));
             g.setColour (lit ? kScrBg : kText.withAlpha (0.8f));
             g.drawText (fsLetter (f), letter.translated (0.0f, S (1.0f)), Justification::centred);
-            g.setFont (font (tfBold, 15.0f));
+            g.setFont (font (tfBold, 13.0f));
             g.setColour (lit ? col.brighter (0.3f) : kDim);
-            g.drawText (eng.fsTitle (f), S (Rectangle<float> (cell.getX() + 54.0f, cell.getY() + 7.0f, cell.getWidth() - 60.0f, 20.0f)), Justification::centredLeft, true);
-            g.setFont (font (tfMedium, 18.0f));
+            g.drawText (eng.fsTitle (f), S (Rectangle<float> (cell.getX() + 50.0f, cell.getY() + 8.0f, cell.getWidth() - 54.0f, 18.0f)), Justification::centredLeft, true);
+            g.setFont (font (tfMedium, 16.0f));
             g.setColour (lit ? kText : kText.withAlpha (0.75f));
-            g.drawText (eng.fsText (f), S (Rectangle<float> (cell.getX() + 54.0f, cell.getY() + 28.0f, cell.getWidth() - 62.0f, 26.0f)), Justification::centredLeft, true);
+            g.drawText (eng.fsText (f), S (Rectangle<float> (cell.getX() + 50.0f, cell.getY() + 28.0f, cell.getWidth() - 54.0f, 24.0f)), Justification::centredLeft, true);
         }
     }
 
     Rectangle<float> footerCell (int f) const
     {
-        return { kFooterGap + (kFooterW + kFooterGap) * (float) f, kFooterY, kFooterW, kFooterH };
+        return { kFooterGap + (kFooterW + kFooterGap) * (float) f + (f >= 4 ? kFooterSplit : 0.0f), kFooterY, kFooterW, kFooterH };
     }
     int footerAt (Point<float> p) const
     {
         if (overlay != Overlay::none || ! eng.isReady()) return -1;
-        for (int f = 0; f < 4; ++f) if (footerCell (f).contains (p)) return f;
+        for (int f = 0; f < OctopusEngine::kKeys; ++f) if (footerCell (f).contains (p)) return f;
         return -1;
     }
 
@@ -2280,7 +2374,8 @@ private:
         const int ft = footerAt (p);
         if (ft >= 0)
         {
-            if (e.mods.isPopupMenu()) footswitchMenu (ft);
+            if (ft >= 4) { const int k = OctopusEngine::comboOfKey (ft); if (e.mods.isPopupMenu()) comboMenu (k); else eng.triggerCombo (k); }
+            else if (e.mods.isPopupMenu()) footswitchMenu (ft);
             else eng.press (ft);
             return;
         }
@@ -2488,48 +2583,39 @@ private:
     }
 
     // enregistrement : jamais d'écrasement silencieux d'un preset existant
-    static constexpr std::pair<const char*, juce::uint32> kPalette[] = {
-            { "Blue", OctopusEngine::kDefaultFsColour }, { "Cyan", 0xff3ce0e8 }, { "Green", 0xff45e070 }, { "Lime", 0xffb6e83a },
-            { "Yellow", 0xffffe23a }, { "Amber", 0xffffb547 }, { "Orange", 0xffff7a2e }, { "Red", 0xffff4040 },
-            { "Pink", 0xffff5fb4 }, { "Purple", 0xffb07aff }, { "White", 0xfff2f4f8 } };
+
+    // nuancier (couleurs rapides + teinte / saturation / luminosité), ouvert dans la fenêtre d'Octopus, au-dessus de 'near' (unités)
+    void openPicker (const String& title, Colour start, Rectangle<float> near, bool withDefault,
+                     std::function<void (Colour)> apply, std::function<void()> toDefault = {})
+    {
+        auto* top = findParentComponentOfClass<OctopusEditor>();
+        Component* parent = top != nullptr ? (Component*) top : (Component*) this;
+        auto picker = std::make_unique<OctoColourPicker> (title, start, jlimit (0.85f, 1.6f, s * 1.25f), withDefault);
+        SafePointer<PedalView> sp (this);
+        picker->onChange = [sp, apply] (Colour c) { if (sp != nullptr) { apply (c); sp->askRepaint (sp->getLocalBounds()); } };
+        picker->onDefault = [sp, toDefault] { if (sp != nullptr && toDefault) { toDefault(); sp->askRepaint (sp->getLocalBounds()); } };
+        const auto area = parent->getLocalArea (this, near.toNearestInt());
+        auto* layer = new OctoPickerLayer (std::move (picker), area, parent->getLocalBounds());   // se détruit en se fermant
+        parent->addAndMakeVisible (layer);
+        layer->toFront (true);
+    }
 
     // couleur d'un preset (clic sur l'étiquette 1A... en haut) : étiquette, lettre, anneau et case de son footswitch
     void presetColourMenu (int idx)
     {
-        PopupMenu m;
-        m.addSectionHeader ("Preset " + OctopusEngine::label (idx) + " colour");
-        const bool own = eng.hasOwnColour (idx);
-        m.addColouredItem (1, "Footswitch colour (default)", Colour (eng.fsColour (idx % OctopusEngine::kSlots)), true, ! own);
-        m.addSeparator();
-        int id = 10;
-        for (auto& c : kPalette) m.addColouredItem (id++, c.first, Colour (c.second), true, own && eng.presetColour (idx) == c.second);
-        SafePointer<PedalView> sp (this);
-        m.showMenuAsync (PopupMenu::Options(), [sp, idx] (int r)
-        {
-            if (sp == nullptr || r <= 0) return;
-            if (r == 1) sp->eng.setPresetColour (idx, 0);
-            else if (r >= 10 && r < 10 + (int) std::size (kPalette)) sp->eng.setPresetColour (idx, kPalette[r - 10].second);
-            sp->askRepaint (sp->getLocalBounds());
-        });
+        openPicker ("Preset " + OctopusEngine::label (idx) + " colour", Colour (eng.presetColour (idx)),
+                    S (Rectangle<float> (14.0f, 13.0f, 104.0f, 48.0f)), true,
+                    [this, idx] (Colour c) { eng.setPresetColour (idx, c.getARGB()); },
+                    [this, idx] { eng.setPresetColour (idx, 0); });
     }
 
     // couleur d'un footswitch (lettre lumineuse et case de l'écran, en mode PRESET)
     void colourMenu (int f)
     {
-        static const std::pair<const char*, juce::uint32> pal[] = {
-            { "Blue (default)", OctopusEngine::kDefaultFsColour }, { "Cyan", 0xff3ce0e8 }, { "Green", 0xff45e070 }, { "Lime", 0xffb6e83a },
-            { "Yellow", 0xffffe23a }, { "Amber", 0xffffb547 }, { "Orange", 0xffff7a2e }, { "Red", 0xffff4040 },
-            { "Pink", 0xffff5fb4 }, { "Purple", 0xffb07aff }, { "White", 0xfff2f4f8 } };
-        PopupMenu m;
-        m.addSectionHeader ("Footswitch " + fsLetter (f) + " colour");
-        int id = 1;
-        for (auto& c : pal) m.addColouredItem (id++, c.first, Colour (c.second), true, eng.fsColour (f) == c.second);
-        SafePointer<PedalView> sp (this);
-        m.showMenuAsync (PopupMenu::Options(), [sp, f] (int r)
-        {
-            if (sp == nullptr || r < 1 || r > (int) std::size (pal)) return;
-            sp->eng.setFsColour (f, pal[r - 1].second);
-        });
+        openPicker ("Footswitch " + fsLetter (f) + " colour", Colour (eng.fsColour (f)),
+                    S (Rectangle<float> (520.0f + 132.0f * (float) f, 470.0f, 124.0f, 44.0f)), true,
+                    [this, f] (Colour c) { eng.setFsColour (f, c.getARGB()); },
+                    [this, f] { eng.setFsColour (f, OctopusEngine::kDefaultFsColour); });
     }
 
     void confirmSave (int idx)
@@ -2581,7 +2667,11 @@ private:
         m.addItem (2, "Parameters on screen");
         m.addItem (3, f.open ? "Close plug-in window" : "Open plug-in window");
         m.addSeparator();
-        for (int k = 0; k < 4; ++k) assign.addItem (10 + k, "Footswitch " + fsLetter (k), true, eng.isAssigned (k, f.guid));
+        for (int k = 0; k < OctopusEngine::kKeys; ++k)
+        {
+            if (k == 4) assign.addSeparator();
+            assign.addItem (10 + k, "Footswitch " + fsLetter (k) + (k == 4 ? "  (A+B)" : k == 5 ? "  (C+D)" : ""), true, eng.isAssigned (k, f.guid));
+        }
         m.addSubMenu ("Assign to footswitch (STOMP)", assign);
         {
             bool inv = false;
@@ -2628,7 +2718,7 @@ private:
                 case 23: e.moveBlock (idx, n - 1); break;
                 case 30: e.setBypassPref (e.chain().getReference (idx).original, OctopusEngine::bypassPedal); break;
                 case 31: e.setBypassPref (e.chain().getReference (idx).original, OctopusEngine::bypassReaper); break;
-                default: if (r >= 10 && r < 14) e.toggleAssign (r - 10, guid); break;
+                default: if (r >= 10 && r < 10 + OctopusEngine::kKeys) e.toggleAssign (r - 10, guid); break;
             }
             juce::ignoreUnused (slot);
         });
@@ -2815,11 +2905,18 @@ private:
             askRepaint (screenPx());
 
         // LED des footswitchs : fondu (0.45 à l'allumage, 0.28 à l'extinction, comme Echoflex), couleur selon le mode
-        for (int f = 0; f < 4; ++f)
+        for (int f = 0; f < kLeds; ++f)
         {
-            const bool lit = eng.isReady() && eng.fsLit (f);
-            Colour col = Colour (eng.presetColour (eng.bank() * OctopusEngine::kSlots + f));
-            if (eng.mode() == OctopusEngine::stompMode) { const int k = eng.fsKind (f); col = k >= 0 ? FxCat::colour (k) : col; }
+            bool lit = false;
+            Colour col;
+            if (f == kTunerLed) { lit = eng.isReady() && eng.comboAction (1) == OctopusEngine::comboTuner && eng.tunerOn(); col = TC::green(); }
+            else if (f >= 4) { lit = eng.isReady() && eng.fsLit (f); col = keyColour (f); }
+            else
+            {
+                lit = eng.isReady() && eng.fsLit (f);
+                col = Colour (eng.presetColour (eng.bank() * OctopusEngine::kSlots + f));
+                if (eng.mode() == OctopusEngine::stompMode) { const int k = eng.fsKind (f); col = k >= 0 ? FxCat::colour (k) : col; }
+            }
             if (lit || ledLevel[f] < 0.01f) ledColour[f] = col;                     // pendant l'extinction, la couleur reste
             const float target = lit ? 1.0f : 0.0f;
             const float before = ledLevel[f];
@@ -2829,11 +2926,11 @@ private:
             {
                 drawnLedColour[f] = ledColour[f];
                 askRepaint (r (glowRect (f)).toNearestInt().expanded (2));
-                askRepaint (r (Rectangle<float> (L::fsSprite, L::fsSprite).withCentre ({ L::fsX[f], L::fsY })).toNearestInt());
+                if (f < 4) askRepaint (r (Rectangle<float> (L::fsSprite, L::fsSprite).withCentre ({ L::fsX[f], L::fsY })).toNearestInt());
             }
         }
     }
-    Colour drawnLedColour[4];
+    Colour drawnLedColour[kLeds];
 
     friend class OctopusEditor;
 };
@@ -2853,7 +2950,11 @@ OctopusEditor::OctopusEditor (OctopusProcessor& p) : AudioProcessorEditor (&p), 
     view->initCaches();
 }
 
-OctopusEditor::~OctopusEditor() = default;
+OctopusEditor::~OctopusEditor()
+{
+    for (int i = getNumChildComponents(); --i >= 0;)              // nuancier resté ouvert
+        if (auto* l = dynamic_cast<OctoPickerLayer*> (getChildComponent (i))) delete l;
+}
 
 //==============================================================================
 // Anti-gel v2 (Studio Wiga) :
@@ -2900,6 +3001,8 @@ void OctopusEditor::visibilityChanged()      { useSoftwareRenderer(); if (isShow
 void OctopusEditor::resized()
 {
     view->setBounds (getLocalBounds());   // jamais de setSize ici (boucle avec l'hôte à 125 / 150 %)
+    for (auto* c : getChildren())                                  // la taille change : le nuancier se ferme
+        if (auto* l = dynamic_cast<OctoPickerLayer*> (c); l != nullptr && l->getBounds() != getLocalBounds() && l->isVisible()) l->dismiss();
 }
 
 int OctopusEditor::getScaleIndex() const
@@ -2924,6 +3027,8 @@ void OctopusEditor::showScreen (int which, int arg)
         case 2: view->openParams (arg); break;
         case 3: view->openBanks(); break;
         case 4: view->openParams (arg); view->showPresets(); break;
+        case 5: view->presetColourMenu (arg); break;
+        case 6: view->openBanks(); view->colourMenu (arg); break;
         default: view->closeOverlay(); break;
     }
 }
