@@ -342,17 +342,10 @@ public:
     void comboMenu (int k)
     {
         if (OctopusEngine::keyOfCombo (k) >= 0) { footswitchMenu (OctopusEngine::keyOfCombo (k)); return; }   // E / F : menu de A-D
-        PopupMenu m, ccM;
-        m.addSectionHeader (k == 0 ? "E = double press A+B" : k == 2 ? "F = double press C+D" : "Double press B+C");
+        PopupMenu m;
+        m.addSectionHeader ("Double press B+C");
         const int a = eng.comboAction (k);
         for (int i = 0; i < OctopusEngine::comboCc; ++i) m.addItem (1 + i, OctopusEngine::comboActionName (i), true, a == i);
-        for (int g0 = 0; g0 < 128; g0 += 32)
-        {
-            PopupMenu sub;
-            for (int c = g0; c < g0 + 32; ++c) sub.addItem (100 + c, "CC " + String (c), true, a == OctopusEngine::comboCc && eng.comboCcNumber (k) == c);
-            ccM.addSubMenu ("CC " + String (g0) + " - " + String (g0 + 31), sub);
-        }
-        m.addSubMenu ("Send a MIDI CC to the following effects" + (a == OctopusEngine::comboCc ? "  (CC " + String (eng.comboCcNumber (k)) + ")" : String()), ccM, true, nullptr, a == OctopusEngine::comboCc);
         const int key = OctopusEngine::keyOfCombo (k);
         if (key >= 0)                                    // E / F : un vrai footswitch, avec ses effets et son MIDI learn
         {
@@ -380,7 +373,7 @@ public:
             m.addItem (390, "MIDI : B + C pressed together (" + ccTxt (eng.ccOf (1)) + " + " + ccTxt (eng.ccOf (2)) + ")", false);
         }
         m.addSeparator();
-        m.addItem (310, "Color & Glow...");
+        m.addItem (310, "Color & Glow");
         SafePointer<PedalView> sp (this);
         m.showMenuAsync (PopupMenu::Options(), [sp, k, key] (int r)
         {
@@ -2805,7 +2798,7 @@ private:
         }
         midiSubmenu (m);
         m.addSeparator();
-        m.addItem (395, "Color & Glow...");                // couleur du footswitch et opacité du halo (pas de taille du plugin ici)
+        m.addItem (395, "Color & Glow");                // couleur du footswitch et opacité du halo (pas de taille du plugin ici)
         const auto near = fsMenuNear (f);
         SafePointer<PedalView> sp (this);
         m.showMenuAsync (PopupMenu::Options(), [sp, f, idx, near] (int r)

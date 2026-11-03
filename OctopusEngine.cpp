@@ -429,7 +429,10 @@ void OctopusEngine::pressFs (int f)
             for (auto& x : fx) if (x.guid == g) provStates.push_back ({ g, x.enabled });
     press (f);
     pendingFs = inCombo (f) ? f : -1;
-    pendingAt = now;
+    // le délai du double appui part de la FIN du premier appui : un preset long à charger (B = 1B...) ne mange pas
+    // le temps laissé au voisin (sinon B+C, dont le premier appui charge souvent une autre chaîne, était manqué)
+    pendingAt = juce::Time::getMillisecondCounterHiRes();
+    juce::ignoreUnused (now);
 }
 
 void OctopusEngine::revertProvisional (int comboK)

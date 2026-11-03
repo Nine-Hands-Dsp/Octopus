@@ -14,7 +14,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHOTS, OUT = sys.argv[1], sys.argv[2]
-VERSION = "1.8.1"
+VERSION = "1.8.2"
 TMP = os.path.join(os.path.dirname(os.path.abspath(OUT)), "midi_guide_tmp"); os.makedirs(TMP, exist_ok=True)
 for n, f in (("Pop", "Poppins-Regular"), ("PopM", "Poppins-Medium"), ("PopB", "Poppins-Bold")):
     pdfmetrics.registerFont(TTFont(n, os.path.join(ROOT, "fonts", f + ".ttf")))
@@ -73,7 +73,7 @@ def table(rows, widths):
 T = {
 "en": dict(
  lang="ENGLISH", title="OCTOPUS - MIDI and CC guide", sub="Footswitches, MIDI pedalboard and double presses, step by step  ·  Octopus " + VERSION,
- intro="Octopus can be driven entirely by a MIDI foot controller. This guide shows, step by step, how to set up a pedalboard (example: <b>M-Vave Chocolate Plus</b> with its CubeSuite editor), how to assign it in Octopus with <b>MIDI learn</b>, and how to use the <b>double presses</b> <b>E</b> (A+B), <b>B+C</b> (built-in tuner) and <b>F</b> (C+D): E and F are two more footswitches (presets 1E-16F, or blocks in STOMP mode), and B+C can also send its own MIDI CC to the effects after Octopus. No CC is assigned by default: everything is learned.",
+ intro="Octopus can be driven entirely by a MIDI foot controller. This guide shows, step by step, how to set up a pedalboard (example: <b>M-Vave Chocolate Plus</b> with its CubeSuite editor), how to assign it in Octopus with <b>MIDI learn</b>, and how to use the <b>double presses</b> <b>E</b> (A+B), <b>B+C</b> (built-in tuner) and <b>F</b> (C+D): E and F are two more footswitches (presets 1E-16F, or blocks in STOMP mode). No CC is assigned by default: everything is learned.",
  t1="1. The MIDI commands of Octopus",
  cmd_hdr=["Command", "MIDI message", "How to assign it"],
  cmd=[["Footswitch A, B, C, D", "a CC of your choice", "Right-click the footswitch &gt; MIDI Learn, then press the pedal switch"],
@@ -81,8 +81,7 @@ T = {
       ["PRESET / STOMP mode", "a CC of your choice", "Right-click &gt; MIDI &gt; Learn : PRESET / STOMP mode"],
       ["Tuner on / off", "a CC of your choice", "Right-click &gt; MIDI &gt; Learn : Tuner on / off (or press B+C)"],
       ["Presets A-D of each bank", "Program Change 1-64 (PC 1-4 = 1A-1D, PC 5-8 = 2A-2D...)", "Nothing to learn (PROGRAM CHANGE = PRESETS in BANKS)"],
-      ["E (A+B), F (C+D), B+C", "CC of A + CC of B together (E), C + D (F), B + C", "Automatic once A-D are learned"],
-      ["B+C (output)", "sent by Octopus: CC 0-127, 127 then 0, channel 1", "Right-click the B+C marking &gt; Send a MIDI CC"]],
+      ["E (A+B), F (C+D), B+C", "CC of A + CC of B together (E), C + D (F), B + C", "Automatic once A-D are learned"]],
  rule="<b>Rule for incoming CCs</b>: a value of 64 or more is a press. <i>Momentary</i> (default): one action each time the switch goes to 127. <i>Latching</i> (right-click &gt; MIDI footswitch latching): for switches that alternate 127 / 0, every change is a press. One CC drives one command only; all assignments are saved with the REAPER project.",
  t2="2. Set up the pedalboard (M-Vave Chocolate Plus, CubeSuite)",
  cs_cap="CubeSuite: 1 Advanced custom mode, 2 footswitch selector, 3 Single step mode, 4 messages of the switch (A Bank).",
@@ -105,10 +104,9 @@ T = {
  t5="5. Double presses: E (A+B), B+C, F (C+D)",
  comb_cap="The three double presses printed on the pedal: 1 E = A+B (footswitch E: preset 1E... or its blocks), 2 B+C = tuner symbol (built-in tuner), 3 F = C+D (footswitch F).",
  s5=["Press two <b>neighbouring</b> switches together (less than 0.25 s apart): Octopus runs the action of the pair instead of the two footswitches.",
-     "<b>Right-click the B+C marking</b> to choose its action: <i>Tuner (CHROMA)</i>, <i>Bank down</i>, <i>Bank up</i>, <i>PRESET / STOMP mode</i>, <i>Send a MIDI CC</i> (CC 0-127) or <i>Nothing</i>. <i>Color &amp; Glow...</i> sets the colour and halo of the tuner symbol.",
+     "<b>Right-click the B+C marking</b> to choose its action: <i>Tuner (CHROMA)</i>, <i>Bank down</i>, <i>Bank up</i>, <i>PRESET / STOMP mode</i> or <i>Nothing</i>. <i>Color &amp; Glow</i> sets the colour and halo of the tuner symbol.",
      "<b>E</b> (A+B) and <b>F</b> (C+D) are two more footswitches, exactly like A-D (same right-click menu): in PRESET mode they recall presets E and F of the bank, in STOMP mode they switch their blocks; B+C opens the tuner (tuner symbol, lit green while tuning). Hover the marking to see its action on the status line.",
      "<b>Nothing to learn for E, F and B+C</b>: E is the CC of A and the CC of B received together, F those of C and D, B+C those of B and C. Learn A, B, C and D (step 4) and the double presses work at once; the E / F and B+C menus show the CCs used. Learning <i>Tuner on / off</i> with the CC of a footswitch is refused, so that footswitch keeps its CC.",
-     "A <i>Send a MIDI CC</i> pair sends the CC with value 127 then 0, on channel 1, to the effects after Octopus. To use it in a plug-in: in REAPER, open the plug-in, click its parameter, <b>Param &gt; Learn</b>, then press the pair (or click the marking).",
      "With the mouse: click the marking (or Shift + click a footswitch). Every footswitch acts at once, without waiting: if its neighbour follows within 0.25 s, the first press is undone and the pair acts instead."],
  tun_cap="B+C: Octopus becomes the tuner (CHROMA screen and engine), without a CHROMA plug-in in the chain.",
  t6="6. Check and solve",
@@ -118,7 +116,7 @@ T = {
      "<b>Nothing happens</b>: check the MIDI input of the track, the record arm / monitoring, and that the status line shows the CC when you press a switch."]),
 "fr": dict(
  lang="FRANÇAIS", title="OCTOPUS - guide MIDI et CC", sub="Footswitchs, pédalier MIDI et doubles appuis, pas à pas  ·  Octopus " + VERSION,
- intro="Octopus peut être entièrement piloté par un pédalier MIDI. Ce guide montre pas à pas comment régler un pédalier (exemple : <b>M-Vave Chocolate Plus</b> avec son logiciel CubeSuite), comment l'affecter dans Octopus par <b>MIDI learn</b>, et comment utiliser les <b>doubles appuis</b> <b>E</b> (A+B), <b>B+C</b> (accordeur intégré) et <b>F</b> (C+D) : E et F sont deux footswitchs de plus (presets 1E-16F, ou blocs en mode STOMP), et B+C peut aussi envoyer son propre CC MIDI aux effets placés après Octopus. Aucun CC n'est affecté par défaut : tout s'apprend.",
+ intro="Octopus peut être entièrement piloté par un pédalier MIDI. Ce guide montre pas à pas comment régler un pédalier (exemple : <b>M-Vave Chocolate Plus</b> avec son logiciel CubeSuite), comment l'affecter dans Octopus par <b>MIDI learn</b>, et comment utiliser les <b>doubles appuis</b> <b>E</b> (A+B), <b>B+C</b> (accordeur intégré) et <b>F</b> (C+D) : E et F sont deux footswitchs de plus (presets 1E-16F, ou blocs en mode STOMP). Aucun CC n'est affecté par défaut : tout s'apprend.",
  t1="1. Les commandes MIDI d'Octopus",
  cmd_hdr=["Commande", "Message MIDI", "Comment l'affecter"],
  cmd=[["Footswitch A, B, C, D", "un CC au choix", "Clic droit sur le footswitch &gt; MIDI Learn, puis appui sur le commutateur du pédalier"],
@@ -126,8 +124,7 @@ T = {
       ["Mode PRESET / STOMP", "un CC au choix", "Clic droit &gt; MIDI &gt; Learn : PRESET / STOMP mode"],
       ["Accordeur on / off", "un CC au choix", "Clic droit &gt; MIDI &gt; Learn : Tuner on / off (ou B+C)"],
       ["Presets A-D de chaque bank", "Program Change 1-64 (PC 1-4 = 1A-1D, PC 5-8 = 2A-2D...)", "Rien à apprendre (PROGRAM CHANGE = PRESETS dans BANKS)"],
-      ["E (A+B), F (C+D), B+C", "CC de A + CC de B ensemble (E), C + D (F), B + C", "Automatique dès que A-D sont appris"],
-      ["B+C (sortie)", "envoyé par Octopus : CC 0-127, 127 puis 0, canal 1", "Clic droit sur le marquage B+C &gt; Send a MIDI CC"]],
+      ["E (A+B), F (C+D), B+C", "CC de A + CC de B ensemble (E), C + D (F), B + C", "Automatique dès que A-D sont appris"]],
  rule="<b>Règle des CC reçus</b> : une valeur de 64 ou plus compte comme un appui. <i>Momentané</i> (par défaut) : une action à chaque passage du commutateur à 127. <i>À accrochage</i> (clic droit &gt; MIDI footswitch latching) : pour les commutateurs qui alternent 127 / 0, chaque changement est un appui. Un CC ne pilote qu'une commande ; toutes les affectations sont enregistrées avec le projet REAPER.",
  t2="2. Régler le pédalier (M-Vave Chocolate Plus, CubeSuite)",
  cs_cap="CubeSuite : 1 Advanced custom mode, 2 choix du commutateur, 3 mode Single step, 4 messages du commutateur (A Bank).",
@@ -150,10 +147,9 @@ T = {
  t5="5. Doubles appuis : E (A+B), B+C, F (C+D)",
  comb_cap="Les trois doubles appuis sérigraphiés sur la pédale : 1 E = A+B (footswitch E : preset 1E... ou ses blocs), 2 B+C = symbole de l'accordeur (accordeur intégré), 3 F = C+D (footswitch F).",
  s5=["Appuyez sur deux commutateurs <b>voisins</b> ensemble (à moins de 0,25 s d'écart) : Octopus exécute l'action de la paire au lieu des deux footswitchs.",
-     "<b>Clic droit sur le marquage B+C</b> pour choisir son action : <i>Tuner (CHROMA)</i>, <i>Bank down</i>, <i>Bank up</i>, <i>PRESET / STOMP mode</i>, <i>Send a MIDI CC</i> (CC 0-127) ou <i>Nothing</i>. <i>Color &amp; Glow...</i> règle la couleur et le halo du symbole de l'accordeur.",
+     "<b>Clic droit sur le marquage B+C</b> pour choisir son action : <i>Tuner (CHROMA)</i>, <i>Bank down</i>, <i>Bank up</i>, <i>PRESET / STOMP mode</i> ou <i>Nothing</i>. <i>Color &amp; Glow</i> règle la couleur et le halo du symbole de l'accordeur.",
      "<b>E</b> (A+B) et <b>F</b> (C+D) sont deux footswitchs de plus, exactement comme A-D (même menu au clic droit) : en mode PRESET ils rappellent les presets E et F de la bank, en mode STOMP ils basculent leurs blocs ; B+C ouvre l'accordeur (symbole de l'accordeur, allumé en vert pendant l'accordage). Survolez le marquage pour voir son action sur la ligne d'état.",
      "<b>Rien à apprendre pour E, F et B+C</b> : E correspond au CC de A et au CC de B reçus ensemble, F à ceux de C et D, B+C à ceux de B et C. Apprenez A, B, C et D (étape 4) et les doubles appuis fonctionnent tout de suite ; les menus de E / F et de B+C affichent les CC utilisés. Apprendre <i>Tuner on / off</i> avec le CC d'un footswitch est refusé : ce footswitch garde son CC.",
-     "Une paire réglée sur <i>Send a MIDI CC</i> envoie le CC en 127 puis 0, canal 1, aux effets placés après Octopus. Pour l'utiliser dans un plugin : dans REAPER, ouvrez le plugin, cliquez sur son paramètre, <b>Param &gt; Learn</b>, puis faites le double appui (ou cliquez sur le marquage).",
      "À la souris : clic sur le marquage (ou Maj + clic sur un footswitch). Chaque footswitch agit tout de suite, sans attente : si son voisin suit dans les 0,25 s, le premier appui est annulé et c'est la paire qui agit."],
  tun_cap="B+C : Octopus devient l'accordeur (écran et moteur de CHROMA), sans plugin CHROMA dans la chaîne.",
  t6="6. Vérifier et dépanner",
