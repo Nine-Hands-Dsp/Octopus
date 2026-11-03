@@ -12,7 +12,7 @@ OctopusEngine::OctopusEngine (ChainHost& h) : host (h)
 
 juce::String OctopusEngine::targetName (int t)
 {
-    static const char* n[numTargets] = { "Footswitch A", "Footswitch B", "Footswitch C", "Footswitch D", "Bank down", "Bank up", "PRESET / STOMP mode" };
+    static const char* n[numTargets] = { "Footswitch A", "Footswitch B", "Footswitch C", "Footswitch D", "Bank down", "Bank up", "PRESET / STOMP mode", "Tuner on / off" };
     return n[juce::jlimit (0, numTargets - 1, t)];
 }
 
@@ -52,6 +52,12 @@ void OctopusEngine::tick()
 {
     // relecture de la chaîne ~7 fois par seconde : ce que l'utilisateur fait directement dans REAPER apparaît aussi
     if (++tickCount % 4 == 0) refreshNow();
+    if (pendingFs >= 0 && juce::Time::getMillisecondCounterHiRes() - pendingAt >= kComboMs)
+    {
+        const int f = pendingFs;                          // pas de deuxième footswitch : action normale
+        pendingFs = -1;
+        press (f);
+    }
     if (! msg.isEmpty() && juce::Time::getMillisecondCounterHiRes() >= msgUntil) { msg = {}; ++gen; }
 }
 
@@ -332,6 +338,107 @@ void OctopusEngine::setMode (Mode m)
     changed();
 }
 
+juce::String OctopusEngine::comboName (int k)
+{
+    static const char* n[kCombos] = { "A+B", "B+C", "C+D" };
+    return n[juce::jlimit (0, kCombos - 1, k)];
+}
+
+juce::String OctopusEngine::comboActionName (int a)
+{
+    static const char* n[numComboActions] = { "Nothing", "Tuner (CHROMA)", "Bank down", "Bank up", "PRESET / STOMP mode", "Send a MIDI CC" };
+    return n[juce::jlimit (0, numComboActions - 1, a)];
+}
+
+void OctopusEngine::setCombo (int k, int action, int ccNumber)
+{
+    k = juce::jlimit (0, kCombos - 1, k);
+    comboAct[(size_t) k] = juce::jlimit (0, numComboActions - 1, action);
+    if (ccNumber >= 0) comboCcNum[(size_t) k] = juce::jlimit (0, 127, ccNumber);
+    changed();
+}
+
+juce::String OctopusEngine::comboTitle (int k) const
+{
+    const juce::String key = k == 0 ? "E (A+B)" : k == 2 ? "F (C+D)" : "B+C";
+    const int a = comboAction (k);
+    return key + " : " + (a == comboCc ? "CC " + juce::String (comboCcNumber (k)) : comboActionName (a));
+}
+
+juce::String OctopusEngine::comboLabel (int k) const
+{
+    if (k == 0) return "E";                               // footswitchs virtuels E et F, comme sur le pédalier
+    if (k == 2) return "F";
+    switch (comboAction (k))
+    {
+        case comboTuner:    return "CHROMA";
+        case comboBankDown: return juce::String::fromUTF8 ("BANK \xe2\x88\x92");
+        case comboBankUp:   return "BANK +";
+        case comboMode:     return "MODE";
+        case comboCc:       return "CC " + juce::String (comboCcNumber (k));
+        default:            return {};
+    }
+}
+
+bool OctopusEngine::inCombo (int f) const
+{
+    return (f >= 1 && comboAct[(size_t) (f - 1)] != comboNone) || (f <= 2 && comboAct[(size_t) f] != comboNone);
+}
+
+void OctopusEngine::triggerCombo (int k)
+{
+    switch (comboAction (k))
+    {
+        case comboTuner:    toggleTuner(); break;
+        case comboBankDown: bankStep (-1); break;
+        case comboBankUp:   bankStep (1); break;
+        case comboMode:     setMode (md == presetMode ? stompMode : presetMode); break;
+        case comboCc:
+            if (onSendCc) onSendCc (comboCcNumber (k));
+            say (comboTitle (k) + " sent");
+            break;
+        default: break;
+    }
+}
+
+// appui sur un footswitch : s'il fait partie d'un double appui actif, il attend kComboMs le footswitch voisin
+void OctopusEngine::pressFs (int f)
+{
+    if (! juce::isPositiveAndBelow (f, kFs)) return;
+    const double now = juce::Time::getMillisecondCounterHiRes();
+    if (pendingFs >= 0 && std::abs (pendingFs - f) == 1 && now - pendingAt < kComboMs)
+    {
+        const int k = juce::jmin (pendingFs, f);
+        if (comboAct[(size_t) k] != comboNone)
+        {
+            pendingFs = -1;                               // double appui : ni l'un ni l'autre, l'action du combo
+            triggerCombo (k);
+            return;
+        }
+    }
+    if (pendingFs >= 0 && pendingFs != f) { const int p = pendingFs; pendingFs = -1; press (p); }
+    if (! inCombo (f)) { press (f); return; }             // pas de double appui possible : action immédiate
+    pendingFs = f; pendingAt = now;
+}
+
+void OctopusEngine::toggleTuner()
+{
+    if (! ready) { say (status); return; }
+    // un bloc CHROMA allumé dans la chaîne : B+C l'éteint (retour à la chaîne)
+    const int ci = chromaIndex();
+    if (ci >= 0)
+    {
+        host.beginUndo();
+        host.setEnabled (ci, false);
+        host.endUndo ("tuner off");
+        refreshNow();
+        say ("Tuner off");
+        return;
+    }
+    // sinon : l'accordeur intégré d'Octopus (moteur de CHROMA), sans plugin CHROMA dans la chaîne
+    if (onInternalTuner) onInternalTuner();
+}
+
 void OctopusEngine::press (int f)
 {
     if (! juce::isPositiveAndBelow (f, kFs)) return;
@@ -587,7 +694,8 @@ void OctopusEngine::resetMidi()
 
 void OctopusEngine::trigger (int t)
 {
-    if (t >= fsA && t <= fsD) press (t - fsA);
+    if (t >= fsA && t <= fsD) pressFs (t - fsA);
+    else if (t == tunerToggle) toggleTuner();
     else if (t == bankDown) bankStep (-1);
     else if (t == bankUp) bankStep (1);
     else if (t == modeToggle) setMode (md == presetMode ? stompMode : presetMode);
@@ -719,6 +827,11 @@ juce::ValueTree OctopusEngine::toTree() const
     root.setProperty ("latch", l.joinIntoString (","), nullptr);
     for (int f = 0; f < kFs; ++f) root.setProperty ("stompGuids" + juce::String (f), stompGuids[f].joinIntoString (";"), nullptr);
     for (int f = 0; f < kFs; ++f) root.setProperty ("fsColour" + juce::String (f), juce::String::toHexString ((int) fsCol[(size_t) f]), nullptr);
+    for (int k = 0; k < kCombos; ++k)
+    {
+        root.setProperty ("combo" + juce::String (k), comboAct[(size_t) k], nullptr);
+        root.setProperty ("comboCc" + juce::String (k), comboCcNum[(size_t) k], nullptr);
+    }
     for (auto& bp : bypassPrefs)
     {
         juce::ValueTree b ("BYPASS");
@@ -760,6 +873,11 @@ void OctopusEngine::fromTree (const juce::ValueTree& root)
         const auto hex = root["fsColour" + juce::String (f)].toString();
         if (f == 0)
         {
+            for (int k = 0; k < kCombos; ++k)
+            {
+                if (root.hasProperty ("combo" + juce::String (k))) comboAct[(size_t) k] = juce::jlimit (0, numComboActions - 1, (int) root["combo" + juce::String (k)]);
+                if (root.hasProperty ("comboCc" + juce::String (k))) comboCcNum[(size_t) k] = juce::jlimit (0, 127, (int) root["comboCc" + juce::String (k)]);
+            }
             bypassPrefs.clear();
             for (auto c : root)
                 if (c.hasType ("BYPASS")) bypassPrefs[c["plugin"].toString()] = juce::jlimit (0, 2, (int) c["mode"]);

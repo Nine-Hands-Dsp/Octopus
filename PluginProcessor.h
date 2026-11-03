@@ -8,8 +8,9 @@
 // accordeur : réglages de CHROMA lus dans REAPER (paramètres + état du plugin)
 struct ChromaState
 {
-    bool on = false;              // un bloc CHROMA est allumé : Octopus devient l'accordeur
-    int index = -1;               // indice REAPER du bloc
+    bool on = false;              // l'accordeur est affiché (bloc CHROMA allumé, ou accordeur intégré)
+    bool internal = false;        // accordeur intégré d'Octopus (B+C), sans bloc CHROMA
+    int index = -1;               // indice REAPER du bloc CHROMA (-1 : accordeur intégré)
     int mode = 0;                 // 0 MONO, 1 POLY, 2 STROBE
     int ref = 440;                // La de référence
     bool muted = false;
@@ -64,7 +65,9 @@ public:
     void refreshChroma (bool readTuning);     // relit les réglages de CHROMA (thread de messages)
     // presets d'accordage : bibliothèque de CHROMA (usine + accordages perso + favoris, fichier commun à CHROMA)
     TuningLibrary& tuningLibrary() noexcept { return library; }
-    void chromaSelectTuning (int libraryIndex);     // -1 : revenir à l'accordage de CHROMA
+    void chromaSelectTuning (int libraryIndex);
+    void toggleInternalTuner();
+    void chromaSetReference (int hz);     // -1 : revenir à l'accordage de CHROMA
     bool tuningOverridden() const { return overrideKey.isNotEmpty(); }
     juce::AudioProcessorValueTreeState apvts;
     std::atomic<int> uiScaleIdx { -1 };     // -1 = taille par défaut (réglage commun) ; 0..3 = 50 / 60 / 75 / 100 %
@@ -82,6 +85,9 @@ private:
     // MIDI reçu par le thread audio -> file sans verrou -> thread de messages (jamais d'appel à l'hôte en audio)
     struct MidiEv { juce::uint8 type, channel, number, value; };     // type 0 = CC, 1 = Program Change
     juce::AbstractFifo midiFifo { 512 };
+    // CC envoyés aux effets suivants par les doubles appuis (thread de messages -> thread audio, sans verrou)
+    juce::AbstractFifo outFifo { 64 };
+    std::array<juce::uint8, 64> outCc {};
     std::array<MidiEv, 512> midiBuf {};
 
     // état sauvé avec le projet : copie tenue à jour sur le thread de messages, lue par getStateInformation
@@ -101,6 +107,9 @@ private:
     juce::AbstractFifo tunerFifo { 1 << 16 };
     std::vector<float> tunerBuf;
     std::atomic<bool> tunerOn { false };
+    // accordeur intégré (B+C) : ses propres réglages, gardés avec le projet
+    std::atomic<bool> innerOn { false }, innerMute { false };
+    int innerMode = 0, innerRef = 440;
     double sampleRate = 48000.0;
     AnalysisThread analysis { *this };
     ChromaState chromaState;

@@ -13,7 +13,7 @@ public:
     enum Mode { presetMode = 0, stompMode = 1 };
 
     // commandes pilotables en MIDI (CC appris) ou par les paramètres du plugin
-    enum Target { fsA, fsB, fsC, fsD, bankDown, bankUp, modeToggle, numTargets };
+    enum Target { fsA, fsB, fsC, fsD, bankDown, bankUp, modeToggle, tunerToggle, numTargets };
     static juce::String targetName (int t);
 
     struct Preset
@@ -65,7 +65,25 @@ public:
     // ---- footswitchs
     Mode mode() const noexcept { return md; }
     void setMode (Mode m);
-    void press (int fs);
+    void press (int fs);                    // action immédiate d'un footswitch
+    // appui sur un footswitch (pied, MIDI, souris) : B et C attendent un court instant pour reconnaître B+C
+    void pressFs (int fs);
+    void toggleTuner();                     // accordeur intégré d'Octopus (un bloc CHROMA allumé est éteint)
+
+    // ---- doubles appuis : A+B, B+C, C+D (deux footswitchs voisins à moins de kComboMs)
+    enum ComboAction { comboNone = 0, comboTuner, comboBankDown, comboBankUp, comboMode, comboCc, numComboActions };
+    static constexpr int kCombos = 3;                    // 0 = A+B, 1 = B+C, 2 = C+D
+    static juce::String comboName (int k);               // "A+B"
+    static juce::String comboActionName (int a);
+    int  comboAction (int k) const { return comboAct[(size_t) juce::jlimit (0, kCombos - 1, k)]; }
+    int  comboCcNumber (int k) const { return comboCcNum[(size_t) juce::jlimit (0, kCombos - 1, k)]; }
+    void setCombo (int k, int action, int ccNumber = -1);
+    juce::String comboLabel (int k) const;               // texte sérigraphié entre les deux footswitchs : E, CHROMA, F
+    juce::String comboTitle (int k) const;               // "E (A+B) : CC 26"
+    void triggerCombo (int k);
+    std::function<void (int cc)> onSendCc;               // le processeur envoie CC (127 puis 0) aux effets suivants
+    std::function<void()> onInternalTuner;  // le processeur allume / éteint son accordeur intégré
+    static constexpr double kComboMs = 140.0;
     juce::String fsTitle (int fs) const;    // "1A" / "DRIVE"
     juce::String fsText (int fs) const;     // nom du preset / des blocs commandés
     bool fsLit (int fs) const;
@@ -159,6 +177,10 @@ private:
 
     juce::String msg;
     double msgUntil = 0.0;
+    int pendingFs = -1; double pendingAt = 0.0;          // footswitch en attente (double appui possible)
+    std::array<int, kCombos> comboAct { comboCc, comboTuner, comboCc };      // E (A+B) = CC 26, B+C = CHROMA, F (C+D) = CC 28
+    std::array<int, kCombos> comboCcNum { 26, 27, 28 };
+    bool inCombo (int f) const;                          // ce footswitch fait partie d'un double appui actif
 
     struct BypassInfo { int param = -1; bool invert = false; };
     std::map<juce::String, BypassInfo> bypassCache;      // par instance (guid)

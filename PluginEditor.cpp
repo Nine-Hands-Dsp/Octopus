@@ -254,7 +254,62 @@ public:
             drawLetter (g, f, ledPos (f), ledLevel[f], ledColour[f]);
         }
 
+        drawComboMark (g);
         drawScreen (g);
+    }
+
+    // sérigraphie des doubles appuis : trait fin entre deux footswitchs voisins, l'action au milieu (CHROMA, BANK +, CC 26...)
+    static Rectangle<float> comboRect (int k) { const float xl = L::fsX[k] + 54.0f, xr = L::fsX[k + 1] - 54.0f; return { xl, L::fsY - 14.0f, xr - xl, 28.0f }; }
+    void drawComboMark (Graphics& g)
+    {
+        const auto ink = Colour (0xffb9c0ca).withAlpha (0.78f);
+        const auto fWord = Font (FontOptions (tfBold).withHeight (15.0f * s)).withExtraKerningFactor (0.18f);
+        for (int k = 0; k < OctopusEngine::kCombos; ++k)
+        {
+            const auto word = eng.comboLabel (k);
+            if (word.isEmpty()) continue;
+            const bool letter = word.length() == 1;                     // E et F : lettre seule, un peu plus grande
+            const auto f = letter ? Font (FontOptions (tfBold).withHeight (24.0f * s)) : fWord;
+            const bool idle = eng.comboAction (k) == OctopusEngine::comboNone;
+            const auto cr = comboRect (k);
+            const float y = L::fsY, xl = cr.getX(), xr = cr.getRight(), cx = cr.getCentreX();
+            const float tw = GlyphArrangement::getStringWidth (f, word) / s, gap = 10.0f;
+            g.setColour (hoverCombo == k ? Colour (0xffe4e8ee) : ink.withMultipliedAlpha (idle ? 0.45f : 1.0f));
+            g.fillRoundedRectangle (r (Rectangle<float> (xl, y - 0.8f, cx - tw * 0.5f - gap - xl, 1.6f)), 0.8f * s);
+            g.fillRoundedRectangle (r (Rectangle<float> (cx + tw * 0.5f + gap, y - 0.8f, xr - (cx + tw * 0.5f + gap), 1.6f)), 0.8f * s);
+            g.setFont (f);
+            g.drawText (word, r (Rectangle<float> (cx - tw * 0.5f - 4.0f, y - 12.0f, tw + 8.0f, 24.0f)), Justification::centred, false);
+        }
+    }
+    int comboAt (Point<float> unit) const
+    {
+        for (int k = 0; k < OctopusEngine::kCombos; ++k) if (comboRect (k).contains (unit)) return k;
+        return -1;
+    }
+    void comboMenu (int k)
+    {
+        PopupMenu m, ccM;
+        m.addSectionHeader (k == 0 ? "E = double press A+B" : k == 2 ? "F = double press C+D" : "Double press B+C");
+        const int a = eng.comboAction (k);
+        for (int i = 0; i < OctopusEngine::comboCc; ++i) m.addItem (1 + i, OctopusEngine::comboActionName (i), true, a == i);
+        for (int g0 = 0; g0 < 128; g0 += 32)
+        {
+            PopupMenu sub;
+            for (int c = g0; c < g0 + 32; ++c) sub.addItem (100 + c, "CC " + String (c), true, a == OctopusEngine::comboCc && eng.comboCcNumber (k) == c);
+            ccM.addSubMenu ("CC " + String (g0) + " - " + String (g0 + 31), sub);
+        }
+        m.addSubMenu ("Send a MIDI CC to the following effects" + (a == OctopusEngine::comboCc ? "  (CC " + String (eng.comboCcNumber (k)) + ")" : String()), ccM, true, nullptr, a == OctopusEngine::comboCc);
+        m.addSeparator();
+        m.addItem (300, "Test now", a != OctopusEngine::comboNone);
+        SafePointer<PedalView> sp (this);
+        m.showMenuAsync (PopupMenu::Options(), [sp, k] (int r)
+        {
+            if (sp == nullptr || r <= 0) return;
+            if (r == 300) sp->eng.triggerCombo (k);
+            else if (r >= 100 && r < 228) sp->eng.setCombo (k, OctopusEngine::comboCc, r - 100);
+            else if (r >= 1 && r <= OctopusEngine::comboCc) sp->eng.setCombo (k, r - 1);
+            sp->askRepaint (sp->getLocalBounds());
+        });
     }
 
 private:
@@ -280,6 +335,7 @@ private:
 
     Overlay overlay = Overlay::none;
     int firstRow = 0;                              // défilement de la grille (rangées)
+    int hoverCombo = -1;
     int hoverSlot = -1, hoverBtn = bNone, hoverItem = -1, hoverFooter = -1, hoverParam = -1;
     // clic / glisser sur un bloc
     int downSlot = -1;
@@ -1264,11 +1320,17 @@ private:
     Rectangle<float> paramBar (int k) const { auto c = paramCell (k); return { c.getX() + 14.0f, c.getY() + 62.0f, c.getWidth() - 28.0f, 22.0f }; }
 
     // lit les paramètres affichés (au plus 8) ; renvoie true si quelque chose a changé
+    String paramPresetName;            // preset du plugin affiché (vide : réglages libres)
     bool pollParams (bool force)
     {
         const int i = paramFxIndex();
         auto& h = eng.chainHost();
         if (i < 0) { if (overlay == Overlay::params) closeOverlay(); return false; }
+        {
+            String pn = (userCur >= 0 && plistGuid == paramGuid && isPositiveAndBelow (userCur, (int) upresets.size()))
+                            ? upresets[(size_t) userCur].name : h.presetName (i);
+            if (pn != paramPresetName) { paramPresetName = pn; force = true; }
+        }
         const auto key = paramGuid + (midiView ? "/midi" : "/main") + "/" + String (h.numParams (i));
         if (key != paramListKey)
         {
@@ -1307,7 +1369,19 @@ private:
         FxCat::drawIcon (g, kind, S (Rectangle<float> (16.0f, 86.0f, 32.0f, 32.0f)), FxCat::colour (kind).brighter (0.3f), S (2.0f));
         g.setFont (font (tfBold, 21.0f));
         g.setColour (kText);
-        g.drawText (FxCat::shortName (f->name), S (Rectangle<float> (58.0f, 84.0f, 336.0f, 36.0f)), Justification::centredLeft, true);
+        const auto title = FxCat::shortName (f->name);
+        const auto titleR = Rectangle<float> (58.0f, 84.0f, 336.0f, 36.0f);
+        g.drawText (title, S (titleR), Justification::centredLeft, true);
+        if (paramPresetName.isNotEmpty())          // preset choisi : son nom à côté du nom du plugin
+        {
+            const float tw = jmin (titleR.getWidth() * 0.6f, GlyphArrangement::getStringWidth (font (tfBold, 21.0f), title) / (L::kG * s));
+            const auto pr = titleR.withTrimmedLeft (tw + 12.0f);
+            g.setColour (kFaint);
+            g.fillRect (S (Rectangle<float> (pr.getX() - 6.5f, pr.getCentreY() - 9.0f, 1.0f, 18.0f)));
+            g.setFont (font (tfMedium, 17.0f));
+            g.setColour (FxCat::colour (kind).brighter (0.45f));
+            g.drawText (paramPresetName, S (pr), Justification::centredLeft, true);
+        }
         if (presetMode) { drawPresets (g, kind); return; }
         const int pages = jmax (1, (paramCount + 7) / 8);
         g.setFont (font (tfBold, 15.0f));
@@ -1746,6 +1820,15 @@ private:
     }
     Rectangle<float> tuningBox() const { return { 414.0f - 165.0f, 16.0f, 330.0f, 66.0f }; }   // repère de CHROMA
 
+    void referenceMenu()
+    {
+        PopupMenu m;
+        m.addSectionHeader ("Reference A");
+        for (int hz = 430; hz <= 450; ++hz) m.addItem (hz, "A = " + String (hz) + " Hz", true, proc.chroma().ref == hz);
+        SafePointer<PedalView> sp (this);
+        m.showMenuAsync (PopupMenu::Options(), [sp] (int r) { if (sp != nullptr && r >= 430) sp->proc.chromaSetReference (r); });
+    }
+
     // presets d'accordage : ceux de CHROMA (favoris, usine par catégorie, perso)
     void tuningMenu()
     {
@@ -1754,7 +1837,7 @@ private:
         const auto cur = proc.chroma().tuningKey;
         PopupMenu m;
         m.addSectionHeader ("TUNINGS (CHROMA)");
-        m.addItem (1, "Use the tuning set in CHROMA", proc.tuningOverridden(), ! proc.tuningOverridden());
+        m.addItem (1, proc.chroma().internal ? "Default tuning (E standard)" : "Use the tuning set in CHROMA", proc.tuningOverridden(), ! proc.tuningOverridden());
         m.addSeparator();
         auto label = [&lib] (int i)
         {
@@ -1846,7 +1929,7 @@ private:
         g.drawText ("TUNER", S (Rectangle<float> (colR.getX(), 40.0f, colR.getWidth(), 34.0f)), Justification::centred);
         g.setFont (Font (FontOptions (tfMono).withHeight (S (13.0f))));
         g.setColour (TC::grey().withAlpha (0.7f));
-        g.drawText ("CHROMA", S (Rectangle<float> (colR.getX(), 74.0f, colR.getWidth(), 20.0f)), Justification::centred);
+        g.drawText (proc.chroma().internal ? "BUILT-IN  B+C" : "CHROMA", S (Rectangle<float> (colR.getX(), 74.0f, colR.getWidth(), 20.0f)), Justification::centred);
         for (auto& b : tunerButtons())
         {
             const auto rr = S (b.r);
@@ -2087,7 +2170,13 @@ private:
         return -1;
     }
 
-    void mouseMove (const MouseEvent& e) override { updateHover (toLocal (e.position)); }
+    void mouseMove (const MouseEvent& e) override
+    {
+        updateHover (toLocal (e.position));
+        const int hc = comboAt (e.position / s);
+        if (hc != hoverCombo && hc >= 0) eng.say (eng.comboTitle (hc) + "   (click : run, right-click : set)", 3000.0);
+        if (hc != hoverCombo) { hoverCombo = hc; askRepaint (r (Rectangle<float> (0.0f, L::fsY - 30.0f, (float) L::kW, 60.0f)).toNearestInt()); }
+    }
     void mouseExit (const MouseEvent&) override { updateHover ({ -100.0f, -100.0f }); }
 
     void mouseDown (const MouseEvent& e) override
@@ -2097,13 +2186,27 @@ private:
         downSlot = -1; dragging = false; paramDrag = -1;
         if (renameSlot >= 0) commitRename();
 
+        // doubles appuis : clic sur la sérigraphie = l'action, clic droit = réglage
+        if (const int k = comboAt (unit); k >= 0)
+        {
+            if (e.mods.isPopupMenu()) comboMenu (k);
+            else if (eng.comboAction (k) != OctopusEngine::comboNone) eng.triggerCombo (k);
+            else comboMenu (k);
+            return;
+        }
+
         // footswitchs
         const int f = fsAt (unit);
         if (f >= 0)
         {
             if (e.mods.isPopupMenu()) { footswitchMenu (f); return; }
             pressedFs = f;
-            eng.press (f);                                 // comme Echoflex : action dès l'appui
+            if (e.mods.isShiftDown())                      // souris : Maj + clic = double appui avec le voisin de droite (ou de gauche)
+            {
+                const int k = (f < 3 && eng.comboAction (f) != OctopusEngine::comboNone) ? f : f - 1;
+                if (k >= 0 && eng.comboAction (k) != OctopusEngine::comboNone) eng.triggerCombo (k);
+            }
+            else eng.pressFs (f);                          // comme Echoflex : action dès l'appui (B et C : après 0,14 s, pour B+C)
             askRepaint (r (Rectangle<float> (L::fsSprite, L::fsSprite).withCentre ({ L::fsX[f], L::fsY })).toNearestInt());
             askRepaint (screenPx());
             return;
@@ -2121,6 +2224,7 @@ private:
                 // comme sur CHROMA : clic sur le nom du mode = mode suivant
                 const auto t = (p - tunerRect().getPosition()) / tunerScale();
                 if (tuningBox().expanded (6.0f).contains (t)) tuningMenu();          // comme sur CHROMA : clic sur le nom de l'accordage
+                else if (t.y < 90.0f && t.x > 640.0f) referenceMenu();               // clic sur « A=440 » : La de référence
                 else if (t.y < 90.0f && t.x < 260.0f) proc.chromaNextMode();
             }
             return;

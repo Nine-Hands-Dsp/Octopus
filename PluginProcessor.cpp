@@ -4,7 +4,7 @@
  #include "ReaperBridge.h"
 #endif
 
-const char* const OctopusProcessor::kTargetIds[OctopusEngine::numTargets] = { "fsA", "fsB", "fsC", "fsD", "bankDown", "bankUp", "mode" };
+const char* const OctopusProcessor::kTargetIds[OctopusEngine::numTargets] = { "fsA", "fsB", "fsC", "fsD", "bankDown", "bankUp", "mode", "tuner" };
 
 juce::AudioProcessorValueTreeState::ParameterLayout OctopusProcessor::layout()
 {
@@ -45,6 +45,13 @@ OctopusProcessor::OctopusProcessor (bool demoChain)
     engine = std::make_unique<OctopusEngine> (*host);
     engine->onStateChanged = [this] { storeEngineState(); };
     engine->onTokenClash = [this] { newToken(); };
+    engine->onInternalTuner = [this] { toggleInternalTuner(); };
+    engine->onSendCc = [this] (int cc)
+    {
+        const auto w = outFifo.write (1);
+        if (w.blockSize1 > 0) outCc[(size_t) w.startIndex1] = (juce::uint8) juce::jlimit (0, 127, cc);
+        else if (w.blockSize2 > 0) outCc[(size_t) w.startIndex2] = (juce::uint8) juce::jlimit (0, 127, cc);
+    };
     storeEngineState();
     startTimerHz (30);
 }
@@ -181,21 +188,49 @@ void OctopusProcessor::refreshChroma (bool readTuning)
     }
 }
 
+void OctopusProcessor::toggleInternalTuner()
+{
+    innerOn = ! innerOn.load();
+    if (! innerOn) innerMute = false;
+    engine->say (innerOn ? "Tuner (B+C to exit)" : "Tuner off");
+    updateChroma();
+}
+
+void OctopusProcessor::chromaSetReference (int hz)
+{
+    hz = juce::jlimit (430, 450, hz);
+    auto& c = chromaState;
+    if (c.internal) { innerRef = hz; c.ref = hz; tuner.setReference ((double) hz); return; }
+    if (c.index >= 0 && c.refParam >= 0) host->setParam (c.index, c.refParam, (hz - 430) / 20.0);
+    c.ref = hz;
+    tuner.setReference ((double) hz);
+}
+
 void OctopusProcessor::updateChroma()
 {
     auto& c = chromaState;
     const int idx = engine->chromaIndex();
-    const bool on = idx >= 0;
-    const auto guid = on ? engine->chain().getReference (idx).guid : juce::String();
+    if (idx >= 0 && innerOn) { innerOn = false; innerMute = false; }      // un bloc CHROMA allumé prend la main
+    const bool internal = idx < 0 && innerOn.load();
+    const bool on = idx >= 0 || internal;
+    const auto guid = idx >= 0 ? engine->chain().getReference (idx).guid : juce::String (internal ? "internal" : "");
     if (on != c.on || guid != chromaGuid)
     {
         const bool was = c.on;
         if (guid != chromaGuid && guid.isNotEmpty()) lastChromaKey = {};       // autre bloc CHROMA : on relit son accordage
         c = ChromaState();
-        c.on = on; c.index = idx; chromaGuid = guid;
+        c.on = on; c.index = idx; c.internal = internal; chromaGuid = guid;
+        if (internal)
+        {
+            c.mode = innerMode; c.ref = innerRef; c.muted = innerMute;
+            if (overrideKey.isNotEmpty() && ! overrideNotes.empty()) { c.notes = overrideNotes; c.tuningName = overrideName; c.tuningKey = overrideKey; }
+            else { c.notes = { 40, 45, 50, 55, 59, 64 }; c.tuningName = "E standard"; c.tuningKey = "factory|GUITARE 6|E"; }
+            tuner.setReference ((double) c.ref);
+            tuner.setTuning (c.notes);
+        }
         if (on)
         {
-            refreshChroma (true);
+            if (! internal) refreshChroma (true);
             if (! was) { tunerFifo.reset(); tunerOn = true; analysis.startThread (juce::Thread::Priority::low); }
         }
         else
@@ -206,7 +241,7 @@ void OctopusProcessor::updateChroma()
         chromaTick = 0;
         return;
     }
-    if (! on) return;
+    if (! on || internal) return;
     c.index = idx;
     ++chromaTick;
     if (chromaTick % 6 == 0) refreshChroma (chromaTick % 60 == 0);   // réglages 5 fois / s, accordage toutes les 2 s
@@ -217,7 +252,12 @@ void OctopusProcessor::chromaSelectTuning (int i)
     if (i < 0)                                        // revenir à l'accordage choisi dans CHROMA
     {
         { const juce::ScopedLock sl (stateLock); overrideKey = {}; overrideNotes.clear(); overrideName = {}; }
-        if (chromaState.on) refreshChroma (true);
+        if (chromaState.internal)
+        {
+            chromaState.notes = { 40, 45, 50, 55, 59, 64 }; chromaState.tuningName = "E standard"; chromaState.tuningKey = "factory|GUITARE 6|E";
+            tuner.setTuning (chromaState.notes);
+        }
+        else if (chromaState.on) refreshChroma (true);
         return;
     }
     if (! juce::isPositiveAndBelow (i, library.size())) return;
@@ -236,6 +276,7 @@ void OctopusProcessor::chromaSelectTuning (int i)
 
 void OctopusProcessor::chromaSetMute (bool mute)
 {
+    if (chromaState.internal) { innerMute = mute; chromaState.muted = mute; return; }
     if (chromaState.index < 0 || chromaState.muteParam < 0) return;
     host->setParam (chromaState.index, chromaState.muteParam, mute ? 1.0 : 0.0);
     chromaState.muted = mute;
@@ -243,6 +284,7 @@ void OctopusProcessor::chromaSetMute (bool mute)
 
 void OctopusProcessor::chromaNextMode()
 {
+    if (chromaState.internal) { innerMode = (innerMode + 1) % 3; chromaState.mode = innerMode; return; }
     if (chromaState.index < 0 || chromaState.modeParam < 0) return;
     chromaState.mode = (chromaState.mode + 1) % 3;
     host->setParam (chromaState.index, chromaState.modeParam, chromaState.mode / 2.0);
@@ -250,6 +292,7 @@ void OctopusProcessor::chromaNextMode()
 
 void OctopusProcessor::chromaExit()
 {
+    if (chromaState.internal) { innerOn = false; innerMute = false; updateChroma(); return; }
     if (chromaState.index >= 0) engine->setEnabled (chromaState.index, false);
 }
 
@@ -305,6 +348,9 @@ void OctopusProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
         if (w.blockSize2 > 0) put (w.startIndex2, w.blockSize2, w.blockSize1);
     }
 
+    // accordeur intégré en mode MUTE : silence en sortie (la guitare reste lue par l'accordeur juste au-dessus)
+    if (innerOn.load (std::memory_order_relaxed) && innerMute.load (std::memory_order_relaxed)) buffer.clear();
+
     for (const auto m : midi)
     {
         const auto msg = m.getMessage();
@@ -315,6 +361,16 @@ void OctopusProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
         const auto w = midiFifo.write (1);                 // sans verrou ni allocation
         if (w.blockSize1 > 0) midiBuf[(size_t) w.startIndex1] = ev;
         else if (w.blockSize2 > 0) midiBuf[(size_t) w.startIndex2] = ev;
+    }
+
+    // doubles appuis réglés sur « Send a MIDI CC » : CC 127 puis 0 (comme un commutateur momentané), canal 1,
+    // ajoutés au MIDI qui continue vers les effets suivants
+    for (int n = outFifo.getNumReady(); n > 0; --n)
+    {
+        const auto r = outFifo.read (1);
+        const int cc = r.blockSize1 > 0 ? outCc[(size_t) r.startIndex1] : outCc[(size_t) r.startIndex2];
+        midi.addEvent (juce::MidiMessage::controllerEvent (1, cc, 127), 0);
+        midi.addEvent (juce::MidiMessage::controllerEvent (1, cc, 0), juce::jmax (0, buffer.getNumSamples() - 1));
     }
 }
 
@@ -374,6 +430,8 @@ void OctopusProcessor::getStateInformation (juce::MemoryBlock& dest)
         root.setProperty ("tuningKey", overrideKey, nullptr);
         root.setProperty ("tuningName", overrideName, nullptr);
         root.setProperty ("tuningNotes", juce::String (tuna::notesToString (overrideNotes)), nullptr);
+        root.setProperty ("tunerMode", innerMode, nullptr);
+        root.setProperty ("tunerRef", innerRef, nullptr);
     }
     root.appendChild (apvts.copyState(), nullptr);
     {
@@ -402,6 +460,8 @@ void OctopusProcessor::setStateInformation (const void* data, int size)
         overrideName = root["tuningName"].toString();
         overrideNotes = tuna::parseNotes (root["tuningNotes"].toString().toStdString());
         if (overrideNotes.empty()) overrideKey = {};
+        innerMode = juce::jlimit (0, 2, (int) root.getProperty ("tunerMode", 0));
+        innerRef = juce::jlimit (430, 450, (int) root.getProperty ("tunerRef", 440));
     }
     const auto params = root.getChildWithName (apvts.state.getType());
     if (params.isValid()) apvts.replaceState (params);

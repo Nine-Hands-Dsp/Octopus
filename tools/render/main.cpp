@@ -76,11 +76,14 @@ int main (int argc, char** argv)
     check (e.ccOf (OctopusEngine::fsB) == 80, "MIDI learn footswitch B = CC 80");
     e.midiCc (1, 80, 0);
     e.midiCc (1, 80, 127);
+    check (e.current() != 1, "B attend 0,14 s (pour reconnaître B+C)");
+    Thread::sleep (160); e.tick();
     check (e.current() == 1, "CC 80 (momentané) -> preset 1B");
     e.midiProgram (1, 0);
     check (e.current() == 0, "Program Change 1 -> preset 1A");
     e.paramInput (OctopusEngine::fsC, 0.0f);
     e.paramInput (OctopusEngine::fsC, 1.0f);
+    Thread::sleep (160); e.tick();
     check (e.current() == 2, "paramètre fsC -> preset 1C");
 
     // bypass de la pédale (son propre interrupteur) ou de REAPER
@@ -208,6 +211,9 @@ int main (int argc, char** argv)
         h.setParam (fi, 3, 0.1);
         ed->screenUserPreset (1, "Ambient Wash");
         ed->screenUserPreset (2, "1");                            // triés par nom : 0 Ambient Wash, 1 My Lead
+        ed->showScreen (2, fi);
+        shot ("octopus_params_preset_name");
+        ed->showScreen (4, fi);
         check (std::abs (h.getParam (fi, 3) - 0.8) < 1.0e-6, "preset utilisateur rechargé (paramètre retrouvé)");
         ed->screenUserPreset (0, "Crunch Rhythm");
         shot ("octopus_presets_user");
@@ -274,6 +280,49 @@ int main (int argc, char** argv)
         e.setEnabled (ci, false);
         pump (5);
         check (! proc.chroma().on, "CHROMA éteint : retour à la chaîne");
+        // accordeur intégré : B+C sans bloc CHROMA allumé
+        e.pressFs (1); e.pressFs (2);
+        pump (5);
+        check (proc.chroma().on && proc.chroma().internal, "B+C : accordeur intégré d'Octopus, sans bloc CHROMA");
+        play (82.41 * std::pow (2.0, 5.0 / 1200.0), 2.0);
+        shot ("octopus_tuner_builtin");
+        proc.chromaSetMute (true);
+        {
+            AudioBuffer<float> b (2, 256); MidiBuffer m;
+            for (int i = 0; i < 256; ++i) { b.setSample (0, i, 0.5f); b.setSample (1, i, 0.5f); }
+            proc.processBlock (b, m);
+            check (b.getMagnitude (0, 256) == 0.0f, "accordeur intégré MUTE : sortie silencieuse");
+        }
+        e.pressFs (2); e.pressFs (1);
+        pump (5);
+        check (! proc.chroma().on, "B+C de nouveau : retour à la chaîne");
+
+        // doubles appuis A+B (CC 26 vers les effets suivants) et C+D (bank suivante)
+        e.setCombo (0, OctopusEngine::comboCc, 26);
+        e.setCombo (2, OctopusEngine::comboBankUp);
+        {
+            MidiBuffer drain; AudioBuffer<float> b0 (2, 256); proc.processBlock (b0, drain);
+        }
+        e.pressFs (0); e.pressFs (1);
+        AudioBuffer<float> b (2, 256); MidiBuffer m;
+        proc.processBlock (b, m);
+        bool on26 = false, off26 = false;
+        for (const auto ev : m)
+        {
+            const auto msg = ev.getMessage();
+            if (msg.isController() && msg.getControllerNumber() == 26) { if (msg.getControllerValue() == 127) on26 = true; else if (msg.getControllerValue() == 0) off26 = true; }
+        }
+        check (on26 && off26, "A+B : CC 26 (127 puis 0) envoyé aux effets suivants");
+        const int bank0 = e.bank();
+        e.pressFs (3); e.pressFs (2);
+        check (e.bank() == (bank0 + 1) % OctopusEngine::kBanks || e.bank() == bank0 + 1, "C+D : bank suivante");
+        e.bankStep (-1);
+        auto st = e.toTree(); e.setCombo (0, OctopusEngine::comboNone); e.fromTree (st);
+        check (e.comboAction (0) == OctopusEngine::comboCc && e.comboCcNumber (0) == 26, "doubles appuis enregistrés avec le projet");
+        e.setCombo (2, OctopusEngine::comboCc, 28);
+        shot ("octopus_combos");
+        e.setCombo (0, OctopusEngine::comboCc, 26); e.setCombo (2, OctopusEngine::comboCc, 28);
+
     }
 
     ed->setScaleIndex (0);
