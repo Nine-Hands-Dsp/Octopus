@@ -1049,11 +1049,11 @@ private:
     {
         const auto rr = S (b.r);
         const bool hov = hoverBtn == b.id && b.enabled;
-        const bool stomp = b.id == bModeStomp;                  // STOMP : nuance d'orange, au survol et sélectionné
+        const bool stomp = b.id == bModeStomp;                  // STOMP sélectionné : nuance d'orange
         const auto acc = stomp ? kStompOrange : kAccent;
-        g.setColour (b.active ? acc.withAlpha (0.22f) : (hov ? (stomp ? kScrPanel2.interpolatedWith (acc, 0.14f) : kScrPanel2.brighter (0.15f)) : kScrPanel2));
+        g.setColour (b.active ? acc.withAlpha (0.22f) : (hov ? kScrPanel2.brighter (0.15f) : kScrPanel2));   // survol : comme les autres boutons
         g.fillRoundedRectangle (rr, S (7.0f));
-        g.setColour (b.active ? acc : (hov ? (stomp ? acc.withAlpha (0.85f) : kDim) : kFaint));
+        g.setColour (b.active ? acc : (hov ? kDim : kFaint));
         g.drawRoundedRectangle (rr.reduced (S (0.6f)), S (7.0f), S (1.2f));
         g.setFont (font (tfBold, textSize));
         g.setColour (! b.enabled ? kFaint : (b.active ? kText : kText.withAlpha (0.85f)));
