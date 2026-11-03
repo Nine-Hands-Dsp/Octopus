@@ -366,7 +366,17 @@ public:
             fxM.addItem (398, "Clear", eng.fsText (key) != "-" && a == OctopusEngine::comboStomp);
             m.addSubMenu ("Switch effects (in PRESET and STOMP modes)", fxM, true, nullptr, a == OctopusEngine::comboStomp);
             m.addSeparator();
-            addLearnItems (m, key == 4 ? OctopusEngine::fsE : OctopusEngine::fsF);
+            // MIDI : E = les CC de A et de B reçus ensemble, F = ceux de C et de D (rien à apprendre en plus)
+            const int f0 = key == 4 ? 0 : 2, c0 = eng.ccOf (f0), c1 = eng.ccOf (f0 + 1);
+            const auto ccTxt = [] (int c) { return c >= 0 ? "CC " + String (c) : String ("not learned"); };
+            m.addItem (390, "MIDI : " + fsLetter (key) + " = " + fsLetter (f0) + " + " + fsLetter (f0 + 1) + " pressed together ("
+                              + ccTxt (c0) + " + " + ccTxt (c1) + ")", false);
+        }
+        if (key < 0)                                     // B+C : les CC de B et de C reçus ensemble
+        {
+            const auto ccTxt = [] (int c) { return c >= 0 ? "CC " + String (c) : String ("not learned"); };
+            m.addSeparator();
+            m.addItem (390, "MIDI : B + C pressed together (" + ccTxt (eng.ccOf (1)) + " + " + ccTxt (eng.ccOf (2)) + ")", false);
         }
         m.addSeparator();
         m.addItem (300, "Test now", a != OctopusEngine::comboNone);
@@ -2787,7 +2797,7 @@ private:
     void midiSubmenu (PopupMenu& m)
     {
         PopupMenu midi;
-        for (int t = 0; t < OctopusEngine::numTargets; ++t)
+        for (int t = 0; t < OctopusEngine::fsE; ++t)                  // E / F : CC de A+B / C+D, pas de learn à part
         {
             const int c = eng.ccOf (t);
             midi.addItem (500 + t, "Learn : " + OctopusEngine::targetName (t) + " (" + (c >= 0 ? "CC " + String (c) : String ("none")) + ")", true, eng.learnTarget == t);

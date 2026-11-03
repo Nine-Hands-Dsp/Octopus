@@ -14,7 +14,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHOTS, OUT = sys.argv[1], sys.argv[2]
-VERSION = "1.7.0"
+VERSION = "1.7.1"
 TMP = os.path.join(os.path.dirname(os.path.abspath(OUT)), "midi_guide_tmp"); os.makedirs(TMP, exist_ok=True)
 for n, f in (("Pop", "Poppins-Regular"), ("PopM", "Poppins-Medium"), ("PopB", "Poppins-Bold")):
     pdfmetrics.registerFont(TTFont(n, os.path.join(ROOT, "fonts", f + ".ttf")))
@@ -107,7 +107,7 @@ T = {
      "<b>Right-click the marking</b> between the two footswitches to choose: <i>Tuner (CHROMA)</i>, <i>Bank down</i>, <i>Bank up</i>, <i>PRESET / STOMP mode</i>, <i>Send a MIDI CC</i> (CC 0-127) or <i>Nothing</i>. <i>Test now</i> runs it at once.",
      "<b>E</b> (A+B) and <b>F</b> (C+D) work like two extra footswitches: by default E sends <b>CC 26</b> and F sends <b>CC 28</b>; B+C opens the tuner (tuner symbol, lit green while tuning). Hover the marking to see its action on the status line.",
      "<b>E and F switch effects</b>: right-click the E or F cell on the screen (after A-D) &gt; <i>Switch effects</i> and tick the effects: E or F then switches them ON / OFF in PRESET and STOMP modes, and its marking lights up in their colour. Their effects are saved with each preset.",
-     "<b>E and F by MIDI learn</b>: in the same menu, <i>MIDI Learn : Footswitch E (A+B)</i> (or F), then press a switch of the pedal: that switch drives E or F directly, without a double press. Useful with a 6-switch pedalboard, or with the long press of the Chocolate Plus.",
+     "<b>Nothing to learn for E, F and B+C</b>: E is the CC of A and the CC of B received together, F those of C and D, B+C those of B and C. Learn A, B, C and D (step 4) and the double presses work at once; the E / F and B+C menus show the CCs used. Learning <i>Tuner on / off</i> with the CC of a footswitch is refused, so that footswitch keeps its CC.",
      "A <i>Send a MIDI CC</i> pair sends the CC with value 127 then 0, on channel 1, to the effects after Octopus. To use it in a plug-in: in REAPER, open the plug-in, click its parameter, <b>Param &gt; Learn</b>, then press the pair (or click the marking).",
      "With the mouse: click the marking (or Shift + click a footswitch). A footswitch that belongs to an active pair waits 0.14 s for its neighbour; the others act at once. Set a pair to <i>Nothing</i> to remove that short wait."],
  tun_cap="B+C: Octopus becomes the tuner (CHROMA screen and engine), without a CHROMA plug-in in the chain.",
@@ -152,7 +152,7 @@ T = {
      "<b>Clic droit sur le marquage</b> entre les deux footswitchs pour choisir : <i>Tuner (CHROMA)</i>, <i>Bank down</i>, <i>Bank up</i>, <i>PRESET / STOMP mode</i>, <i>Send a MIDI CC</i> (CC 0-127) ou <i>Nothing</i>. <i>Test now</i> l'exécute tout de suite.",
      "<b>E</b> (A+B) et <b>F</b> (C+D) fonctionnent comme deux footswitchs de plus : par défaut, E envoie le <b>CC 26</b> et F le <b>CC 28</b> ; B+C ouvre l'accordeur (symbole de l'accordeur, allumé en vert pendant l'accordage). Survolez le marquage pour voir son action sur la ligne d'état.",
      "<b>E et F basculent des effets</b> : clic droit sur la case E ou F de l'écran (après A-D) &gt; <i>Switch effects</i> et cochez les effets : E ou F les allume / coupe alors en mode PRESET comme en STOMP, et son marquage s'éclaire dans leur couleur. Leurs effets sont enregistrés avec chaque preset.",
-     "<b>E et F par MIDI learn</b> : dans le même menu, <i>MIDI Learn : Footswitch E (A+B)</i> (ou F), puis appuyez sur un commutateur du pédalier : ce commutateur pilote E ou F directement, sans double appui. Pratique avec un pédalier à 6 commutateurs, ou avec l'appui long de la Chocolate Plus.",
+     "<b>Rien à apprendre pour E, F et B+C</b> : E correspond au CC de A et au CC de B reçus ensemble, F à ceux de C et D, B+C à ceux de B et C. Apprenez A, B, C et D (étape 4) et les doubles appuis fonctionnent tout de suite ; les menus de E / F et de B+C affichent les CC utilisés. Apprendre <i>Tuner on / off</i> avec le CC d'un footswitch est refusé : ce footswitch garde son CC.",
      "Une paire réglée sur <i>Send a MIDI CC</i> envoie le CC en 127 puis 0, canal 1, aux effets placés après Octopus. Pour l'utiliser dans un plugin : dans REAPER, ouvrez le plugin, cliquez sur son paramètre, <b>Param &gt; Learn</b>, puis faites le double appui (ou cliquez sur le marquage).",
      "À la souris : clic sur le marquage (ou Maj + clic sur un footswitch). Un footswitch qui fait partie d'une paire active attend 0,14 s son voisin ; les autres agissent tout de suite. Réglez une paire sur <i>Nothing</i> pour supprimer ce court délai."],
  tun_cap="B+C : Octopus devient l'accordeur (écran et moteur de CHROMA), sans plugin CHROMA dans la chaîne.",

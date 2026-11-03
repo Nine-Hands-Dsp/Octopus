@@ -747,6 +747,21 @@ void OctopusEngine::input (int t, bool on, std::array<bool, numTargets>& prev, b
 
 void OctopusEngine::midiCc (int, int number, int value)
 {
+    if (learnTarget == fsE || learnTarget == fsF)          // E / F n'ont pas de CC à eux : CC de A+B / C+D (ce CC n'agit pas)
+    {
+        say (juce::String (learnTarget == fsE ? "E = CC of A + CC of B together" : "F = CC of C + CC of D together") + " : learn A, B, C, D", 5000.0);
+        learnTarget = -1;
+        return;
+    }
+    if (learnTarget == tunerToggle)                        // B+C = CC de B + CC de C : ne pas prendre le CC d'un footswitch
+        for (int f = fsA; f <= fsD; ++f)
+            if (cc[(size_t) f] == number)
+            {
+                say ("CC " + juce::String (number) + " is footswitch " + juce::String::charToString ((juce::juce_wchar) ('A' + f))
+                     + " : B+C already opens the tuner (CC of B + CC of C together)", 5000.0);
+                learnTarget = -1;
+                return;
+            }
     if (learnTarget >= 0)
     {
         for (auto& c : cc) if (c == number) c = -1;           // un CC ne commande qu'une chose
@@ -899,6 +914,15 @@ void OctopusEngine::fromTree (const juce::ValueTree& root)
         cc[(size_t) i] = i < c.size() && c[i].isNotEmpty() ? c[i].getIntValue() : -1;
         latch[(size_t) i] = i < l.size() && l[i] == "1";
     }
+    // v1.7.0 : un CC appris sur E / F a pu être pris à A (ou C) : il lui est rendu, E / F n'ont plus de CC à eux
+    for (int t : { (int) fsE, (int) fsF })
+    {
+        const int owner = t == fsE ? fsA : fsC;
+        if (cc[(size_t) t] >= 0 && cc[(size_t) owner] < 0) cc[(size_t) owner] = cc[(size_t) t];
+        cc[(size_t) t] = -1;
+    }
+    // idem pour l'accordeur appris en faisant B+C : son CC avait été pris à B
+    if (cc[(size_t) tunerToggle] >= 0 && cc[(size_t) fsB] < 0) { cc[(size_t) fsB] = cc[(size_t) tunerToggle]; cc[(size_t) tunerToggle] = -1; }
     for (int f = 0; f < kKeys; ++f)
         stompGuids[f] = juce::StringArray::fromTokens (root["stompGuids" + juce::String (f)].toString(), ";", "");
     for (auto& s : stompGuids) s.removeEmptyStrings();

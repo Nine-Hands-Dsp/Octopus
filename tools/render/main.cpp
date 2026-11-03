@@ -339,18 +339,42 @@ int main (int argc, char** argv)
             e.pressFs (0); e.pressFs (1);
             pump (3);
             check (e.chain().getReference (e.blocks()[e.blockOf (g5)]).enabled != was, "A+B : E bascule ses effets (mode PRESET)");
-            e.learnTarget = OctopusEngine::fsE; e.midiCc (1, 40, 127); e.midiCc (1, 40, 0);
-            check (e.ccOf (OctopusEngine::fsE) == 40, "MIDI learn de E : CC 40");
-            e.midiCc (1, 40, 127); e.midiCc (1, 40, 0);
+            e.learnTarget = OctopusEngine::fsA; e.midiCc (1, 40, 127); e.midiCc (1, 40, 0);
+            e.learnTarget = OctopusEngine::fsB; e.midiCc (1, 41, 127); e.midiCc (1, 41, 0);
+            check (e.ccOf (OctopusEngine::fsA) == 40 && e.ccOf (OctopusEngine::fsB) == 41, "MIDI learn de A et B : CC 40 / 41");
+            e.midiCc (1, 40, 127); e.midiCc (1, 41, 127); e.midiCc (1, 40, 0); e.midiCc (1, 41, 0);
             pump (3);
-            check (e.chain().getReference (e.blocks()[e.blockOf (g5)]).enabled == was, "E par MIDI : effets rebasculés");
+            check (e.chain().getReference (e.blocks()[e.blockOf (g5)]).enabled == was, "E par MIDI : CC de A + CC de B ensemble rebasculent ses effets");
+            check (e.ccOf (OctopusEngine::fsA) == 40, "A garde son CC");
+            {
+                auto t = e.toTree(); t.setProperty ("cc", "-1,41,,,,,,,40,", nullptr); e.fromTree (t);      // ancien learn de E qui avait pris le CC de A
+                check (e.ccOf (OctopusEngine::fsA) == 40 && e.ccOf (OctopusEngine::fsE) < 0, "CC appris sur E en 1.7.0 rendu à A");
+            }
+            e.learnTarget = OctopusEngine::fsE; e.midiCc (1, 40, 127);
+            check (e.ccOf (OctopusEngine::fsA) == 40 && e.ccOf (OctopusEngine::fsE) < 0, "pas de learn à part pour E : le CC de A reste à A");
+            e.midiCc (1, 40, 0); pump (12);
+            e.learnTarget = OctopusEngine::fsC; e.midiCc (1, 42, 127); e.midiCc (1, 42, 0);
+            e.learnTarget = OctopusEngine::tunerToggle; e.midiCc (1, 41, 127);
+            check (e.ccOf (OctopusEngine::fsB) == 41 && e.ccOf (OctopusEngine::tunerToggle) < 0, "learn de l'accordeur avec le CC de B : B garde son CC");
+            e.midiCc (1, 41, 0); pump (12);
+            {
+                const bool t0 = e.tunerOn();
+                e.midiCc (1, 41, 127); e.midiCc (1, 42, 127); e.midiCc (1, 41, 0); e.midiCc (1, 42, 0);
+                pump (3);
+                check (e.tunerOn() != t0, "B+C par MIDI : CC de B + CC de C ensemble ouvrent l'accordeur");
+                e.midiCc (1, 41, 127); e.midiCc (1, 42, 127); e.midiCc (1, 41, 0); e.midiCc (1, 42, 0);
+                pump (3);
+                check (e.tunerOn() == t0, "B+C par MIDI de nouveau : retour à la chaîne");
+            }
+            e.clearCc (OctopusEngine::fsC);
+            e.clearCc (OctopusEngine::fsA); e.clearCc (OctopusEngine::fsB);
             auto st2 = e.toTree(); e.clearAssign (4); e.fromTree (st2);
             check (e.isAssigned (4, g5) && e.isAssigned (4, g6), "effets de E enregistrés avec le projet");
             if (! e.chain().getReference (e.blocks()[e.blockOf (g5)]).enabled) { e.pressFs (0); e.pressFs (1); pump (3); }
             e.toggleAssign (5, e.chain().getReference (e.blocks()[9]).guid);
             pump (8);
             shot ("octopus_keys_ef");
-            e.clearAssign (4); e.clearAssign (5); e.clearCc (OctopusEngine::fsE);
+            e.clearAssign (4); e.clearAssign (5);
             e.setCombo (0, OctopusEngine::comboCc, 26); e.setCombo (2, OctopusEngine::comboCc, 28);
         }
     }
