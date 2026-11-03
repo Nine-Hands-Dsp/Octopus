@@ -83,7 +83,7 @@ private:
     std::atomic<float>* targetParam[OctopusEngine::numTargets] {};
 
     // MIDI reçu par le thread audio -> file sans verrou -> thread de messages (jamais d'appel à l'hôte en audio)
-    struct MidiEv { juce::uint8 type, channel, number, value; };     // type 0 = CC, 1 = Program Change
+    struct MidiEv { juce::uint8 type, channel, number, value; double atMs; };     // type 0 = CC, 1 = Program Change ; atMs = heure d'arrivée
     juce::AbstractFifo midiFifo { 512 };
     // CC envoyés aux effets suivants par les doubles appuis (thread de messages -> thread audio, sans verrou)
     juce::AbstractFifo outFifo { 64 };

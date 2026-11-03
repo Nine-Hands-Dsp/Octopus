@@ -172,6 +172,9 @@ int main (int argc, char** argv)
     ed->screenSearch ({}, 2);
     ed->screenPick (5); ed->screenPick (1); ed->screenPick (9);
     shot ("octopus_add_effect");
+    ed->screenHover ({ 16.0f + 200.0f, 182.0f + 34.0f * 3.0f + 15.0f });      // survol d'un plugin Studio Wiga : sa description
+    shot ("octopus_add_hover");
+    ed->screenHover ({ 2.0f, 2.0f });
     ed->screenSearch ("rea", 0);
     shot ("octopus_add_search");
 
@@ -223,6 +226,19 @@ int main (int argc, char** argv)
     e.setFsColour (0, 0xff6fc8ff); e.setFsColour (1, 0xff45e070); e.setFsColour (2, 0xffffb547); e.setFsColour (3, 0xffff4040);
     ed->showScreen (3);
     shot ("octopus_banks");
+    {
+        // points des banks : 6 presets dans la bank 1, 3 dans la bank 2, aucun dans la bank 3
+        auto keep = e.toTree();
+        const int cur0 = e.current();
+        for (int i : { 4, 5, 6, 7, 8 }) e.save (i);
+        e.load (cur0 >= 0 ? cur0 : 0);
+        e.setBank (0);
+        pump (3);
+        check (e.preset (6).saved && e.preset (8).saved && ! e.preset (12).saved, "banks 1 (6 presets), 2 (3 presets), 3 (vide)");
+        shot ("octopus_banks_dots");
+        e.fromTree (keep);
+        pump (3);
+    }
     ed->showScreen (0);
     shot ("octopus_fs_colours");
     ed->showScreen (6, 2);
@@ -317,6 +333,24 @@ int main (int argc, char** argv)
             e.pressFs (1); e.pressFs (2);
             pump (5);
             Thread::sleep (270); e.tick();
+            // MIDI : B+C mesuré à l'heure d'arrivée des CC, même si le chargement de 1B a pris du temps
+            e.learnTarget = OctopusEngine::fsB; e.midiCc (1, 51, 127); e.midiCc (1, 51, 0);
+            e.learnTarget = OctopusEngine::fsC; e.midiCc (1, 52, 127); e.midiCc (1, 52, 0);
+            Thread::sleep (270); e.tick();
+            const double t0 = Time::getMillisecondCounterHiRes();
+            e.eventMs = t0;         e.midiCc (1, 51, 127);
+            Thread::sleep (300);                                             // chargement long simulé
+            e.eventMs = t0 + 60.0;  e.midiCc (1, 52, 127);
+            e.eventMs = -1.0;
+            e.midiCc (1, 51, 0); e.midiCc (1, 52, 0);
+            pump (5);
+            check (proc.chroma().on, "B+C par MIDI après un chargement long : accordeur");
+            Thread::sleep (270); e.tick();
+            e.midiCc (1, 51, 127); e.midiCc (1, 52, 127); e.midiCc (1, 51, 0); e.midiCc (1, 52, 0);
+            pump (5);
+            check (! proc.chroma().on, "B+C par MIDI de nouveau : accordeur fermé");
+            e.clearCc (OctopusEngine::fsB); e.clearCc (OctopusEngine::fsC);
+            Thread::sleep (270); e.tick();
         }
 
         // E (A+B) et F (C+D) : footswitchs comme A-D (presets 1E / 1F en mode PRESET, effets en STOMP)
@@ -409,7 +443,7 @@ int main (int argc, char** argv)
     }
 
     ed->setScaleIndex (0);
-    check (ed->getWidth() == 828 && ed->getHeight() == 617, "taille 50 % : " + String (ed->getWidth()) + " x " + String (ed->getHeight()));
+    check (ed->getWidth() == 828 && ed->getHeight() == 619, "taille 50 % : " + String (ed->getWidth()) + " x " + String (ed->getHeight()));
     shot ("octopus_50pc");
     ed->setScaleIndex (-1);
     check (ed->getWidth() == 993, "taille par défaut (60 % sans réglage) : " + String (ed->getWidth()));

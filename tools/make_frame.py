@@ -159,5 +159,7 @@ logo = logo.resize((lw, lh), Image.LANCZOS)
 la = np.asarray(logo).astype(np.float64); la[..., 3] *= 0.95
 out.alpha_composite(Image.fromarray(la.astype(np.uint8), "RGBA"), (int(64 * AS), int(53.5 * AS) - lh // 2))
 
+# même marge que le haut (3) tout autour du boîtier : 9 unités en moins à gauche, image 1249 x 934 (repère de Layout.h)
+out = out.crop((int(9 * AS), 0, int(9 * AS) + int(1249 * AS), int(934 * AS)))
 out.save(os.path.join(ROOT, "background.png"), optimize=True)
 print("background.png", out.size, "repère", W2, "x", H)

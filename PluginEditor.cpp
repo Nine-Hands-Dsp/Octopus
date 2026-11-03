@@ -345,7 +345,8 @@ public:
         PopupMenu m;
         m.addSectionHeader ("Double press B+C");
         const int a = eng.comboAction (k);
-        for (int i = 0; i < OctopusEngine::comboCc; ++i) m.addItem (1 + i, OctopusEngine::comboActionName (i), true, a == i);
+        for (int i : { (int) OctopusEngine::comboNone, (int) OctopusEngine::comboTuner, (int) OctopusEngine::comboMode })   // ni bank -, ni bank +, ni CC
+            m.addItem (1 + i, OctopusEngine::comboActionName (i), true, a == i);
         const int key = OctopusEngine::keyOfCombo (k);
         if (key >= 0)                                    // E / F : un vrai footswitch, avec ses effets et son MIDI learn
         {
@@ -1223,8 +1224,25 @@ private:
         else if (overlay == Overlay::banks)  drawBanks (g);
         for (auto& b : overlayButtons())
         {
-            drawButton (g, b, b.id == bClose ? 18.0f : 15.0f);
-            if (b.id >= bFsColour && b.id <= bFsColour + OctopusEngine::kFs)          // pastille de la couleur choisie
+            const bool colourBtn = b.id >= bFsColour && b.id <= bFsColour + OctopusEngine::kFs;
+            if (! colourBtn) drawButton (g, b, b.id == bClose ? 18.0f : 15.0f);
+            else                                                   // pastille à gauche, nom centré dans la place qui reste
+            {
+                const bool tuner = b.id == bFsColour + OctopusEngine::kFs;
+                auto bb = b; bb.text = {};
+                drawButton (g, bb);
+                const auto f = font (tfBold, 15.0f);
+                g.setFont (f);
+                g.setColour (kText.withAlpha (0.85f));
+                const auto area = b.r.withTrimmedLeft (32.0f).withTrimmedRight (6.0f).translated (-8.0f, 0.0f);   // à droite de la pastille, 8 plus à gauche
+                if (! tuner) g.drawText (b.text, S (area), Justification::centred, true);   // A-F : lettre centrée dans cette place
+                else                                                   // TUNER : commence près de l'endroit où commencent les lettres
+                {
+                    const float letterW = GlyphArrangement::getStringWidth (f, "A") / S (1.0f);
+                    g.drawText (b.text, S (area.withTrimmedLeft ((area.getWidth() - letterW) * 0.5f - 13.5f).withWidth (60.0f)), Justification::centredLeft, false);
+                }
+            }
+            if (colourBtn)                                         // pastille de la couleur choisie
             {
                 const auto sw = S (Rectangle<float> (b.r.getX() + 10.0f, b.r.getCentreY() - 8.0f, 16.0f, 16.0f));
                 g.setColour (b.id - bFsColour == OctopusEngine::kFs ? tunerColour() : Colour (eng.fsColour (b.id - bFsColour)));
@@ -1233,6 +1251,8 @@ private:
                 g.drawEllipse (sw, S (1.0f));
             }
         }
+        drawFxTooltip (g);                                         // survol d'un plugin Studio Wiga : sa description
+        if (overlay == Overlay::banks) drawBankDots (g);
         if (overlay == Overlay::banks)
         {
             g.setFont (font (tfBold, 15.0f));
@@ -1292,6 +1312,78 @@ private:
         }
         p.closeSubPath();
         return p;
+    }
+
+    // description courte des plugins Studio Wiga (survol dans la fenêtre d'ajout), d'après leur nom
+    static String wigaDescription (const String& shortName)
+    {
+        static const std::pair<const char*, const char*> d[] = {
+            { "octopus",      "FX chain controller for REAPER: the track's effects on a floor-modeler screen, 96 presets, 6 footswitches and MIDI." },
+            { "chroma",       "Tuner for guitar and bass: MONO, POLY (all strings at once) and STROBE modes, down to very low tunings." },
+            { "ngate",        "Noise gate for guitar and bass: cuts hum and hiss between notes, keeps the attack." },
+            { "crycat",       "Wah in the spirit of the Dunlop Cry Baby, played with an expression pedal, the mouse or MIDI." },
+            { "doorn",        "Distortion in the spirit of the Lichtlaerm Thorn: from crunch to thick, saturated high gain." },
+            { "peachy",       "Preamp and fuzz in the spirit of the KoRn Indigo Ranch pedal: two sounds in one double pedal." },
+            { "strong pickle","Fuzz in the spirit of the Way Huge Swollen Pickle: huge, thick and sustaining fuzz." },
+            { "wharry",       "Pitch shifter in the spirit of the DigiTech Whammy 5: octaves, harmonies and dives with the pedal." },
+            { "fog z",        "Polyphonic octave generator in the spirit of the EHX POG2: sub and upper octaves mixed with your guitar." },
+            { "semitones",    "Transposition in the spirit of the Solar CHUG Capo: play in another key without retuning." },
+            { "pipeline",     "Pitch vibrato in the spirit of the EarthQuaker Aqueduct, with several modulation shapes." },
+            { "small tone",   "Chorus in the spirit of the EHX Small Clone: lush, watery chorus with a single knob." },
+            { "flangerus",    "Chorus and flanger in the spirit of the Ibanez CF7." },
+            { "wack",         "Chorus and flanger in the spirit of the Ibanez CF7." },
+            { "phase",        "Phaser inspired by the MXR Phase 90: one SPEED knob, with tempo sync." },
+            { "ring think",   "Ring modulator in the spirit of the EHX Ring Thing: metallic, bell-like and robotic tones, with pitch shift." },
+            { "echoflex",     "Tape echo in the spirit of the Dunlop Echoplex EP103: warm repeats with tape colour." },
+            { "eight echo",   "Digital delay in the spirit of the Boss DD-8: several delay modes, tap tempo." },
+            { "holyverb",     "Reverb in the spirit of the TC Electronic Hall of Fame: from small rooms to huge halls." },
+            { "freeze",       "Infinite sustain (freeze) and shimmer reverb in the spirit of the EHX Freeze and Pico Shimmer." },
+            { "textural",     "Granular effect in the spirit of the MXR Textures: turns your playing into clouds and textures." },
+            { "arc",          "EBow simulation: endless sustain and violin-like swells on every note." },
+            { "freakout",     "Controlled feedback in the spirit of the DigiTech FreqOut: natural guitar feedback at any volume." },
+            { "fantomine",    "Theremin voice played from your guitar: gliding, ghostly melodies." },
+            { "jawari",       "Sitar sound for guitar: the buzzing, resonant voice of the Indian sitar." },
+            { "stereo width", "Stereo width: from mono to wide stereo." } };
+        const auto n = shortName.toLowerCase();
+        for (auto& x : d) if (n.contains (x.first)) return x.second;
+        return {};
+    }
+    // bulle au survol d'un plugin Studio Wiga (VST3) dans la fenêtre d'ajout
+    void drawFxTooltip (Graphics& g)
+    {
+        if (overlay != Overlay::browser || hoverItem < 0) return;
+        const auto items = filtered();
+        const int i = listScroll * kListRows + hoverItem;
+        if (! isPositiveAndBelow (i, items.size())) return;
+        const auto& f = items.getReference (i);
+        if (! FxCat::vendor (f.name).equalsIgnoreCase ("Studio Wiga") || FxCat::typeOf (f.name).toUpperCase() != "VST3") return;
+        const auto desc = wigaDescription (FxCat::shortName (f.name));
+        if (desc.isEmpty()) return;
+        const auto ir = itemRect (hoverItem);
+        const float w = 440.0f, h = 84.0f;
+        float x = jlimit (16.0f, kSW - 16.0f - w, ir.getX() + 40.0f);
+        float y = ir.getBottom() + 6.0f;
+        if (y + h > kSH - 8.0f) y = ir.getY() - 6.0f - h;
+        const Rectangle<float> box (x, y, w, h);
+        const int kind = FxCat::classify (f.name);
+        const auto col = FxCat::colour (kind);
+        g.setColour (Colours::black.withAlpha (0.45f));
+        g.fillRoundedRectangle (S (box.translated (0.0f, 3.0f).expanded (2.0f)), S (9.0f));
+        g.setColour (Colour (0xff151922));
+        g.fillRoundedRectangle (S (box), S (8.0f));
+        g.setColour (col.withAlpha (0.75f));
+        g.drawRoundedRectangle (S (box).reduced (S (0.6f)), S (8.0f), S (1.3f));
+        g.fillRoundedRectangle (S (box.withWidth (5.0f).reduced (0.0f, 8.0f).translated (8.0f, 0.0f)), S (2.5f));
+        FxCat::drawIcon (g, kind, S (Rectangle<float> (26.0f, 26.0f).withCentre ({ x + 36.0f, y + 24.0f })), col.brighter (0.3f), S (1.9f));
+        g.setFont (font (tfBold, 17.0f));
+        g.setColour (kText);
+        g.drawText (FxCat::shortName (f.name), S (Rectangle<float> (x + 58.0f, y + 10.0f, w - 70.0f, 24.0f)), Justification::centredLeft, true);
+        g.setFont (font (tfRegular, 12.5f));
+        g.setColour (col.brighter (0.2f));
+        g.drawText (String (FxCat::label (kind)).toUpperCase() + "  -  STUDIO WIGA", S (Rectangle<float> (x + 58.0f, y + 10.0f, w - 70.0f, 24.0f)), Justification::centredRight, true);
+        g.setFont (font (tfRegular, 14.5f));
+        g.setColour (kText.withAlpha (0.85f));
+        g.drawFittedText (desc, S (Rectangle<float> (x + 22.0f, y + 40.0f, w - 34.0f, 38.0f)).toNearestInt(), Justification::topLeft, 2, 1.0f);
     }
 
     static constexpr int kListRows = 12;
@@ -1789,18 +1881,6 @@ private:
         g.setColour (kDim);
         g.drawText ("16 banks x 6 presets  -  footswitches A-F recall the presets of the bank shown (PRESET mode)",
                     S (Rectangle<float> (130.0f, 84.0f, 860.0f, 36.0f)), Justification::centredLeft, true);
-        // points : banks qui contiennent des presets
-        for (int b = 0; b < OctopusEngine::kBanks; ++b)
-        {
-            int n = 0;
-            for (int sl = 0; sl < OctopusEngine::kSlots; ++sl) n += eng.preset (b * OctopusEngine::kSlots + sl).saved ? 1 : 0;
-            const auto br = bankRect (b);
-            for (int d = 0; d < n; ++d)
-            {
-                g.setColour (kPresetLed.withAlpha (0.9f));
-                g.fillEllipse (S (Rectangle<float> (5.0f, 5.0f).withCentre ({ br.getCentreX() - 17.5f + 7.0f * (float) d, br.getBottom() - 9.0f })));
-            }
-        }
         for (int sl = 0; sl < OctopusEngine::kSlots; ++sl)
         {
             const int idx = eng.bank() * OctopusEngine::kSlots + sl;
@@ -1827,6 +1907,21 @@ private:
                 const String info = p.saved ? String (p.entries.size()) + (p.entries.size() == 1 ? " effect" : " effects") : String ("free slot");
                 g.drawText (info, Rectangle<float> (c.getX() + S (80.0f), c.getY() + c.getHeight() * 0.55f, S (250.0f), c.getHeight() * 0.38f), Justification::centredLeft, true);
             }
+        }
+    }
+
+    // points sous le numéro de chaque bank : un par preset enregistré (dessinés après les cases, sinon cachés par elles)
+    void drawBankDots (Graphics& g)
+    {
+        for (int b = 0; b < OctopusEngine::kBanks; ++b)
+        {
+            // autant de points que de presets enregistrés dans la bank (aucun pour une bank vide), centrés
+            const auto br = bankRect (b);
+            int n = 0;
+            for (int sl = 0; sl < OctopusEngine::kSlots; ++sl) n += eng.preset (b * OctopusEngine::kSlots + sl).saved ? 1 : 0;
+            g.setColour (eng.bank() == b ? kPresetLed.withAlpha (0.9f) : kDim.withAlpha (0.85f));
+            for (int d = 0; d < n; ++d)
+                g.fillEllipse (S (Rectangle<float> (5.0f, 5.0f).withCentre ({ br.getCentreX() + 7.0f * ((float) d - (float) (n - 1) * 0.5f), br.getBottom() - 10.0f })));
         }
     }
 
@@ -2331,7 +2426,8 @@ private:
 
         if (overlay == Overlay::browser)
         {
-            // clic : choisir / retirer (numérotés dans l'ordre) ; double-clic : ajouter tout de suite
+            // clic : choisir / retirer (numérotés dans l'ordre) ; double-clic : ajouter tout de suite ; clic droit : rien
+            if (e.mods.isPopupMenu()) return;
             for (int v = 0; v < kListRows * 2; ++v)
                 if (itemRect (v).contains (p))
                 {

@@ -14,7 +14,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHOTS, OUT = sys.argv[1], sys.argv[2]
-VERSION = "1.8.2"
+VERSION = "1.8.3"
 TMP = os.path.join(os.path.dirname(os.path.abspath(OUT)), "midi_guide_tmp"); os.makedirs(TMP, exist_ok=True)
 for n, f in (("Pop", "Poppins-Regular"), ("PopM", "Poppins-Medium"), ("PopB", "Poppins-Bold")):
     pdfmetrics.registerFont(TTFont(n, os.path.join(ROOT, "fonts", f + ".ttf")))
@@ -37,16 +37,16 @@ cs_path = os.path.join(TMP, "cubesuite.png"); cs.save(cs_path)
 # 2. footswitchs et doubles appuis (A+B = CC 26, B+C = CHROMA, C+D = BANK +)
 def crop_units(name, box, out):
     im = Image.open(os.path.join(SHOTS, name)).convert("RGB")
-    k = im.width / 1267.0
+    k = im.width / 1249.0
     im.crop(tuple(int(v * k) for v in box)).save(os.path.join(TMP, out))
     return os.path.join(TMP, out)
-combos = Image.open(crop_units("octopus_combos.png", (90, 770, 1180, 935), "combos.png")); d = ImageDraw.Draw(combos)
+combos = Image.open(crop_units("octopus_combos.png", (81, 770, 1171, 934), "combos.png")); d = ImageDraw.Draw(combos)
 kk = combos.width / 1090.0
-for n, ux in ((1, 345), (2, 628), (3, 912)):
-    badge(d, int((ux - 90) * kk), int(18 * kk), n, r=int(17 * kk / 1.4))
+for n, ux in ((1, 336), (2, 619), (3, 903)):
+    badge(d, int((ux - 81) * kk), int(18 * kk), n, r=int(17 * kk / 1.4))
 combos_path = os.path.join(TMP, "combos_marked.png"); combos.save(combos_path)
-full_path = crop_units("octopus_combos.png", (0, 0, 1267, 944), "full.png")
-tuner_path = crop_units("octopus_tuner_builtin.png", (72, 109, 1197, 769), "tuner.png")
+full_path = crop_units("octopus_combos.png", (0, 0, 1249, 934), "full.png")
+tuner_path = crop_units("octopus_tuner_builtin.png", (63, 109, 1188, 769), "tuner.png")
 
 def img(path, width):
     im = Image.open(path); return RLImage(path, width=width, height=width * im.height / im.width)
@@ -104,7 +104,7 @@ T = {
  t5="5. Double presses: E (A+B), B+C, F (C+D)",
  comb_cap="The three double presses printed on the pedal: 1 E = A+B (footswitch E: preset 1E... or its blocks), 2 B+C = tuner symbol (built-in tuner), 3 F = C+D (footswitch F).",
  s5=["Press two <b>neighbouring</b> switches together (less than 0.25 s apart): Octopus runs the action of the pair instead of the two footswitches.",
-     "<b>Right-click the B+C marking</b> to choose its action: <i>Tuner (CHROMA)</i>, <i>Bank down</i>, <i>Bank up</i>, <i>PRESET / STOMP mode</i> or <i>Nothing</i>. <i>Color &amp; Glow</i> sets the colour and halo of the tuner symbol.",
+     "<b>Right-click the B+C marking</b> to choose its action: <i>Tuner (CHROMA)</i>, <i>PRESET / STOMP mode</i> or <i>Nothing</i>. <i>Color &amp; Glow</i> sets the colour and halo of the tuner symbol.",
      "<b>E</b> (A+B) and <b>F</b> (C+D) are two more footswitches, exactly like A-D (same right-click menu): in PRESET mode they recall presets E and F of the bank, in STOMP mode they switch their blocks; B+C opens the tuner (tuner symbol, lit green while tuning). Hover the marking to see its action on the status line.",
      "<b>Nothing to learn for E, F and B+C</b>: E is the CC of A and the CC of B received together, F those of C and D, B+C those of B and C. Learn A, B, C and D (step 4) and the double presses work at once; the E / F and B+C menus show the CCs used. Learning <i>Tuner on / off</i> with the CC of a footswitch is refused, so that footswitch keeps its CC.",
      "With the mouse: click the marking (or Shift + click a footswitch). Every footswitch acts at once, without waiting: if its neighbour follows within 0.25 s, the first press is undone and the pair acts instead."],
@@ -147,7 +147,7 @@ T = {
  t5="5. Doubles appuis : E (A+B), B+C, F (C+D)",
  comb_cap="Les trois doubles appuis sérigraphiés sur la pédale : 1 E = A+B (footswitch E : preset 1E... ou ses blocs), 2 B+C = symbole de l'accordeur (accordeur intégré), 3 F = C+D (footswitch F).",
  s5=["Appuyez sur deux commutateurs <b>voisins</b> ensemble (à moins de 0,25 s d'écart) : Octopus exécute l'action de la paire au lieu des deux footswitchs.",
-     "<b>Clic droit sur le marquage B+C</b> pour choisir son action : <i>Tuner (CHROMA)</i>, <i>Bank down</i>, <i>Bank up</i>, <i>PRESET / STOMP mode</i> ou <i>Nothing</i>. <i>Color &amp; Glow</i> règle la couleur et le halo du symbole de l'accordeur.",
+     "<b>Clic droit sur le marquage B+C</b> pour choisir son action : <i>Tuner (CHROMA)</i>, <i>PRESET / STOMP mode</i> ou <i>Nothing</i>. <i>Color &amp; Glow</i> règle la couleur et le halo du symbole de l'accordeur.",
      "<b>E</b> (A+B) et <b>F</b> (C+D) sont deux footswitchs de plus, exactement comme A-D (même menu au clic droit) : en mode PRESET ils rappellent les presets E et F de la bank, en mode STOMP ils basculent leurs blocs ; B+C ouvre l'accordeur (symbole de l'accordeur, allumé en vert pendant l'accordage). Survolez le marquage pour voir son action sur la ligne d'état.",
      "<b>Rien à apprendre pour E, F et B+C</b> : E correspond au CC de A et au CC de B reçus ensemble, F à ceux de C et D, B+C à ceux de B et C. Apprenez A, B, C et D (étape 4) et les doubles appuis fonctionnent tout de suite ; les menus de E / F et de B+C affichent les CC utilisés. Apprendre <i>Tuner on / off</i> avec le CC d'un footswitch est refusé : ce footswitch garde son CC.",
      "À la souris : clic sur le marquage (ou Maj + clic sur un footswitch). Chaque footswitch agit tout de suite, sans attente : si son voisin suit dans les 0,25 s, le premier appui est annulé et c'est la paire qui agit."],

@@ -408,7 +408,7 @@ void OctopusEngine::triggerCombo (int k)
 void OctopusEngine::pressFs (int f)
 {
     if (! juce::isPositiveAndBelow (f, 4)) return;          // footswitchs physiques A-D (E / F : leurs doubles appuis)
-    const double now = juce::Time::getMillisecondCounterHiRes();
+    const double now = eventMs > 0.0 ? eventMs : juce::Time::getMillisecondCounterHiRes();
     if (pendingFs >= 0 && std::abs (pendingFs - f) == 1 && now - pendingAt < kComboMs)
     {
         const int k = juce::jmin (pendingFs, f);
@@ -954,6 +954,7 @@ void OctopusEngine::fromTree (const juce::ValueTree& root)
             for (int k = 0; k < kCombos; ++k)
             {
                 if (root.hasProperty ("combo" + juce::String (k))) comboAct[(size_t) k] = juce::jlimit (0, numComboActions - 1, (int) root["combo" + juce::String (k)]);
+                if (k == 1 && comboAct[1] != comboNone && comboAct[1] != comboTuner && comboAct[1] != comboMode) comboAct[1] = comboTuner;   // B+C : bank / CC retirés du menu
                 if (root.hasProperty ("comboCc" + juce::String (k))) comboCcNum[(size_t) k] = juce::jlimit (0, 127, (int) root["comboCc" + juce::String (k)]);
             }
             bypassPrefs.clear();

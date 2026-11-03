@@ -352,12 +352,15 @@ void OctopusProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
     // accordeur intégré en mode MUTE : silence en sortie (la guitare reste lue par l'accordeur juste au-dessus)
     if (innerOn.load (std::memory_order_relaxed) && innerMute.load (std::memory_order_relaxed)) buffer.clear();
 
+    // heure d'arrivée de chaque message (les doubles appuis se mesurent à l'arrivée, pas quand le timer les lit)
+    const double blockMs = midi.isEmpty() ? 0.0 : juce::Time::getMillisecondCounterHiRes();
     for (const auto m : midi)
     {
         const auto msg = m.getMessage();
+        const double at = blockMs + 1000.0 * (double) m.samplePosition / sampleRate;
         MidiEv ev {};
-        if (msg.isController())         ev = { 0, (juce::uint8) msg.getChannel(), (juce::uint8) msg.getControllerNumber(), (juce::uint8) msg.getControllerValue() };
-        else if (msg.isProgramChange()) ev = { 1, (juce::uint8) msg.getChannel(), (juce::uint8) msg.getProgramChangeNumber(), 0 };
+        if (msg.isController())         ev = { 0, (juce::uint8) msg.getChannel(), (juce::uint8) msg.getControllerNumber(), (juce::uint8) msg.getControllerValue(), at };
+        else if (msg.isProgramChange()) ev = { 1, (juce::uint8) msg.getChannel(), (juce::uint8) msg.getProgramChangeNumber(), 0, at };
         else continue;
         const auto w = midiFifo.write (1);                 // sans verrou ni allocation
         if (w.blockSize1 > 0) midiBuf[(size_t) w.startIndex1] = ev;
@@ -397,8 +400,10 @@ void OctopusProcessor::timerCallback()
             else if (r.blockSize2 > 0) ev = midiBuf[(size_t) r.startIndex2];
             else break;
         }
+        engine->eventMs = ev.atMs;                         // un appui lu après le chargement d'un preset garde son heure réelle
         if (ev.type == 0) engine->midiCc (ev.channel, ev.number, ev.value);
         else engine->midiProgram (ev.channel, ev.number);
+        engine->eventMs = -1.0;
     }
 
     for (int t = 0; t < OctopusEngine::numTargets; ++t)

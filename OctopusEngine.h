@@ -68,6 +68,7 @@ public:
     void press (int fs);                    // action immédiate d'un footswitch
     // appui sur un footswitch (pied, MIDI, souris) : B et C attendent un court instant pour reconnaître B+C
     void pressFs (int fs);
+    double eventMs = -1.0;                  // heure d'arrivée du message MIDI en cours (-1 : maintenant)
     void toggleTuner();                     // accordeur intégré d'Octopus (un bloc CHROMA allumé est éteint)
 
     // ---- doubles appuis : A+B, B+C, C+D (deux footswitchs voisins à moins de kComboMs)
