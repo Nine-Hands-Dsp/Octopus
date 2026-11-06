@@ -63,6 +63,35 @@ namespace OctoSettings
         x.writeTo (file());
     }
 
+    // couleur (0 = celle d'origine) et opacité du halo en % d'un élément de l'écran : "semi" (bouton Semitones),
+    // "chromaOk" / "chromaOff" (mini CHROMA : note juste / fausse) et "chroma" (halo commun du mini CHROMA)
+    inline juce::uint32 colourOf (const juce::String& key)
+    {
+        if (auto x = juce::XmlDocument::parse (file())) return (juce::uint32) x->getStringAttribute (key + "Colour", "0").getHexValue64();
+        return 0;
+    }
+    inline int glowOf (const juce::String& key)
+    {
+        if (auto x = juce::XmlDocument::parse (file())) return juce::jlimit (0, 200, x->getIntAttribute (key + "Glow", 100));
+        return 100;
+    }
+    inline void setColourOf (const juce::String& key, juce::uint32 colour)
+    {
+        juce::XmlElement x ("OctopusSettings");
+        if (auto old = juce::XmlDocument::parse (file())) x = *old;
+        x.setAttribute (key + "Colour", juce::String::toHexString ((juce::int64) colour));
+        file().getParentDirectory().createDirectory();
+        x.writeTo (file());
+    }
+    inline void setGlowOf (const juce::String& key, int pc)
+    {
+        juce::XmlElement x ("OctopusSettings");
+        if (auto old = juce::XmlDocument::parse (file())) x = *old;
+        x.setAttribute (key + "Glow", juce::jlimit (0, 200, pc));
+        file().getParentDirectory().createDirectory();
+        x.writeTo (file());
+    }
+
     // plugins favoris (nom complet donné par REAPER, ex. "VST3: Holyverb (NINE HANDS | DSP)"), communs à tous les projets
     inline juce::StringArray favourites()
     {

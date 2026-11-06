@@ -47,6 +47,8 @@ OctopusProcessor::OctopusProcessor (bool demoChain)
     engine->onTokenClash = [this] { newToken(); };
     engine->onInternalTuner = [this] { toggleInternalTuner(); };
     engine->isInternalTunerOn = [this] { return innerOn.load(); };
+    engine->semiNow = [this] { return semiIdx.load(); };
+    engine->semiApply = [this] (int i) { setSemitonesPreset (i); };
     engine->onSendCc = [this] (int cc)
     {
         const auto w = outFifo.write (1);
@@ -63,11 +65,22 @@ OctopusProcessor::~OctopusProcessor()
     analysis.stopThread (2000);
 }
 
-void OctopusProcessor::prepareToPlay (double sr, int)
+void OctopusProcessor::prepareToPlay (double sr, int block)
 {
     const bool running = analysis.isThreadRunning();
     analysis.stopThread (2000);
     sampleRate = sr > 0 ? sr : 48000.0;
+    // Semitones : pas de latence annoncée (comme la pédale, le son transposé s'entend en direct)
+    const int nch = juce::jlimit (1, 2, getTotalNumOutputChannels());
+    shifter.prepare (sampleRate, nch);
+    const int maxBlock = juce::jmax (256, block);
+    semiDry.setSize (2, maxBlock, false, true, false);
+    semiWet.setSize (2, maxBlock, false, true, false);
+    semiLast = 9999;
+    const auto& sp = semi::get (semiIdx.load());
+    gPass = sp.semis == 0 ? 1.0f : 0.0f;
+    gMixOn = sp.mixOn ? 1.0f : 0.0f;
+    mixSm = sp.mix * 0.01f;
     tuner.prepare (sampleRate);
     tuner.setReference ((double) chromaState.ref);
     if (! chromaState.notes.empty()) tuner.setTuning (chromaState.notes);
@@ -189,6 +202,25 @@ void OctopusProcessor::refreshChroma (bool readTuning)
     }
 }
 
+void OctopusProcessor::setSemitonesPreset (int i)
+{
+    i = juce::jlimit (0, semi::kCount - 1, i);
+    if (i == semiIdx.load()) return;
+    semiIdx = i;
+    const auto& p = semi::get (i);
+    engine->say ("Semitones : " + juce::String (p.name) + "  (" + (p.semis > 0 ? "+" : "") + juce::String (p.semis) + ")");
+    storeEngineState();
+}
+
+// l'accordeur écoute quand un écran d'accordeur est affiché ou qu'une fenêtre est ouverte (mini CHROMA de l'en-tête)
+void OctopusProcessor::syncTunerThread()
+{
+    const bool want = chromaState.on || miniTunerUsers.load() > 0;
+    if (want == tunerOn.load()) return;
+    if (want) { tunerFifo.reset(); tunerOn = true; analysis.startThread (juce::Thread::Priority::low); }
+    else { tunerOn = false; analysis.stopThread (500); }
+}
+
 void OctopusProcessor::toggleInternalTuner()
 {
     innerOn = ! innerOn.load();
@@ -229,16 +261,9 @@ void OctopusProcessor::updateChroma()
             tuner.setReference ((double) c.ref);
             tuner.setTuning (c.notes);
         }
-        if (on)
-        {
-            if (! internal) refreshChroma (true);
-            if (! was) { tunerFifo.reset(); tunerOn = true; analysis.startThread (juce::Thread::Priority::low); }
-        }
-        else
-        {
-            tunerOn = false;
-            analysis.stopThread (500);
-        }
+        juce::ignoreUnused (was);
+        if (on && ! internal) refreshChroma (true);
+        syncTunerThread();
         chromaTick = 0;
         return;
     }
@@ -325,7 +350,7 @@ bool OctopusProcessor::isBusesLayoutSupported (const BusesLayout& l) const
     return in == out;
 }
 
-// Le son passe tel quel. Le MIDI est lu (CC appris, Program Change) et laissé dans le tampon pour les effets suivants.
+// Le son passe tel quel, sauf transposition de Semitones. Le MIDI est lu (CC appris, Program Change) et laissé dans le tampon pour les effets suivants.
 void OctopusProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
 {
     juce::ScopedNoDenormals noDenormals;
@@ -347,6 +372,39 @@ void OctopusProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
         };
         if (w.blockSize1 > 0) put (w.startIndex1, w.blockSize1, 0);
         if (w.blockSize2 > 0) put (w.startIndex2, w.blockSize2, w.blockSize1);
+    }
+
+    // Semitones : transposition en entrée (après la lecture de l'accordeur, qui mesure la guitare telle qu'elle est jouée)
+    {
+        const int nOut = juce::jmin (2, getTotalNumOutputChannels()), nIn = getTotalNumInputChannels();
+        if (nIn == 1 && nOut == 2) buffer.copyFrom (1, 0, buffer, 0, 0, buffer.getNumSamples());
+        const auto& sp = semi::get (semiIdx.load (std::memory_order_relaxed));
+        if (sp.semis != semiLast) { shifter.setRatio (std::pow (2.0, sp.semis / 12.0)); semiLast = sp.semis; }
+        const float tPass = sp.semis == 0 ? 1.0f : 0.0f, tMixOn = sp.mixOn ? 1.0f : 0.0f, tMix = sp.mix * 0.01f;
+        const float kSm = 1.0f - std::exp (-1.0f / (0.012f * (float) sampleRate));
+        const int ch = juce::jmax (1, nOut);
+        for (int start = 0, total = buffer.getNumSamples(); start < total;)
+        {
+            const int m = juce::jmin (total - start, semiDry.getNumSamples());
+            for (int c = 0; c < ch; ++c) { semiDry.copyFrom (c, 0, buffer, c, start, m); semiWet.copyFrom (c, 0, buffer, c, start, m); }
+            float* wp[2] = { semiWet.getWritePointer (0), semiWet.getWritePointer (ch > 1 ? 1 : 0) };
+            shifter.process (wp, ch, m);
+            for (int i = 0; i < m; ++i)
+            {
+                gPass += (tPass - gPass) * kSm;
+                gMixOn += (tMixOn - gMixOn) * kSm;
+                mixSm += (tMix - mixSm) * kSm;
+                const float mm = juce::jlimit (0.0f, 1.0f, mixSm) * 1.5707963f;
+                const float dryG = gMixOn * std::cos (mm), wetG = (1.0f - gMixOn) + gMixOn * std::sin (mm);
+                for (int c = 0; c < ch; ++c)
+                {
+                    const float d = semiDry.getSample (c, i);
+                    const float w = gPass * d + (1.0f - gPass) * semiWet.getSample (c, i);
+                    buffer.setSample (c, start + i, dryG * d + wetG * w);
+                }
+            }
+            start += m;
+        }
     }
 
     // accordeur intégré en mode MUTE : silence en sortie (la guitare reste lue par l'accordeur juste au-dessus)
@@ -411,6 +469,7 @@ void OctopusProcessor::timerCallback()
 
     engine->tick();
     updateChroma();
+    syncTunerThread();
 }
 
 void OctopusProcessor::storeEngineState()
@@ -439,6 +498,7 @@ void OctopusProcessor::getStateInformation (juce::MemoryBlock& dest)
         root.setProperty ("tunerMode", innerMode, nullptr);
         root.setProperty ("tunerRef", innerRef, nullptr);
     }
+    root.setProperty ("semiPreset", semiIdx.load(), nullptr);
     root.appendChild (apvts.copyState(), nullptr);
     {
         const juce::ScopedLock sl (stateLock);
@@ -469,6 +529,7 @@ void OctopusProcessor::setStateInformation (const void* data, int size)
         innerMode = juce::jlimit (0, 2, (int) root.getProperty ("tunerMode", 0));
         innerRef = juce::jlimit (430, 450, (int) root.getProperty ("tunerRef", 440));
     }
+    semiIdx = juce::jlimit (0, semi::kCount - 1, (int) root.getProperty ("semiPreset", 0));
     const auto params = root.getChildWithName (apvts.state.getType());
     if (params.isValid()) apvts.replaceState (params);
     const auto eng = root.getChildWithName ("OCTOPUS");

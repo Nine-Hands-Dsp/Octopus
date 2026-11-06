@@ -127,3 +127,4 @@ v1.8.3 : même marge de 3 tout autour de la pédale (repère 1249 x 934) ; B+C m
 v1.8.4 : B+C (« G ») comme A+B / C+D : l'accordeur s'ouvre tout de suite, n'importe quel footswitch le ferme et ramène le preset d'avant ; le Letter glow s'applique aussi au symbole de l'accordeur ; bulle de description des plugins NINE HANDS | DSP au bout de 0,8 s de survol.
 v1.8.5 : B+C n'ouvre plus l'accordeur : il se commande par MIDI learn (clic droit sur le symbole de l'accordeur : MIDI Learn, Clear MIDI, latching, Color & Glow ; clic sur le symbole : on / off) ; bouton STOMP en orange quand le mode STOMP est sélectionné.
 v1.8.6 : logo NINE HANDS | DSP 30 % plus petit sur la pédale.
+v1.9.0 : Semitones intégré (transposition -12 à +12 en entrée, bouton à gauche de la bank, tambour vertical des 21 presets, globale ou enregistrée avec un preset, couleur et halo) ; mini CHROMA dans l'en-tête (note qui sort, anneau vert juste / rouge faux, couleurs et halo).

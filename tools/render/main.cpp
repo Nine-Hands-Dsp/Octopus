@@ -376,6 +376,87 @@ int main (int argc, char** argv)
             }
         }
 
+        // Semitones (transposition en entrée) + mini CHROMA de l'en-tête
+        {
+            pump (3);
+            check (! proc.chroma().on, "Semitones : accordeur fermé");
+            // son inchangé au réglage Standard (0)
+            proc.setSemitonesPreset (0);
+            {
+                AudioBuffer<float> b (2, 256), ref (2, 256); MidiBuffer m;
+                for (int i = 0; i < 256; ++i) { const float v = (float) std::sin (0.05 * i); b.setSample (0, i, v); b.setSample (1, i, v); }
+                ref.makeCopyOf (b);
+                proc.processBlock (b, m);
+                float d = 0; for (int i = 0; i < 256; ++i) d = jmax (d, std::abs (b.getSample (0, i) - ref.getSample (0, i)));
+                check (d == 0.0f, "Semitones Standard (0) : son identique à l'entrée");
+            }
+            // -12 : fréquence divisée par 2 (passages par zéro comptés sur 0,5 s)
+            auto zeroCrossHz = [&] (double hz)
+            {
+                AudioBuffer<float> b (2, 256); MidiBuffer m; double ph = 0; int zc = 0, n = 0; float last = 0;
+                for (int blk = 0; blk < 375; ++blk)
+                {
+                    for (int i = 0; i < 256; ++i) { const float v = (float) (0.4 * std::sin (ph)); b.setSample (0, i, v); b.setSample (1, i, v); ph += 2.0 * MathConstants<double>::pi * hz / 48000.0; }
+                    proc.processBlock (b, m);
+                    if (blk < 188) continue;
+                    for (int i = 0; i < 256; ++i) { const float y = b.getSample (0, i); if ((last < 0) != (y < 0)) ++zc; last = y; ++n; }
+                }
+                return zc * 0.5 * 48000.0 / n;
+            };
+            proc.setSemitonesPreset (8);                               // Octave down (-12)
+            const double f1 = zeroCrossHz (220.0);
+            check (std::abs (f1 - 110.0) < 4.0, "Semitones Octave down : 220 Hz -> " + String (f1, 1) + " Hz");
+            proc.setSemitonesPreset (2);                               // D Standard (-2)
+            const double f2 = zeroCrossHz (220.0);
+            check (std::abs (f2 - 220.0 * std::pow (2.0, -2.0 / 12.0)) < 4.0, "Semitones D Standard : 220 Hz -> " + String (f2, 1) + " Hz");
+            // globale, mais rappelée par un preset qui la garde
+            const int bk = e.bank() * OctopusEngine::kSlots;
+            e.load (bk + 0);
+            check (proc.semitonesPreset() == 2, "Semitones globale : inchangée au changement de preset");
+            e.setPresetSemi (bk + 1, 15);                              // 1B garde Capo 5
+            e.load (bk + 1);
+            check (proc.semitonesPreset() == 15, "preset 1B lié : Capo 5 rappelé");
+            e.load (bk + 0);
+            check (proc.semitonesPreset() == 15, "preset 1A non lié : la transposition reste");
+            proc.setSemitonesPreset (3);
+            e.load (bk + 1); e.save (bk + 1);
+            check (e.presetSemi (bk + 1) == 15 && proc.semitonesPreset() == 15, "enregistrer 1B garde sa transposition");
+            {
+                MemoryBlock mb2; proc.getStateInformation (mb2);
+                OctopusProcessor p3; p3.setStateInformation (mb2.getData(), (int) mb2.getSize());
+                check (p3.semitonesPreset() == 15 && p3.getEngine().presetSemi (bk + 1) == 15, "Semitones enregistré avec le projet (global + preset 1B)");
+            }
+            e.setPresetSemi (bk + 1, -1);
+            e.load (bk + 0);
+            proc.setSemitonesPreset (2);
+            // mini CHROMA : note juste puis fausse (fenêtre ouverte : l'accordeur écoute)
+            proc.setSemitonesPreset (0);
+            play (82.41, 2.0);
+            shot ("octopus_header_intune_standard");                 // Mi joué, sans transposition : E
+            proc.setSemitonesPreset (2);
+            play (82.41, 1.0);
+            shot ("octopus_header_intune");                          // Mi joué, D Standard (-2) : le mini CHROMA affiche D
+            play (92.5 * std::pow (2.0, 9.0 / 1200.0), 2.0);
+            shot ("octopus_header_offtune");
+            const auto sm = proc.tunerSnapshot();
+            check (sm.monoMidi == 42, "mini CHROMA : F#2 lu fenêtre ouverte, sans bloc CHROMA (" + String (sm.monoMidi) + ")");
+            play (0.0, 2.6); pump (8);                               // silence : la note s'efface
+            shot ("octopus_header_idle");
+            ed->showScreen (9);
+            pump (12);
+            shot ("octopus_semitones_drum");
+            ed->showScreen (10, 4);
+            pump (12);
+            shot ("octopus_semitones_drum_scrolled");
+            ed->showScreen (0);
+            ed->showScreen (11);
+            pump (6);
+            shot ("octopus_colour_picker_semitones");
+            for (auto* c : ed->getChildren()) if (auto* l = dynamic_cast<OctoPickerLayer*> (c)) l->dismiss();
+            pump (6);
+            proc.setSemitonesPreset (0);
+        }
+
         // E (A+B) et F (C+D) : footswitchs comme A-D (presets 1E / 1F en mode PRESET, effets en STOMP)
         {
             const int bk = e.bank() * OctopusEngine::kSlots;

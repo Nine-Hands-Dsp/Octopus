@@ -84,7 +84,7 @@ namespace
     {
         bNone = 0, bBankPrev, bBankNext, bModePreset, bModeStomp, bSave, bBanks, bClose,
         bParamOnOff, bParamWindow, bPagePrev, bPageNext, bExport, bImport, bPc, bReload,
-        bAddPicked, bClearPicked, bParamMidi, bPresets, bTunerTunings, bPresetSave, bPresetRescan, bTunerMute, bTunerMode, bTunerExit,
+        bAddPicked, bClearPicked, bParamMidi, bPresets, bTunerTunings, bPresetSave, bPresetRescan, bTunerMute, bTunerMode, bTunerExit, bChroma, bSemi,
         bChip = 100,                     // + catégorie du navigateur
         bBank = 200,                     // + numéro de bank
         bCard = 300,                     // + slot * 10 + action
@@ -147,10 +147,11 @@ public:
 
         setOpaque (true);
         setWantsKeyboardFocus (true);
+        proc.setMiniTuner (true);                  // mini CHROMA de l'en-tête : l'accordeur écoute tant que la fenêtre est ouverte
         startTimerHz (30);
     }
 
-    ~PedalView() override { stopTimer(); }
+    ~PedalView() override { stopTimer(); proc.setMiniTuner (false); }
 
     // ------------------------------------------------------------ public (outil de rendu, éditeur)
     void openBrowser (int blockPos)
@@ -509,7 +510,7 @@ private:
     }
 
     // ---- nom du preset chargé : clic sur le nom en haut de l'écran pour le changer
-    static Rectangle<float> headerNameRect() { return { 132.0f, 8.0f, 376.0f, 36.0f }; }
+    Rectangle<float> headerNameRect() const { return { 132.0f, 8.0f, jmax (120.0f, chromaRect().getX() - 10.0f - 132.0f), 36.0f }; }
     void startHeaderRename()
     {
         const int cur = eng.current();
@@ -909,6 +910,306 @@ private:
         }
     }
 
+    // ------------------------------------------------------------ mini CHROMA + Semitones (en-tête)
+    // Semitones : bouton (anneau = transposition, nom du preset) aligné à gauche de la bank ; clic = tambour vertical
+    // des presets (molette, clic pour choisir). Mini CHROMA : à sa gauche, la note jouée (transposée par Semitones) dans un anneau vert / rouge
+    // (juste / faux) ; clic = accordeur, clic droit = couleurs et halo.
+    bool semiOpen = false;
+    int semiTarget = 0, hoverDrum = -1, drawnSemi = -1;
+    float semiPos = 0.0f;
+    String drawnChroma;
+    juce::uint32 semiCol = OctoSettings::colourOf ("semi"), chromaOkCol = OctoSettings::colourOf ("chromaOk"), chromaOffCol = OctoSettings::colourOf ("chromaOff");
+    int semiGlowPc = OctoSettings::glowOf ("semi"), chromaGlowPc = OctoSettings::glowOf ("chroma");
+    Colour semiColour() const      { return semiCol != 0 ? Colour (semiCol) : Colour (0xff2fa8ff); }
+    Colour chromaOkColour() const  { return chromaOkCol != 0 ? Colour (chromaOkCol) : TC::green(); }
+    Colour chromaOffColour() const { return chromaOffCol != 0 ? Colour (chromaOffCol) : Colour (0xffff4d4d); }
+
+    static String semiValue (int v) { return v > 0 ? "+" + String (v) : String (v); }
+    static String semiValue2 (int v) { return (v > 0 ? "+" : v < 0 ? "-" : "") + String (std::abs (v)).paddedLeft ('0', 2); }
+
+    float unitsOf (const Font& f, const String& t) const { return GlyphArrangement::getStringWidth (f, t) / jmax (0.001f, S (1.0f)); }
+    Font semiLabelFont() const { return font (tfBold, 8.8f).withExtraKerningFactor (0.24f); }
+    Rectangle<float> semiRect() const
+    {
+        const auto& p = semi::get (proc.semitonesPreset());
+        const float tw = jmax (unitsOf (font (tfBold, 13.3f), p.name), unitsOf (semiLabelFont(), "SEMITONES"));
+        const float w = jlimit (96.0f, 170.0f, 5.3f + 26.0f + 7.1f + tw + 9.5f);
+        return { 507.0f - w, 19.0f, w, 36.0f };
+    }
+    Rectangle<float> chromaRect() const { return { semiRect().getX() - 13.0f - 36.0f, 19.0f, 36.0f, 36.0f }; }
+
+    // anneau lumineux : halo (opacité glowPc %) puis trait net
+    void glowArc (Graphics& g, Point<float> c, float rad, float w, float from, float to, Colour col, int glowPc)
+    {
+        Path p; p.addCentredArc (c.x, c.y, rad, rad, 0.0f, from, to, true);
+        const float k = (float) glowPc / 100.0f;
+        if (k > 0.0f)
+        {
+            const float layers[3][2] = { { 4.2f, 0.07f }, { 2.6f, 0.13f }, { 1.7f, 0.22f } };
+            for (auto& l : layers)
+            {
+                g.setColour (col.withMultipliedAlpha (jmin (1.0f, l[1] * k)));
+                g.strokePath (p, PathStrokeType (w * l[0], PathStrokeType::curved, PathStrokeType::rounded));
+            }
+        }
+        g.setColour (col);
+        g.strokePath (p, PathStrokeType (w, PathStrokeType::curved, PathStrokeType::rounded));
+    }
+
+    void drawHeaderBox (Graphics& g, Rectangle<float> b, bool hov)
+    {
+        const auto rr = S (b);
+        g.setColour (hov ? kScrPanel2.brighter (0.15f) : kScrPanel2);
+        g.fillRoundedRectangle (rr, S (7.0f));
+        g.setColour (hov ? kDim : kFaint);
+        g.drawRoundedRectangle (rr.reduced (S (0.6f)), S (7.0f), S (1.2f));
+    }
+
+    struct MiniNote { bool has = false; bool inTune = false; float alpha = 0.3f; String letter, acc; };
+    MiniNote miniNote() const
+    {
+        MiniNote n;
+        const auto sn = proc.tunerSnapshot();
+        n.has = sn.monoMidi >= 0 && (sn.monoActive || sn.monoAge < 2.0f);
+        if (! n.has) return n;
+        n.alpha = sn.monoActive ? 1.0f : jmap (jlimit (0.25f, 2.0f, sn.monoAge), 0.25f, 2.0f, 1.0f, 0.35f);
+        n.inTune = sn.monoPrecise && std::abs (sn.monoCents) <= (float) tuna::TunerEngine::kMonoInTune;   // comme CHROMA
+        // note qui sort d'Octopus : celle jouée, décalée par Semitones (le grand accordeur garde la note jouée, pour accorder)
+        const String pc (tuna::pitchClassName (sn.monoMidi + semi::get (proc.semitonesPreset()).semis));
+        n.letter = pc.substring (0, 1); n.acc = pc.substring (1);
+        return n;
+    }
+
+    void drawMiniChroma (Graphics& g)
+    {
+        const auto b = chromaRect();
+        drawHeaderBox (g, b, hoverBtn == bChroma);
+        const auto n = miniNote();
+        const auto c = S (b.getCentre());
+        const float rad = S (11.6f), w = S (2.1f);
+        g.setColour (Colours::black.withAlpha (0.4f));
+        g.fillEllipse (Rectangle<float> (rad * 2.0f, rad * 2.0f).withCentre (c));
+        if (! n.has)
+        {
+            g.setColour (Colours::white.withAlpha (0.12f));
+            g.drawEllipse (Rectangle<float> (rad * 2.0f, rad * 2.0f).withCentre (c), w);
+        }
+        else glowArc (g, c, rad, w, 0.0f, MathConstants<float>::twoPi,
+                      (n.inTune ? chromaOkColour() : chromaOffColour()).withMultipliedAlpha (n.alpha), (int) (chromaGlowPc * n.alpha));
+        const auto big = font (tfBold, 16.7f), small = font (tfBold, 9.8f);
+        g.setColour (n.has ? Colours::white.withAlpha (jmax (0.5f, n.alpha)) : kDim);
+        if (! n.has) { g.setFont (big); g.drawText (CharPointer_UTF8 ("\xe2\x80\x93"), Rectangle<float> (rad * 2.0f, rad * 2.0f).withCentre (c), Justification::centred); return; }
+        const float wl = GlyphArrangement::getStringWidth (big, n.letter), wa = n.acc.isEmpty() ? 0.0f : GlyphArrangement::getStringWidth (small, n.acc) + S (0.4f);
+        const float x = c.x - (wl + wa) * 0.5f;
+        g.setFont (big);
+        g.drawText (n.letter, Rectangle<float> (x, c.y - S (10.0f), wl + S (1.0f), S (20.6f)), Justification::centredLeft);
+        if (n.acc.isNotEmpty())
+        {
+            g.setFont (small);
+            g.drawText (n.acc, Rectangle<float> (x + wl + S (0.4f), c.y - S (9.5f), wa + S (1.0f), S (11.0f)), Justification::centredLeft);
+        }
+    }
+
+    void drawSemiButton (Graphics& g)
+    {
+        const auto b = semiRect();
+        const int idx = proc.semitonesPreset();
+        const auto& p = semi::get (idx);
+        drawHeaderBox (g, b, hoverBtn == bSemi || semiOpen);
+        const auto c = S (Point<float> (b.getX() + 5.3f + 13.0f, b.getCentreY()));
+        const float rad = S (11.0f), w = S (2.26f);
+        g.setColour (Colours::black.withAlpha (0.4f));
+        g.fillEllipse (Rectangle<float> (rad * 2.0f, rad * 2.0f).withCentre (c));
+        g.setColour (Colours::white.withAlpha (0.12f));
+        g.drawEllipse (Rectangle<float> (rad * 2.0f, rad * 2.0f).withCentre (c), w);
+        if (p.semis != 0)
+        {
+            const float a = MathConstants<float>::twoPi * (float) jmin (12, std::abs (p.semis)) / 12.0f;
+            glowArc (g, c, rad, w, 0.0f, p.semis < 0 ? -a : a, semiColour(), semiGlowPc / 2);
+        }
+        g.setFont (font (tfBold, 14.1f));
+        g.setColour (Colours::white);
+        g.drawText (semiValue (p.semis), Rectangle<float> (rad * 2.2f, rad * 2.0f).withCentre (c), Justification::centred);
+        const float tx = b.getX() + 5.3f + 26.0f + 7.1f;
+        g.setFont (semiLabelFont());
+        g.setColour (Colour (0xff9aa3b2));
+        g.drawText ("SEMITONES", S (Rectangle<float> (tx, b.getY() + 6.0f, b.getRight() - tx - 2.0f, 10.0f)), Justification::centredLeft, false);
+        g.setFont (font (tfBold, 13.3f));
+        g.setColour (Colour (0xfff2f5f9));
+        g.drawText (p.name, S (Rectangle<float> (tx, b.getY() + 15.0f, b.getRight() - tx - 2.0f, 15.0f)), Justification::centredLeft, true);
+    }
+
+    // ---- tambour : presets sur un cylindre vertical, le preset choisi dans la bande du milieu
+    static constexpr float kDrumX = 334.0f, kDrumW = 214.0f, kDrumMidY = 198.9f, kDrumR = 112.9f, kDrumStep = 16.0f;
+    void openSemiDrum()
+    {
+        semiTarget = proc.semitonesPreset(); semiPos = (float) semiTarget; hoverDrum = -1;
+        semiOpen = true;
+        askRepaint (screenPx());
+    }
+    void closeSemiDrum()
+    {
+        if (! semiOpen) return;
+        semiOpen = false; hoverDrum = -1;
+        askRepaint (screenPx());
+    }
+    void chooseSemi (int i)
+    {
+        proc.setSemitonesPreset (i);
+        semiTarget = i;
+        const int cur = eng.current();
+        if (cur >= 0 && eng.presetSemi (cur) >= 0) eng.setPresetSemi (cur, i);      // preset lié : il garde la nouvelle transposition
+        askRepaint (screenPx());
+    }
+    float drumY (float d) const { return kDrumMidY + kDrumR * std::sin (jlimit (-5.5f, 5.5f, d) * kDrumStep * MathConstants<float>::pi / 180.0f); }
+    int drumItemAt (Point<float> p) const
+    {
+        if (p.x < kDrumX || p.x > kDrumX + kDrumW) return -1;
+        int best = -1; float bd = 1.0e9f;
+        for (int i = 0; i < semi::kCount; ++i)
+        {
+            const float d = (float) i - semiPos;
+            if (std::abs (d) > 4.3f) continue;
+            const float h = 13.5f * std::cos (d * kDrumStep * MathConstants<float>::pi / 180.0f);
+            const float dy = std::abs (p.y - drumY (d));
+            if (dy <= h && dy < bd) { bd = dy; best = i; }
+        }
+        return best;
+    }
+
+    void drawSemiDrum (Graphics& g)
+    {
+        const auto col = semiColour();
+        // voile sur l'écran (sous l'en-tête) + zone sombre derrière le tambour
+        g.setColour (Colour (0xff05070b).withAlpha (0.8f));
+        g.fillRect (S (kOverlay));
+        const auto lc = S (Point<float> (kDrumX + kDrumW * 0.5f, kDrumMidY - 6.0f));
+        g.setGradientFill (ColourGradient (Colour (0xff04060a).withAlpha (0.8f), lc, Colour (0xff04060a).withAlpha (0.0f), lc + Point<float> (S (150.0f), 0.0f), true));
+        g.fillEllipse (Rectangle<float> (S (300.0f), S (290.0f)).withCentre (lc));
+        // bande du milieu
+        const auto band = S (Rectangle<float> (kDrumX + 3.6f, kDrumMidY - 14.85f, kDrumW - 7.2f, 29.7f));
+        const float k = (float) semiGlowPc / 100.0f;
+        for (int l = 3; l >= 1; --l)
+        {
+            g.setColour (col.withAlpha (jmin (1.0f, 0.05f * k)));
+            g.fillRoundedRectangle (band.expanded (S (3.0f * (float) l)), S (6.0f + 3.0f * (float) l));
+        }
+        g.setColour (col.withAlpha (0.10f));
+        g.fillRoundedRectangle (band, S (6.0f));
+        g.setColour (col.withAlpha (0.55f));
+        g.drawRoundedRectangle (band, S (6.0f), S (0.9f));
+        // presets
+        for (int i = 0; i < semi::kCount; ++i)
+        {
+            const float d = (float) i - semiPos;
+            if (std::abs (d) > 4.6f) continue;
+            const float ad = std::abs (d);
+            const float a = d * kDrumStep * MathConstants<float>::pi / 180.0f;
+            float op = jmax (0.06f, 1.0f - ad * 0.24f);
+            if (i == hoverDrum && ad > 0.5f) op = jmin (1.0f, op + 0.25f);
+            const float sc = 1.0f - ad * 0.08f, sy = std::cos (a);
+            const auto& p = semi::get (i);
+            const bool sel = ad < 0.5f;
+            const auto cy = S (Point<float> (kDrumX + kDrumW * 0.5f, drumY (d)));
+            Graphics::ScopedSaveState ss (g);
+            g.addTransform (AffineTransform::scale (sc, sc * sy, cy.x, cy.y));
+            const float rowH = S (27.3f);
+            const float x0 = S (kDrumX + 17.8f);
+            g.setFont (font (tfBold, 15.8f));
+            g.setColour (col.withAlpha (op * 0.35f));
+            g.drawText (semiValue2 (p.semis), Rectangle<float> (x0, cy.y - rowH * 0.5f, S (33.0f), rowH).expanded (S (0.6f), 0.0f), Justification::centredRight);
+            g.setColour (col.withAlpha (op));
+            g.drawText (semiValue2 (p.semis), Rectangle<float> (x0, cy.y - rowH * 0.5f, S (33.0f), rowH), Justification::centredRight);
+            g.setFont (sel ? font (tfBold, 18.3f) : font (tfMedium, 16.7f));
+            g.setColour ((sel ? Colours::white : kText).withAlpha (op));
+            g.drawText (p.name, Rectangle<float> (x0 + S (33.0f + 9.5f), cy.y - rowH * 0.5f, S (kDrumW - 17.8f - 42.5f), rowH), Justification::centredLeft, true);
+        }
+        // aide : souris + texte
+        const auto mr = S (Rectangle<float> (363.0f, 336.0f, 13.0f, 19.0f));
+        g.setColour (Colour (0xff9aa4b4));
+        g.drawRoundedRectangle (mr, mr.getWidth() * 0.5f, S (1.2f));
+        g.setColour (col);
+        g.fillRoundedRectangle (S (Rectangle<float> (368.3f, 339.6f, 2.4f, 5.4f)), S (1.2f));
+        g.setFont (font (tfBold, 11.6f).withExtraKerningFactor (0.14f));
+        g.setColour (Colour (0xff9aa4b4));
+        g.drawText (CharPointer_UTF8 ("SCROLL  \xc2\xb7  CLICK TO CHOOSE"), S (Rectangle<float> (382.0f, 336.0f, 200.0f, 19.0f)), Justification::centredLeft);
+    }
+
+    // clic droit sur Semitones : lien avec le preset chargé, couleur et halo
+    void semiMenu()
+    {
+        const int cur = eng.current();
+        PopupMenu m;
+        m.addSectionHeader ("SEMITONES");
+        const bool can = cur >= 0 && eng.preset (cur).saved;
+        const bool linked = can && eng.presetSemi (cur) >= 0;
+        m.addItem (1, can ? "Save with preset " + OctopusEngine::label (cur) + " (" + eng.displayName (cur) + ")" : String ("Save with a preset (load or save a preset first)"),
+                   can, linked);
+        m.addSeparator();
+        m.addItem (2, "Color & Glow");
+        SafePointer<PedalView> sp (this);
+        m.showMenuAsync (PopupMenu::Options(), [sp, cur, linked] (int r)
+        {
+            if (sp == nullptr) return;
+            if (r == 1)
+            {
+                sp->eng.setPresetSemi (cur, linked ? -1 : sp->proc.semitonesPreset());
+                sp->eng.say (linked ? "Semitones : global again (not saved with " + OctopusEngine::label (cur) + ")"
+                                    : "Semitones saved with " + OctopusEngine::label (cur) + " : recalled when it loads");
+            }
+            else if (r == 2)
+                sp->openPicker ("Semitones colour", sp->semiColour(), sp->S (sp->semiRect()), true,
+                                [sp] (Colour c) { if (sp != nullptr) { sp->semiCol = c.getARGB(); OctoSettings::setColourOf ("semi", sp->semiCol); } },
+                                [sp] { if (sp != nullptr) { sp->semiCol = 0; OctoSettings::setColourOf ("semi", 0); } },
+                                sp->semiGlowPc,
+                                [sp] (int pc) { if (sp != nullptr) { sp->semiGlowPc = pc; OctoSettings::setGlowOf ("semi", pc); sp->askRepaint (sp->screenPx()); } });
+        });
+    }
+
+    // clic droit sur le mini CHROMA : couleur de la note juste, de la note fausse, halo commun
+    void chromaMenu()
+    {
+        PopupMenu m;
+        m.addSectionHeader ("CHROMA");
+        m.addItem (1, "Color & Glow : in tune");
+        m.addItem (2, "Color & Glow : out of tune");
+        m.addSeparator();
+        m.addItem (3, "Open the tuner");
+        SafePointer<PedalView> sp (this);
+        m.showMenuAsync (PopupMenu::Options(), [sp] (int r)
+        {
+            if (sp == nullptr || r <= 0) return;
+            if (r == 3) { sp->eng.toggleTuner(); return; }
+            const bool ok = r == 1;
+            const String key = ok ? "chromaOk" : "chromaOff";
+            auto glowFn = [sp] (int pc) { if (sp != nullptr) { sp->chromaGlowPc = pc; OctoSettings::setGlowOf ("chroma", pc); sp->askRepaint (sp->screenPx()); } };
+            sp->openPicker (ok ? "CHROMA : in tune colour" : "CHROMA : out of tune colour", ok ? sp->chromaOkColour() : sp->chromaOffColour(),
+                            sp->S (sp->chromaRect()), true,
+                            [sp, ok, key] (Colour c) { if (sp != nullptr) { (ok ? sp->chromaOkCol : sp->chromaOffCol) = c.getARGB(); OctoSettings::setColourOf (key, c.getARGB()); } },
+                            [sp, ok, key] { if (sp != nullptr) { (ok ? sp->chromaOkCol : sp->chromaOffCol) = 0; OctoSettings::setColourOf (key, 0); } },
+                            sp->chromaGlowPc, glowFn);
+        });
+    }
+
+    // timer : tambour qui glisse vers le preset visé, mini CHROMA redessiné quand la note change
+    void tickHeaderWidgets()
+    {
+        if (semiOpen && (tunerShown() || ! eng.isReady())) closeSemiDrum();
+        if (semiOpen && std::abs (semiPos - (float) semiTarget) > 0.001f)
+        {
+            semiPos += ((float) semiTarget - semiPos) * 0.35f;
+            if (std::abs (semiPos - (float) semiTarget) < 0.01f) semiPos = (float) semiTarget;
+            askRepaint (screenPx());
+        }
+        if (proc.semitonesPreset() != drawnSemi) { drawnSemi = proc.semitonesPreset(); askRepaint (screenPx()); }
+        if (! tunerShown())
+        {
+            const auto n = miniNote();
+            const String sig = n.has ? n.letter + n.acc + (n.inTune ? "1" : "0") + String (roundToInt (n.alpha * 20.0f)) : String ("-");
+            if (sig != drawnChroma) { drawnChroma = sig; askRepaint (S (chromaRect()).expanded (S (8.0f)).toNearestInt()); }
+        }
+    }
+
     // ------------------------------------------------------------ boutons
     std::vector<Btn> headerButtons() const
     {
@@ -1007,6 +1308,8 @@ private:
             for (auto& b : tunerButtons()) if (b.r.contains (p)) return b.id;
             return bNone;
         }
+        if (chromaRect().contains (p)) return bChroma;
+        if (semiRect().contains (p)) return bSemi;
         if (overlay != Overlay::none)
             for (auto& b : overlayButtons()) if (b.enabled && b.r.contains (p)) return b.id;
         for (auto& b : headerButtons()) if (b.enabled && b.r.contains (p)) return b.id;
@@ -1050,6 +1353,7 @@ private:
                 drawFooter (g);
             }
             if (overlay != Overlay::none) drawOverlay (g);
+            if (semiOpen) drawSemiDrum (g);
         }
 
         // vitre : léger reflet en biais (lumière en haut à gauche) + assombrissement des bords
@@ -1102,13 +1406,15 @@ private:
         if (msg.isNotEmpty()) sub = msg;
         g.setFont (font (tfRegular, 17.0f));
         g.setColour (msg.isNotEmpty() ? kAccent : kDim);
-        g.drawText (sub, S (Rectangle<float> (132.0f, 44.0f, 380.0f, 22.0f)), Justification::centredLeft, true);
+        g.drawText (sub, S (Rectangle<float> (132.0f, 44.0f, headerNameRect().getWidth(), 22.0f)), Justification::centredLeft, true);
 
         // bank affichée
         g.setFont (font (tfBold, 17.0f));
         g.setColour (kText);
         g.drawText ("BANK " + String (eng.bank() + 1).paddedLeft ('0', 2), S (Rectangle<float> (554.0f, 19.0f, 106.0f, 36.0f)), Justification::centred);
         for (auto& b : headerButtons()) drawButton (g, b);
+        drawMiniChroma (g);
+        drawSemiButton (g);
     }
 
     void drawNotReady (Graphics& g)
@@ -2334,6 +2640,11 @@ private:
 
     void mouseMove (const MouseEvent& e) override
     {
+        if (semiOpen)
+        {
+            const int hd = drumItemAt (toLocal (e.position));
+            if (hd != hoverDrum) { hoverDrum = hd; askRepaint (screenPx()); }
+        }
         updateHover (toLocal (e.position));
         const int hc = comboAt (e.position / s);
         if (hc != hoverCombo && hc >= 0) eng.say (eng.comboTitle (hc) + "   (click : run, right-click : set)", 3000.0);
@@ -2379,9 +2690,22 @@ private:
             return;
         }
 
-        if (! L::glass.contains (unit)) { if (e.mods.isPopupMenu()) pedalMenu(); return; }
+        if (! L::glass.contains (unit)) { closeSemiDrum(); if (e.mods.isPopupMenu()) pedalMenu(); return; }
+
+        // tambour de Semitones ouvert : clic sur un preset = le choisir, ailleurs = fermer
+        if (semiOpen && ! tunerShown())
+        {
+            if (semiRect().contains (p) && e.mods.isPopupMenu()) { closeSemiDrum(); semiMenu(); return; }
+            if (semiRect().contains (p)) { closeSemiDrum(); return; }
+            const int it = drumItemAt (p);
+            if (it >= 0 && ! e.mods.isPopupMenu()) chooseSemi (it);
+            closeSemiDrum();
+            return;
+        }
 
         const int b = buttonAt (p);
+        if (e.mods.isPopupMenu() && b == bChroma) { chromaMenu(); return; }
+        if (e.mods.isPopupMenu() && b == bSemi) { semiMenu(); return; }
         if (b != bNone && ! e.mods.isPopupMenu()) { clickButton (b); return; }
         if (tunerShown())
         {
@@ -2573,6 +2897,13 @@ private:
         const auto p = toLocal (e.position);
         const int dir = w.deltaY < 0 ? 1 : (w.deltaY > 0 ? -1 : 0);
         if (dir == 0 || ! Rectangle<float> (0, 0, kSW, kSH).contains (p)) return;
+        if (semiOpen)
+        {
+            semiTarget = jlimit (0, semi::kCount - 1, semiTarget + dir);
+            hoverDrum = -1;
+            askRepaint (screenPx());
+            return;
+        }
         if (overlay == Overlay::browser)
         {
             const int rows = (filtered().size() + kListRows - 1) / kListRows;
@@ -2596,6 +2927,8 @@ private:
 
     bool keyPressed (const KeyPress& k) override
     {
+        if (k == KeyPress::escapeKey && semiOpen) { closeSemiDrum(); return true; }
+        if (k == KeyPress::returnKey && semiOpen) { chooseSemi (semiTarget); closeSemiDrum(); return true; }
         if (k == KeyPress::escapeKey && overlay != Overlay::none) { closeOverlay(); return true; }
         if ((k == KeyPress::deleteKey || k == KeyPress::backspaceKey) && overlay == Overlay::none
             && isPositiveAndBelow (hoverSlot, eng.blocks().size()))
@@ -2632,6 +2965,8 @@ private:
             case bTunerMute:  proc.chromaSetMute (! proc.chroma().muted); break;
             case bTunerMode:  proc.chromaNextMode(); break;
             case bTunerExit:  proc.chromaExit(); break;
+            case bChroma:     closeSemiDrum(); eng.toggleTuner(); break;      // mini CHROMA : ouvre l'accordeur
+            case bSemi:       if (semiOpen) closeSemiDrum(); else openSemiDrum(); break;
             case bExport:     exportBanks(); break;
             case bImport:     importBanks(); break;
             case bPc:         eng.setProgramChange (! eng.programChange); break;
@@ -3008,6 +3343,7 @@ private:
 
         // clic simple sur un bloc : bascule ON / OFF une fois le délai du double-clic passé
         runPendingToggle (now);
+        tickHeaderWidgets();
 
         // accordeur : l'écran de CHROMA s'anime en continu tant que le bloc CHROMA est allumé
         if (tunerShown())
@@ -3157,7 +3493,10 @@ void OctopusEditor::showScreen (int which, int arg)
         case 6: view->openBanks(); view->colourMenu (arg); break;
         case 7: view->setHalo (arg); break;
         case 8: view->openBanks(); view->tunerColourMenu (view->S (PedalView::colourBtnRect (OctopusEngine::kFs))); break;
-        default: view->closeOverlay(); break;
+        case 9: view->openSemiDrum(); break;                                      // tambour de Semitones
+        case 10: view->semiTarget = jlimit (0, semi::kCount - 1, view->semiTarget + arg); break;   // molette
+        case 11: view->openPicker ("Semitones colour", view->semiColour(), view->S (view->semiRect()), true, [] (Colour) {}); break;
+        default: view->closeSemiDrum(); view->closeOverlay(); break;
     }
 }
 

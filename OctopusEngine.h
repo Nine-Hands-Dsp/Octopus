@@ -25,6 +25,7 @@ public:
         bool saved = false;
         juce::uint32 colour = 0;            // couleur du preset (0 = celle de son footswitch)
         juce::StringArray onStates;         // "1" / "0" par effet : ON / OFF tel qu'enregistré (bypass de la pédale compris)
+        int semi = -1;                      // Semitones enregistré avec ce preset (indice du preset Semitones), -1 = transposition globale
     };
 
     explicit OctopusEngine (ChainHost& host);
@@ -129,6 +130,12 @@ public:
     bool canPaste() const { return hasClip; }
     void paste (int idx);
     void swapPresets (int a, int b);
+
+    // Semitones : globale, mais un preset peut garder la sienne (rappelée à son chargement)
+    int  presetSemi (int idx) const { return presets[(size_t) juce::jlimit (0, kPresets - 1, idx)].semi; }
+    void setPresetSemi (int idx, int semi) { presets[(size_t) juce::jlimit (0, kPresets - 1, idx)].semi = semi; changed(); }
+    std::function<int()> semiNow;                       // preset Semitones en cours (processeur)
+    std::function<void (int)> semiApply;                // le processeur change de preset Semitones
 
     juce::ValueTree banksTree() const;                  // export d'un fichier de banks
     bool importBanks (const juce::ValueTree& t);

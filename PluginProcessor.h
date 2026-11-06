@@ -4,6 +4,8 @@
 #include "TunerEngine.h"
 #include "Tunings.h"
 #include "TuningLibrary.h"
+#include "PitchShifter.h"
+#include "SemitonesPresets.h"
 
 // accordeur : réglages de CHROMA lus dans REAPER (paramètres + état du plugin)
 struct ChromaState
@@ -22,7 +24,7 @@ struct ChromaState
 class ReaperBridge;
 
 // OCTOPUS (NINE HANDS | DSP) : contrôleur de la chaîne d'effets de la piste REAPER qui l'héberge.
-// Le son traverse Octopus sans modification ; tout le travail se fait sur le thread de messages (timer à 30 Hz),
+// Le son traverse Octopus sans modification (sauf la transposition de Semitones, en entrée) ; tout le travail se fait sur le thread de messages (timer à 30 Hz),
 // via l'API de REAPER, même fenêtre fermée.
 class OctopusProcessor : public juce::AudioProcessor,
                          public juce::VST3ClientExtensions,
@@ -69,6 +71,11 @@ public:
     void toggleInternalTuner();
     void chromaSetReference (int hz);     // -1 : revenir à l'accordage de CHROMA
     bool tuningOverridden() const { return overrideKey.isNotEmpty(); }
+    // mini CHROMA de l'en-tête : l'accordeur écoute tant qu'une fenêtre d'Octopus est ouverte
+    void setMiniTuner (bool on) { miniTunerUsers += on ? 1 : -1; }
+    // Semitones : transposition en entrée (globale, rappelée par les presets qui en gardent une)
+    int  semitonesPreset() const noexcept { return semiIdx.load(); }
+    void setSemitonesPreset (int i);
     juce::AudioProcessorValueTreeState apvts;
     std::atomic<int> uiScaleIdx { -1 };     // -1 = taille par défaut (réglage commun) ; 0..3 = 50 / 60 / 75 / 100 %
 
@@ -111,6 +118,14 @@ private:
     std::atomic<bool> innerOn { false }, innerMute { false };
     int innerMode = 0, innerRef = 440;
     double sampleRate = 48000.0;
+    std::atomic<int> miniTunerUsers { 0 };
+    void syncTunerThread();
+    // Semitones (thread audio : atomiques seulement)
+    std::atomic<int> semiIdx { 0 };
+    sw::PitchShifter shifter;
+    juce::AudioBuffer<float> semiDry, semiWet;
+    int semiLast = 9999;
+    float gPass = 1.0f, gMixOn = 0.0f, mixSm = 0.5f;
     AnalysisThread analysis { *this };
     ChromaState chromaState;
     TuningLibrary library;

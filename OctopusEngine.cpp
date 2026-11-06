@@ -613,6 +613,7 @@ bool OctopusEngine::save (int idx)
         for (auto& g : stompGuids[f]) { const int b = blockOf (g); if (b >= 0) p.stomp[f].add (b); }
     }
     p.saved = true;
+    if (p.semi >= 0 && semiNow) p.semi = semiNow();                     // preset lié à Semitones : garde la transposition du moment
     if (p.name.isEmpty()) p.name = "Preset " + label (idx);
     cur = idx;
     viewBank = idx / kSlots;
@@ -708,6 +709,7 @@ bool OctopusEngine::load (int idx)
     viewBank = idx / kSlots;
     sigLoaded = signature();
     sigPending = true;
+    if (p.semi >= 0 && semiApply) semiApply (p.semi);                    // transposition enregistrée avec ce preset
     if (! ok) say (label (idx) + " : " + err, 5000.0);
     else say (label (idx) + "  " + displayName (idx) + (reload.size() < p.entries.size() ? "  (instant)" : ""));
     changed();
@@ -835,6 +837,7 @@ juce::ValueTree OctopusEngine::presetToTree (const Preset& p, int idx)
     if (! p.saved) t.setProperty ("empty", true, nullptr);
     if (! p.onStates.isEmpty()) t.setProperty ("on", p.onStates.joinIntoString (""), nullptr);          // emplacement vide qui a seulement une couleur
     if (p.colour != 0) t.setProperty ("colour", juce::String::toHexString ((int) p.colour), nullptr);
+    if (p.semi >= 0) t.setProperty ("semi", p.semi, nullptr);
     for (int f = 0; f < kKeys; ++f)
     {
         juce::StringArray s;
@@ -858,6 +861,7 @@ OctopusEngine::Preset OctopusEngine::presetFromTree (const juce::ValueTree& t)
     p.name = t["name"].toString();
     p.selfPos = (int) t["self"];
     if (t.hasProperty ("colour")) p.colour = (juce::uint32) t["colour"].toString().getHexValue64();
+    p.semi = t.hasProperty ("semi") ? juce::jmax (-1, (int) t["semi"]) : -1;
     for (int f = 0; f < kKeys; ++f)
     {
         auto s = juce::StringArray::fromTokens (t["stomp" + juce::String (f)].toString(), ",", "");
