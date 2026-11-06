@@ -37,7 +37,7 @@ static juce::StringArray gInstalled { "VST3: CHROMA (NINE HANDS | DSP)", "VST3: 
                                       "VST3: Octopus (NINE HANDS | DSP)" };
 
 static String newGuid() { return "{" + juce::Uuid().toString().toUpperCase() + "}"; }
-static FakeFx makeFx (const String& n) { FakeFx f; f.name = n; f.guid = newGuid(); f.state = "state-of-" + n; f.serial = gSerial++; return f; }
+static FakeFx makeFx (const String& n) { FakeFx f; f.name = n; f.guid = newGuid(); f.state = "state-of-" + n.replace ("|", "/"); f.serial = gSerial++; return f; }   // "|" sert de separateur dans le chunk simule
 static FakeTrack* T (void* t) { return static_cast<FakeTrack*> (t); }
 static std::vector<FakeFx>& chainOf (void* t, int& fx) { const bool rec = (fx & 0x1000000) != 0; fx &= 0xffffff; return rec ? T (t)->rec : T (t)->fx; }
 static FakeFx* fxAt (void* t, int fx) { auto& c = chainOf (t, fx); return fx >= 0 && fx < (int) c.size() ? &c[(size_t) fx] : nullptr; }
