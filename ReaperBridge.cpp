@@ -700,7 +700,7 @@ juce::Array<InstalledFx> ReaperBridge::installed()
         InstalledFx f;
         f.name = utf8 (name);
         f.ident = utf8 (ident);
-        if (f.name.containsIgnoreCase ("Octopus") && f.name.containsIgnoreCase ("Studio Wiga")) continue;   // pas d'Octopus dans Octopus
+        if (f.name.containsIgnoreCase ("Octopus") && f.name.containsIgnoreCase ("NINE HANDS | DSP")) continue;   // pas d'Octopus dans Octopus
         list.add (f);
     }
     return list;

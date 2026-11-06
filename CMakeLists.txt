@@ -22,7 +22,7 @@ juce_add_binary_data(OctopusAssets SOURCES
 
 # Octopus drives REAPER through its VST3 extension (IReaperHostApplication) : VST3 only
 juce_add_plugin(Octopus
-  COMPANY_NAME "Studio Wiga"
+  COMPANY_NAME "NINE HANDS | DSP"
   PLUGIN_MANUFACTURER_CODE Wiga
   PLUGIN_CODE WgOc
   FORMATS VST3

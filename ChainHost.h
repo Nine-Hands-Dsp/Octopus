@@ -8,7 +8,7 @@
 struct FxInfo
 {
     juce::String name;        // nom affiché par REAPER (renommage de l'utilisateur compris)
-    juce::String original;    // nom d'origine "VST3: Holyverb (Studio Wiga)"
+    juce::String original;    // nom d'origine "VST3: Holyverb (NINE HANDS | DSP)"
     juce::String guid;        // identifiant unique et stable de l'instance dans le projet
     bool enabled = true;
     bool offline = false;
@@ -25,7 +25,7 @@ struct FxInfo
 
 struct InstalledFx
 {
-    juce::String name;        // "VST3: Holyverb (Studio Wiga)" : c'est ce nom qu'on passe pour l'ajouter
+    juce::String name;        // "VST3: Holyverb (NINE HANDS | DSP)" : c'est ce nom qu'on passe pour l'ajouter
     juce::String ident;
 };
 
@@ -112,11 +112,11 @@ class DemoChainHost : public ChainHost
 public:
     DemoChainHost()
     {
-        chain.add (make ("VST3: Octopus (Studio Wiga)", true, true));
-        for (auto* n : { "VST3: CHROMA (Studio Wiga)", "VST3: NGATE (Studio Wiga)", "VST3: Crycat (Studio Wiga)",
-                         "VST3: Doorn (Studio Wiga)", "VST3: Wharry (Studio Wiga)", "VST3: Small Tone (Studio Wiga)",
+        chain.add (make ("VST3: Octopus (NINE HANDS | DSP)", true, true));
+        for (auto* n : { "VST3: CHROMA (NINE HANDS | DSP)", "VST3: NGATE (NINE HANDS | DSP)", "VST3: Crycat (NINE HANDS | DSP)",
+                         "VST3: Doorn (NINE HANDS | DSP)", "VST3: Wharry (NINE HANDS | DSP)", "VST3: Small Tone (NINE HANDS | DSP)",
                          "VST3: Genome (Two notes Audio Engineering)", "VST3: ReaEQ (Cockos)",
-                         "VST3: ECHOFLEX (Studio Wiga)", "VST3: Holyverb (Studio Wiga)" })
+                         "VST3: ECHOFLEX (NINE HANDS | DSP)", "VST3: Holyverb (NINE HANDS | DSP)" })
             chain.add (make (n, true, false));
         chain.getReference (1).enabled = false;
         chain.getReference (3).enabled = false;
@@ -279,11 +279,11 @@ public:
     juce::Array<InstalledFx> installed() override
     {
         juce::Array<InstalledFx> a;
-        for (auto* n : { "VST3: Holyverb (Studio Wiga)", "VST3: ECHOFLEX (Studio Wiga)", "VST3: Eight Echo (Studio Wiga)",
-                         "VST3: Doorn (Studio Wiga)", "VST3: Peachy (Studio Wiga)", "VST3: Wharry (Studio Wiga)",
-                         "VST3: FOG Z (Studio Wiga)", "VST3: Ring Think (Studio Wiga)", "VST3: Textural (Studio Wiga)",
-                         "VST3: Pipeline (Studio Wiga)", "VST3: Small Tone (Studio Wiga)", "VST3: CHROMA (Studio Wiga)",
-                         "VST3: Crycat (Studio Wiga)", "VST3: NGATE (Studio Wiga)", "VST3: Fantomine (Studio Wiga)",
+        for (auto* n : { "VST3: Holyverb (NINE HANDS | DSP)", "VST3: ECHOFLEX (NINE HANDS | DSP)", "VST3: Eight Echo (NINE HANDS | DSP)",
+                         "VST3: Doorn (NINE HANDS | DSP)", "VST3: Peachy (NINE HANDS | DSP)", "VST3: Wharry (NINE HANDS | DSP)",
+                         "VST3: FOG Z (NINE HANDS | DSP)", "VST3: Ring Think (NINE HANDS | DSP)", "VST3: Textural (NINE HANDS | DSP)",
+                         "VST3: Pipeline (NINE HANDS | DSP)", "VST3: Small Tone (NINE HANDS | DSP)", "VST3: CHROMA (NINE HANDS | DSP)",
+                         "VST3: Crycat (NINE HANDS | DSP)", "VST3: NGATE (NINE HANDS | DSP)", "VST3: Fantomine (NINE HANDS | DSP)",
                          "VST3: Genome (Two notes Audio Engineering)", "VST3: ReaEQ (Cockos)", "VST3: ReaComp (Cockos)",
                          "VST3: ReaDelay (Cockos)", "VST3: ReaVerbate (Cockos)", "VST3: ReaGate (Cockos)",
                          "VST: ReaPitch (Cockos)", "JS: 3-Band EQ", "JS: Chorus", "JS: Volume Adjustment",

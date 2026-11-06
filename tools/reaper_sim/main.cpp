@@ -32,9 +32,9 @@ struct FakeTrack { String name; std::vector<FakeFx> fx, rec; };
 static std::vector<std::unique_ptr<FakeTrack>> gTracks;
 static FakeTrack* gParent = nullptr;
 static int gSerial = 1, gUndoOpen = 0, gUndoBlocks = 0, gRefresh = 0;
-static juce::StringArray gInstalled { "VST3: CHROMA (Studio Wiga)", "VST3: Doorn (Studio Wiga)", "VST3: Holyverb (Studio Wiga)",
-                                      "VST3: Pipeline (Studio Wiga)", "VST3: ReaEQ (Cockos)", "VST3i: Surge XT (Surge Synth Team)",
-                                      "VST3: Octopus (Studio Wiga)" };
+static juce::StringArray gInstalled { "VST3: CHROMA (NINE HANDS | DSP)", "VST3: Doorn (NINE HANDS | DSP)", "VST3: Holyverb (NINE HANDS | DSP)",
+                                      "VST3: Pipeline (NINE HANDS | DSP)", "VST3: ReaEQ (Cockos)", "VST3i: Surge XT (Surge Synth Team)",
+                                      "VST3: Octopus (NINE HANDS | DSP)" };
 
 static String newGuid() { return "{" + juce::Uuid().toString().toUpperCase() + "}"; }
 static FakeFx makeFx (const String& n) { FakeFx f; f.name = n; f.guid = newGuid(); f.state = "state-of-" + n; f.serial = gSerial++; return f; }
@@ -335,10 +335,10 @@ int main()
     double token = 0.4242, token2 = 0.7311;
     for (auto* n : { "Guitare", "Basse" }) { auto t = std::make_unique<FakeTrack>(); t->name = n; gTracks.push_back (std::move (t)); }
     auto& tr = *gTracks[0];
-    tr.fx.push_back (makeFx ("VST3: CHROMA (Studio Wiga)"));
-    auto octo = makeFx ("VST3: Octopus (Studio Wiga)"); octo.token = &token; octo.renamed = "Mon pedalier"; tr.fx.push_back (octo);
-    tr.fx.push_back (makeFx ("VST3: Doorn (Studio Wiga)"));
-    tr.fx.push_back (makeFx ("VST3: Holyverb (Studio Wiga)"));
+    tr.fx.push_back (makeFx ("VST3: CHROMA (NINE HANDS | DSP)"));
+    auto octo = makeFx ("VST3: Octopus (NINE HANDS | DSP)"); octo.token = &token; octo.renamed = "Mon pedalier"; tr.fx.push_back (octo);
+    tr.fx.push_back (makeFx ("VST3: Doorn (NINE HANDS | DSP)"));
+    tr.fx.push_back (makeFx ("VST3: Holyverb (NINE HANDS | DSP)"));
     gTracks[1]->fx.push_back (makeFx ("VST3: ReaEQ (Cockos)"));
     gParent = &tr;
     const int octoSerial = tr.fx[1].serial;
@@ -360,7 +360,7 @@ int main()
     eng.refreshNow();
     check (eng.isReady(), "REAPER reconnu, piste trouvée (" + eng.trackName() + ")");
     check (eng.blocks().size() == 3 && eng.chain().getReference (1).isSelf, "Octopus (renommé « Mon pedalier ») retrouvé en 2e position, 3 blocs affichés");
-    check (eng.chain().getReference (0).name == "VST3: CHROMA (Studio Wiga)", "noms lus");
+    check (eng.chain().getReference (0).name == "VST3: CHROMA (NINE HANDS | DSP)", "noms lus");
 
     eng.toggle (eng.blocks()[1]);
     check (! tr.fx[2].enabled && gUndoOpen == 0, "ON/OFF de Doorn (point d'annulation fermé)");
@@ -389,7 +389,7 @@ int main()
 
     // structure différente : on vide et on reconstruit
     eng.remove (eng.blocks()[0]);
-    eng.addFx ({ "VST3: Pipeline (Studio Wiga)", "" }, 99);
+    eng.addFx ({ "VST3: Pipeline (NINE HANDS | DSP)", "" }, 99);
     eng.addFx ({ "VST3: ReaEQ (Cockos)", "" }, 0);
     check (names (tr) == "[OCTO] > ReaEQ > Doorn > Holyverb > Pipeline", "ajout devant le 1er bloc / à la fin : " + names (tr));
     eng.moveBlock (eng.blocks()[3], 1);
@@ -405,11 +405,11 @@ int main()
     check (names (tr) == "CHROMA > [OCTO] > Doorn(off) > Holyverb" && tr.fx[1].serial == octoSerial, "rappel 1A après changement de structure : " + names (tr));
 
     // preset contenant un plugin désinstallé
-    gInstalled.removeString ("VST3: Doorn (Studio Wiga)");
+    gInstalled.removeString ("VST3: Doorn (NINE HANDS | DSP)");
     eng.remove (eng.blocks()[0]);                               // structure différente -> rechargement complet
     eng.load (1);
     check (names (tr) == "CHROMA > [OCTO] > Holyverb" && eng.message().contains ("Doorn"), "plugin manquant : les autres à leur place, message : " + eng.message());
-    gInstalled.add ("VST3: Doorn (Studio Wiga)");
+    gInstalled.add ("VST3: Doorn (NINE HANDS | DSP)");
 
     // parallèle, fenêtre, paramètres
     eng.load (1);
@@ -438,7 +438,7 @@ int main()
     {
         auto o = tr.fx[1];
         tr.fx.erase (tr.fx.begin() + 1);
-        tr.rec.push_back (makeFx ("VST3: CHROMA (Studio Wiga)"));
+        tr.rec.push_back (makeFx ("VST3: CHROMA (NINE HANDS | DSP)"));
         tr.rec.push_back (o);
         eng.refreshNow();
         check (eng.isReady() && bridge.isInputChain() && eng.blocks().size() == 1, "Octopus dans les effets d'entrée : pilote cette chaîne-là");
@@ -451,11 +451,11 @@ int main()
     // ---- presets d'un plugin (liste usine + utilisateur, état exact rétabli après la lecture des noms)
     {
         tr.fx.clear(); tr.rec.clear();
-        auto o = makeFx ("VST3: Octopus (Studio Wiga)"); o.token = &token; tr.fx.push_back (o);
-        gInstalled.addIfNotAlreadyThere ("VST3: Holyverb (Studio Wiga)");
+        auto o = makeFx ("VST3: Octopus (NINE HANDS | DSP)"); o.token = &token; tr.fx.push_back (o);
+        gInstalled.addIfNotAlreadyThere ("VST3: Holyverb (NINE HANDS | DSP)");
         eng.refreshNow();
         juce::Array<InstalledFx> several;
-        for (auto* n : { "VST3: Holyverb (Studio Wiga)", "VST3: Inexistant (X)", "VST3: ReaEQ (Cockos)", "VST3: Doorn (Studio Wiga)" }) several.add ({ n, "" });
+        for (auto* n : { "VST3: Holyverb (NINE HANDS | DSP)", "VST3: Inexistant (X)", "VST3: ReaEQ (Cockos)", "VST3: Doorn (NINE HANDS | DSP)" }) several.add ({ n, "" });
         eng.addFxList (several, 0);
         check (names (tr) == "[OCTO] > Holyverb > ReaEQ > Doorn" && gUndoOpen == 0, "ajout de plusieurs effets d'un coup, dans l'ordre (le plugin absent est signalé) : " + names (tr));
         gUserIni = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("vst3-Holyverb.ini");
@@ -487,8 +487,8 @@ int main()
     //      (les répétitions continuent grâce au Carryover), jamais avec le bypass de REAPER (queue coupée net)
     {
         tr.fx.clear(); tr.rec.clear();
-        auto o = makeFx ("VST3: Octopus (Studio Wiga)"); o.token = &token; tr.fx.push_back (o);
-        auto ee = makeFx ("VST3: Eight Echo (Studio Wiga)");
+        auto o = makeFx ("VST3: Octopus (NINE HANDS | DSP)"); o.token = &token; tr.fx.push_back (o);
+        auto ee = makeFx ("VST3: Eight Echo (NINE HANDS | DSP)");
         // liste réelle vue par l'hôte (Eight Echo 1.8.3), puis les paramètres ajoutés par REAPER
         ee.paramNames = { "E.Level", "Mix", "Feedback", "Time", "Mode", "Effect On", "Footswitch (hold)", "Tap / Loop Stop",
                           "Twist / Loop Clear", "Carryover", "Stereo Mode", "Tap Division", "Long Delay (x2)", "Direct Mute",
@@ -498,7 +498,7 @@ int main()
         ee.params.assign ((size_t) ee.paramNames.size(), 0.0);
         ee.params[5] = 1.0; ee.params[9] = 1.0;                    // Effect On, Carryover
         tr.fx.push_back (ee);
-        auto hv = makeFx ("VST3: Holyverb (Studio Wiga)"); tr.fx.push_back (hv);   // reverb ajoutée après le delay
+        auto hv = makeFx ("VST3: Holyverb (NINE HANDS | DSP)"); tr.fx.push_back (hv);   // reverb ajoutée après le delay
         eng.refreshNow();
         const int eb = eng.blocks()[0];
         bool inv = true;

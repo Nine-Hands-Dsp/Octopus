@@ -1,4 +1,4 @@
-# OCTOPUS (Studio Wiga) - guide MIDI et CC, à part de la notice : commandes MIDI, réglage d'un pédalier
+# OCTOPUS (NINE HANDS | DSP) - guide MIDI et CC, à part de la notice : commandes MIDI, réglage d'un pédalier
 # (M-Vave Chocolate Plus avec CubeSuite), MIDI learn, doubles appuis A+B / B+C / C+D, tests. Anglais puis français.
 # Usage : python3 tools/midi_guide.py <dossier des captures (design/renders)> <fichier PDF de sortie>
 import os, sys
@@ -182,12 +182,12 @@ def deco(c, doc):
     c.setFillColor(DARK); c.rect(0, A4[1] - 6 * mm, A4[0], 6 * mm, stroke=0, fill=1)
     c.setFillColor(ACC); c.rect(0, A4[1] - 6.8 * mm, A4[0], 0.8 * mm, stroke=0, fill=1)
     c.setFont("Pop", 7.5); c.setFillColor(GREY)
-    c.drawString(18 * mm, 10 * mm, "Octopus (Studio Wiga) · MIDI and CC guide · v" + VERSION)
+    c.drawString(18 * mm, 10 * mm, "Octopus (NINE HANDS | DSP) · MIDI and CC guide · v" + VERSION)
     c.drawRightString(A4[0] - 18 * mm, 10 * mm, str(doc.page))
     c.restoreState()
 
 doc = BaseDocTemplate(OUT, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm, topMargin=16 * mm, bottomMargin=18 * mm,
-                      title="OCTOPUS - MIDI and CC guide v" + VERSION, author="Studio Wiga")
+                      title="OCTOPUS - MIDI and CC guide v" + VERSION, author="NINE HANDS | DSP")
 doc.addPageTemplates([PageTemplate(id="p", frames=[Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id="f")], onPage=deco)])
 story = section("en") + section("fr")
 doc.build(story[:-1])

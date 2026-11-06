@@ -34,7 +34,7 @@ namespace FxCat
         return juce::Colour (c[juce::jlimit (0, numKinds - 1, k)]);
     }
 
-    // "VST3: Holyverb (Studio Wiga)" -> "Holyverb" ; "JS: Utility/volume" -> "volume"
+    // "VST3: Holyverb (NINE HANDS | DSP)" -> "Holyverb" ; "JS: Utility/volume" -> "volume"
     inline juce::String shortName (const juce::String& full)
     {
         auto s = full.trim();
@@ -49,13 +49,19 @@ namespace FxCat
         return s.isEmpty() ? full : s;
     }
 
-    // "VST3: Holyverb (Studio Wiga)" -> "Studio Wiga"
+    // "VST3: Holyverb (NINE HANDS | DSP)" -> "NINE HANDS | DSP"
     inline juce::String vendor (const juce::String& full)
     {
         auto s = full.trim();
         if (! s.endsWithChar (')')) return {};
         const int open = s.lastIndexOfChar ('(');
         return open > 0 ? s.substring (open + 1, s.length() - 1).trim() : juce::String();
+    }
+
+    // plugins de la marque : NINE HANDS | DSP, ou NINE HANDS | DSP pour les anciennes versions
+    inline bool isOwnVendor (const juce::String& v)
+    {
+        return v.equalsIgnoreCase ("NINE HANDS | DSP") || v.equalsIgnoreCase ("Studio Wiga");
     }
 
     // "VST3: x" -> "VST3"

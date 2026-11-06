@@ -1,5 +1,6 @@
 #pragma once
 #include <juce_core/juce_core.h>
+#include "NineHandsFolder.h"
 
 // Presets utilisateur des plugins, enregistrés par Octopus (REAPER n'offre pas de fonction pour créer un preset
 // utilisateur de sa liste) : un fichier par plugin, retrouvé avec le nom d'origine du plugin (fx_name).
@@ -15,7 +16,7 @@ public:
     static juce::File folder()
     {
         return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
-                   .getChildFile ("Studio Wiga").getChildFile ("Octopus").getChildFile ("Plugin presets");
+                   .getChildFile (nhd::folderName()).getChildFile ("Octopus").getChildFile ("Plugin presets");
     }
     static juce::File fileFor (const juce::String& plugin)
     {

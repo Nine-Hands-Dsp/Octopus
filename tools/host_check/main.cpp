@@ -12,7 +12,7 @@ int main (int argc, char** argv)
     vst3.findAllTypesForFile (found, argv[1]);
     check (found.size() == 1, "VST3 trouvé : " + (found.isEmpty() ? String() : found[0]->name + " / " + found[0]->manufacturerName + " / " + found[0]->category));
     if (found.isEmpty()) return 1;
-    check (found[0]->name == "Octopus" && found[0]->manufacturerName == "Studio Wiga", "nom dans le DAW : Octopus (Studio Wiga)");
+    check (found[0]->name == "Octopus" && found[0]->manufacturerName == "NINE HANDS | DSP", "nom dans le DAW : Octopus (NINE HANDS | DSP)");
     String err;
     auto inst = fm.createPluginInstance (*found[0], 48000.0, 256, err);
     check (inst != nullptr, "instance créée " + err);

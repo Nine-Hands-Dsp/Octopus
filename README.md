@@ -1,4 +1,4 @@
-# OCTOPUS (Studio Wiga)
+# OCTOPUS (NINE HANDS | DSP)
 
 Plugin VST3 (Windows / macOS) **pour REAPER** : un écran façon multi-effet (inspiré du Quad Cortex mini) qui pilote
 la chaîne d'effets de la piste où il est inséré. Pédale sans jacks qui occupe toute la fenêtre (tailles 50 %, 60 %, 75 %,
@@ -12,12 +12,12 @@ la chaîne d'effets de la piste où il est inséré. Pédale sans jacks qui occu
   pour la fenêtre du plugin). **Glisser** : déplacer. **Clic droit** : ouvrir la fenêtre, assigner à un footswitch,
   traitement parallèle, déplacer, insérer avant / après, supprimer. Touche Suppr : supprime le bloc survolé.
 - **Ajouter** (case « + ») : liste des plugins installés fournie par REAPER, recherche et filtres
-  (Studio Wiga, VST3, VST, CLAP, JS, AU ; instruments masqués). Plusieurs plugins se choisissent à la suite (numérotés dans
+  (NINE HANDS | DSP, VST3, VST, CLAP, JS, AU ; instruments masqués). Plusieurs plugins se choisissent à la suite (numérotés dans
   l'ordre des clics) puis ADD les insère tous dans la piste, dans cet ordre, en un seul point d'annulation.
 - **Presets de chaque plugin** (bouton PRESETS du panneau des paramètres) : presets d'usine et utilisateur de REAPER, numérotés,
   chargés d'un clic, flèches précédent / suivant. Pour lire les noms, chaque preset est chargé un instant puis l'état exact
   du plugin est rétabli (vst_chunk / clap_chunk). **SAVE USER** : presets utilisateur gardés par Octopus pour chaque plugin
-  (`Studio Wiga/Octopus/Plugin presets/<plugin>.xml` dans le dossier de données utilisateur, état exact du plugin), en tête de
+  (`NINE HANDS | DSP/Octopus/Plugin presets/<plugin>.xml` dans le dossier de données utilisateur, état exact du plugin), en tête de
   liste avec une étoile ; clic droit : charger, remplacer, renommer, supprimer.
 - **Accordeur** : quand un bloc CHROMA est allumé, Octopus affiche l'écran de CHROMA (même dessin) et fait tourner le même
   moteur (TunerEngine de CHROMA) sur le son qui le traverse ; mode, La de référence et accordage lus dans CHROMA
@@ -61,7 +61,7 @@ lourd dans `paint()` (caches du fond, des footswitchs et de l'éclairage des LED
 (redessin non servi en 1,5 s : moteur réappliqué), aucun appel à l'hôte ni allocation dans le thread audio.
 
 ## Visuel
-`python3 tools/make_frame.py` génère `background.png` à partir du visuel fourni (`design/frame_photo.jpg` : marquages effacés, vitre vidée, 148 colonnes retirées pour les proportions de l'écran, logo Studio Wiga net) ; `python3 tools/make_art.py` génère l'ancien fond dessiné (`design/background_procedural.png`) (boîtier acier brossé anthracite sans jacks, lunette et vitre, logos Studio Wiga et OCTOPUS), `fs_off.png` / `fs_on.png` (footswitch inox, photo réelle détourée `design/footswitch_inox_source.png`,
+`python3 tools/make_frame.py` génère `background.png` à partir du visuel fourni (`design/frame_photo.jpg` : marquages effacés, vitre vidée, 148 colonnes retirées pour les proportions de l'écran, logo NINE HANDS | DSP net) ; `python3 tools/make_art.py` génère l'ancien fond dessiné (`design/background_procedural.png`) (boîtier acier brossé anthracite sans jacks, lunette et vitre, logos NINE HANDS | DSP et OCTOPUS), `fs_off.png` / `fs_on.png` (footswitch inox, photo réelle détourée `design/footswitch_inox_source.png`,
 ombres selon la lumière en haut à gauche). Positions communes : `Layout.h`.
 
 ## Build et vérifications
@@ -82,17 +82,17 @@ v1.1.0 : taille par défaut = ancienne taille 100 % (affichée 60 %), 75 % et 10
   accordeur CHROMA dans Octopus ; ajout de plusieurs effets d'un coup ; presets usine / utilisateur de chaque plugin ; famille utilitaire en blanc.
 v1.1.1 : double-clic fiable (détecté par Octopus, la bascule d'un double-clic lent est défaite) ; noms des paramètres plus grands ;
   paramètres à crans réglés cran par cran ; paramètres MIDI derrière le bouton MIDI ; BYPASS à côté de la croix.
-v1.1.2 : presets utilisateur des plugins (SAVE USER) ; en-tête PRESET / STOMP séparés, SAVE après BANKS ; logo Studio Wiga plus petit
+v1.1.2 : presets utilisateur des plugins (SAVE USER) ; en-tête PRESET / STOMP séparés, SAVE après BANKS ; logo NINE HANDS | DSP plus petit
   et centré entre le haut de la pédale et l'écran ; couleur des footswitchs A-D au choix (BANKS) ; accordeur plus compact et menu
   TUNINGS avec les presets d'accordage de CHROMA.
 v1.1.3 : trois rangées de blocs, même espace entre les blocs en largeur et en hauteur ; cases des footswitchs décollées du bas de
-  l'écran ; logo Studio Wiga encore réduit ; taille 50 % et choix de la taille par défaut (réglage commun, `settings.xml`).
+  l'écran ; logo NINE HANDS | DSP encore réduit ; taille 50 % et choix de la taille par défaut (réglage commun, `settings.xml`).
 v1.1.4 : cases des footswitchs à égale distance entre elles et des bords de l'écran.
 v1.1.5 : ligne de liaison entre deux rangées centrée entre le nom des blocs et la rangée suivante ; grille centrée, lignes de retour
   de même longueur à gauche et à droite.
 v1.1.6 : bloc utilitaire allumé en blanc plein (icône sombre), bien distinct d'un bloc éteint ; ligne de liaison entre les rangées un peu remontée.
 v1.1.7 : blanc du bloc utilitaire allumé 5 % moins lumineux.
-v1.1.8 : nouveau logo OCTOPUS (pieuvre, « fx chain controller ») en haut à droite, en symétrie du logo Studio Wiga.
+v1.1.8 : nouveau logo OCTOPUS (pieuvre, « fx chain controller ») en haut à droite, en symétrie du logo NINE HANDS | DSP.
 v1.1.9 : logo OCTOPUS agrandi (54 unités de haut).
 v1.2.0 : nouveaux footswitchs inox (photo fournie, écrou plat en haut) ; blanc du bloc utilitaire allumé encore 5 % plus transparent.
 v1.2.1 : logo OCTOPUS dessiné par le plugin à la taille exacte (net à toutes les tailles) ; footswitchs remontés, anneau lumineux autour de chaque footswitch (diffuseur gris éteint, couleur du footswitch allumé, avec halo, comme la Phase 90).
@@ -123,7 +123,7 @@ v1.7.2 : délai des doubles appuis élargi de 0,14 s à 0,25 s (A+B, B+C, C+D re
 v1.8.0 : E (A+B) et F (C+D) deviennent des footswitchs comme A-D (même menu, presets E / F en mode PRESET, blocs en STOMP) : 6 presets par bank (1A-16F, 96 presets ; anciens projets et .octobank convertis en gardant leurs lettres ; Program Change 1-64 = A-D de chaque bank) ; panneau BANKS à 6 lignes, cases des banks alignées sur 1A-1F, couleurs A-F + TUNER ; curseur GLOW (opacité du halo seulement) dans le nuancier et menu Letter glow ; couleur et halo propres au symbole de l'accordeur.
 v1.8.1 : clic droit des footswitchs A-F : « Color & Glow... » (nuancier du footswitch et halo) à la place de Plugin size et Letter glow ; menu B+C : « Color & Glow... » à la place de Test now et Tuner symbol colour and glow. ; footswitchs sans attente : chaque appui agit tout de suite, et si le voisin suit dans les 0,25 s le premier appui est annulé au profit du double appui ; clic droit sur les lettres A-D = menu de leur footswitch.
 v1.8.2 : B+C (accordeur) aussi facile à faire que A+B et C+D : le délai du double appui part de la fin du premier appui (un preset long à charger ne le raccourcit plus) ; menus « Color & Glow » sans points de suspension ; envoi de CC retiré du menu de B+C.
-v1.8.3 : même marge de 3 tout autour de la pédale (repère 1249 x 934) ; B+C mesuré à l'heure d'arrivée des CC (reconnu même après un chargement long) ; menu B+C : Nothing, Tuner, PRESET / STOMP mode ; fenêtre d'ajout : clic droit sans effet, bulle de description au survol des plugins Studio Wiga ; BANKS : un point par preset enregistré sous chaque bank, lettres et TUNER recentrés.
-v1.8.4 : B+C (« G ») comme A+B / C+D : l'accordeur s'ouvre tout de suite, n'importe quel footswitch le ferme et ramène le preset d'avant ; le Letter glow s'applique aussi au symbole de l'accordeur ; bulle de description des plugins Studio Wiga au bout de 0,8 s de survol.
+v1.8.3 : même marge de 3 tout autour de la pédale (repère 1249 x 934) ; B+C mesuré à l'heure d'arrivée des CC (reconnu même après un chargement long) ; menu B+C : Nothing, Tuner, PRESET / STOMP mode ; fenêtre d'ajout : clic droit sans effet, bulle de description au survol des plugins NINE HANDS | DSP ; BANKS : un point par preset enregistré sous chaque bank, lettres et TUNER recentrés.
+v1.8.4 : B+C (« G ») comme A+B / C+D : l'accordeur s'ouvre tout de suite, n'importe quel footswitch le ferme et ramène le preset d'avant ; le Letter glow s'applique aussi au symbole de l'accordeur ; bulle de description des plugins NINE HANDS | DSP au bout de 0,8 s de survol.
 v1.8.5 : B+C n'ouvre plus l'accordeur : il se commande par MIDI learn (clic droit sur le symbole de l'accordeur : MIDI Learn, Clear MIDI, latching, Color & Glow ; clic sur le symbole : on / off) ; bouton STOMP en orange quand le mode STOMP est sélectionné.
-v1.8.6 : logo Studio Wiga 30 % plus petit sur la pédale.
+v1.8.6 : logo NINE HANDS | DSP 30 % plus petit sur la pédale.

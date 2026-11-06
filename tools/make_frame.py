@@ -1,9 +1,9 @@
-# OCTOPUS (Studio Wiga) : fond de la pédale à partir du visuel fourni (design/frame_photo.jpg, 1415 x 981).
+# OCTOPUS (NINE HANDS | DSP) : fond de la pédale à partir du visuel fourni (design/frame_photo.jpg, 1415 x 981).
 # 1. les marquages de la photo sont effacés (logos, lettres A-D) en recopiant le brossage horizontal voisin ;
 #    la vitre est vidée (le plugin y dessine son écran) ;
 # 2. 148 colonnes sont retirées en 5 bandes verticales (bords, entre les footswitchs) pour que l'ouverture de l'écran
 #    ait exactement les proportions de l'écran du plugin (1064 x 624) : le brossage horizontal rend les raccords invisibles ;
-# 3. image en 2x, boîtier détouré (coins arrondis), logo Studio Wiga net (le logo OCTOPUS est dessiné par le plugin).
+# 3. image en 2x, boîtier détouré (coins arrondis), logo NINE HANDS | DSP net (le logo OCTOPUS est dessiné par le plugin).
 # Repère obtenu (unités du plugin = pixels de l'image recadrée) : 1267 x 981. Valeurs reprises dans Layout.h.
 import os
 import numpy as np, cv2
@@ -51,7 +51,7 @@ def patch_rows(img, x0, y0, x1, y1, dx, feather=4, detail=1.0):
     img[y0 - feather:y1 + feather, x0 - feather:x1 + feather] = reg * (1 - w) + srcp * w
 
 img = src.copy()
-patch_rows(img, 59, 40, 241, 68, 260)                          # logo Studio Wiga
+patch_rows(img, 59, 40, 241, 68, 260)                          # logo NINE HANDS | DSP
 patch_rows(img, 1103, 16, 1356, 90, -258, feather=14, detail=0.8)   # logo OCTOPUS
 # footswitchs de la photo effacés : le plugin dessine ses propres footswitchs inox vus de dessus (fs_off.png).
 # Lumière (basses fréquences) reconstruite autour des trous, brossage (hautes fréquences) repris sur la même ligne
@@ -152,7 +152,7 @@ alu = alu * bevel_shade + bevel_spec * np.array([0.97, 1.0, 1.05])
 big = big * (1 - face[..., None]) + alu * face[..., None]
 out = Image.fromarray(np.dstack([np.clip(big, 0, 255), alpha * 255]).astype(np.uint8), "RGBA")
 
-# logo Studio Wiga net, à la place de celui de la photo : bord gauche à x 64, centré à y 53.5, 30 % plus petit (120 de large)
+# logo NINE HANDS | DSP net, à la place de celui de la photo : bord gauche à x 64, centré à y 53.5, 30 % plus petit (120 de large)
 logo = Image.open(os.path.join(ROOT, "design", "logo_studio_wiga_blanc.png")).convert("RGBA")
 lw = int(171 * 0.70 * AS); lh = round(logo.height * lw / logo.width)
 logo = logo.resize((lw, lh), Image.LANCZOS)

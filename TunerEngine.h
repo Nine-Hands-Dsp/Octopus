@@ -1,5 +1,5 @@
 #pragma once
-// CHROMA (Studio Wiga) — moteur d'accordage, C++17 pur (aucune dépendance JUCE, testable seul).
+// CHROMA (NINE HANDS | DSP) — moteur d'accordage, C++17 pur (aucune dépendance JUCE, testable seul).
 //
 // Chaîne d'analyse :
 //   entrée pleine résolution -> filtre anti-repliement (Butterworth ordre 8) -> décimation vers ~11-12 kHz

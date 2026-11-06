@@ -92,7 +92,7 @@ namespace
     };
     enum CardAction { cLoad, cSave, cRename, cCopy, cPaste, cClear, numCardActions };
     const char* const kCardText[numCardActions] = { "LOAD", "SAVE", "RENAME", "COPY", "PASTE", "CLEAR" };
-    const char* const kChips[] = { "All", "Favorites", "Studio Wiga", "VST3", "VST", "CLAP", "JS", "AU" };
+    const char* const kChips[] = { "All", "Favorites", "Nine Hands", "VST3", "VST", "CLAP", "JS", "AU" };
     constexpr int kNumChips = 8;
     constexpr int kChipFavourites = 1;
 
@@ -1220,7 +1220,7 @@ private:
                 g.drawEllipse (sw, S (1.0f));
             }
         }
-        drawFxTooltip (g);                                         // survol d'un plugin Studio Wiga : sa description
+        drawFxTooltip (g);                                         // survol d'un plugin NINE HANDS | DSP : sa description
         if (overlay == Overlay::banks) drawBankDots (g);
         if (overlay == Overlay::banks)
         {
@@ -1242,7 +1242,7 @@ private:
             switch (chip)
             {
                 case 1: if (! favs.contains (f.name)) continue; break;
-                case 2: if (! FxCat::vendor (f.name).equalsIgnoreCase ("Studio Wiga")) continue; break;
+                case 2: if (! FxCat::isOwnVendor (FxCat::vendor (f.name))) continue; break;
                 case 3: if (type != "VST3") continue; break;
                 case 4: if (type != "VST" && type != "VST2") continue; break;
                 case 5: if (type != "CLAP") continue; break;
@@ -1283,7 +1283,7 @@ private:
         return p;
     }
 
-    // description courte des plugins Studio Wiga (survol dans la fenêtre d'ajout), d'après leur nom
+    // description courte des plugins NINE HANDS | DSP (survol dans la fenêtre d'ajout), d'après leur nom
     static String wigaDescription (const String& shortName)
     {
         static const std::pair<const char*, const char*> d[] = {
@@ -1317,7 +1317,7 @@ private:
         for (auto& x : d) if (n.contains (x.first)) return x.second;
         return {};
     }
-    // bulle au survol d'un plugin Studio Wiga (VST3) dans la fenêtre d'ajout, au bout de 0,8 s sur la même ligne
+    // bulle au survol d'un plugin NINE HANDS | DSP (VST3) dans la fenêtre d'ajout, au bout de 0,8 s sur la même ligne
     static constexpr double kTipDelayMs = 800.0;
     double hoverItemMs = 0.0;
     bool tipShown = false;
@@ -1329,7 +1329,7 @@ private:
         const int i = listScroll * kListRows + hoverItem;
         if (! isPositiveAndBelow (i, items.size())) return;
         const auto& f = items.getReference (i);
-        if (! FxCat::vendor (f.name).equalsIgnoreCase ("Studio Wiga") || FxCat::typeOf (f.name).toUpperCase() != "VST3") return;
+        if (! FxCat::isOwnVendor (FxCat::vendor (f.name)) || FxCat::typeOf (f.name).toUpperCase() != "VST3") return;
         const auto desc = wigaDescription (FxCat::shortName (f.name));
         if (desc.isEmpty()) return;
         const auto ir = itemRect (hoverItem);
@@ -1353,7 +1353,7 @@ private:
         g.drawText (FxCat::shortName (f.name), S (Rectangle<float> (x + 58.0f, y + 10.0f, w - 70.0f, 24.0f)), Justification::centredLeft, true);
         g.setFont (font (tfRegular, 12.5f));
         g.setColour (col.brighter (0.2f));
-        g.drawText (String (FxCat::label (kind)).toUpperCase() + "  -  STUDIO WIGA", S (Rectangle<float> (x + 58.0f, y + 10.0f, w - 70.0f, 24.0f)), Justification::centredRight, true);
+        g.drawText (String (FxCat::label (kind)).toUpperCase() + "  -  NINE HANDS | DSP", S (Rectangle<float> (x + 58.0f, y + 10.0f, w - 70.0f, 24.0f)), Justification::centredRight, true);
         g.setFont (font (tfRegular, 14.5f));
         g.setColour (kText.withAlpha (0.85f));
         g.drawFittedText (desc, S (Rectangle<float> (x + 22.0f, y + 40.0f, w - 34.0f, 38.0f)).toNearestInt(), Justification::topLeft, 2, 1.0f);
@@ -3082,7 +3082,7 @@ OctopusEditor::~OctopusEditor()
 }
 
 //==============================================================================
-// Anti-gel v2 (Studio Wiga) :
+// Anti-gel v2 (NINE HANDS | DSP) :
 //  1. moteur de rendu logiciel forcé sur Windows (Direct2D peut figer la fenêtre dans certains hôtes),
 //     appliqué à chaque nouvelle fenêtre hôte (peer) et revérifié toutes les secondes, jamais en boucle ;
 //  2. aucun calcul lourd dans paint() : les caches d'images (fond, footswitchs, éclairage des LED) sont refaits

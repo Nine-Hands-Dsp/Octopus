@@ -21,7 +21,7 @@ struct ChromaState
 
 class ReaperBridge;
 
-// OCTOPUS (Studio Wiga) : contrôleur de la chaîne d'effets de la piste REAPER qui l'héberge.
+// OCTOPUS (NINE HANDS | DSP) : contrôleur de la chaîne d'effets de la piste REAPER qui l'héberge.
 // Le son traverse Octopus sans modification ; tout le travail se fait sur le thread de messages (timer à 30 Hz),
 // via l'API de REAPER, même fenêtre fermée.
 class OctopusProcessor : public juce::AudioProcessor,

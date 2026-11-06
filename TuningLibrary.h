@@ -1,9 +1,10 @@
 #pragma once
 // CHROMA — bibliothèque d'accordages : usine + accordages perso + favoris.
 // Les accordages perso et les favoris sont communs à toutes les instances du plugin
-// (fichier XML dans le dossier de données utilisateur : %APPDATA%\Studio Wiga\Chroma sous Windows,
-//  ~/Library/Application Support/Studio Wiga/Chroma sous macOS). À utiliser sur le thread message.
+// (fichier XML dans le dossier de données utilisateur : %APPDATA%\NINE HANDS | DSP\Chroma sous Windows,
+//  ~/Library/Application Support/NINE HANDS | DSP/Chroma sous macOS). À utiliser sur le thread message.
 #include <juce_core/juce_core.h>
+#include "NineHandsFolder.h"
 #include <juce_data_structures/juce_data_structures.h>
 #include "Tunings.h"
 #include <set>
@@ -85,7 +86,7 @@ public:
     static juce::File file()
     {
         return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
-                   .getChildFile ("Studio Wiga").getChildFile ("Chroma").getChildFile ("library.xml");
+                   .getChildFile (nhd::folderName()).getChildFile ("Chroma").getChildFile ("library.xml");
     }
 
 private:

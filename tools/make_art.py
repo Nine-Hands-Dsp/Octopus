@@ -1,6 +1,6 @@
-# OCTOPUS (Studio Wiga) : fabrication des images de la pédale (hors plugin)
+# OCTOPUS (NINE HANDS | DSP) : fabrication des images de la pédale (hors plugin)
 #   Repère du plugin : 1240 x 928 unités (même rapport que Ring Think), images livrées en 2x.
-#   Lumière unique : en haut à gauche, élévation ~45° (comme sur toutes les pédales Studio Wiga).
+#   Lumière unique : en haut à gauche, élévation ~45° (comme sur toutes les pédales NINE HANDS | DSP).
 #   Sorties (à la racine du dépôt) :
 #     background.png : boîtier (aluminium anodisé graphite brossé), lunette de l'écran, logo, marquages (sans jacks)
 #     fs_off.png / fs_on.png : footswitch d'ECHOFLEX (photo réelle), détouré, ombre portée ; fs_on = léger reflet de la lettre lumineuse
@@ -132,7 +132,7 @@ def spaced(text, font, x_right, y_top, track, fill):
         x += w_ + track
     return total
 
-# logo OCTOPUS (pieuvre + « fx chain controller ») : en symétrie du logo Studio Wiga (même marge au bord, 66),
+# logo OCTOPUS (pieuvre + « fx chain controller ») : en symétrie du logo NINE HANDS | DSP (même marge au bord, 66),
 # centré en hauteur dans la bande entre le haut du boîtier (12) et la lunette (90), avec 12 de marge en haut et en bas
 olog = Image.open(os.path.join(ROOT, "design", "logo_octopus_blanc.png")).convert("RGBA")
 ohh = int(54 * AS); oww = round(olog.width * ohh / olog.height)

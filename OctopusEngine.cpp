@@ -284,7 +284,7 @@ int OctopusEngine::addFxList (const juce::Array<InstalledFx>& list, int blockPos
 bool OctopusEngine::isChroma (const FxInfo& f)
 {
     const auto n = f.original.isNotEmpty() ? f.original : f.name;
-    return (n.containsIgnoreCase ("CHROMA") || n.containsIgnoreCase ("Tuna")) && n.containsIgnoreCase ("Studio Wiga");
+    return (n.containsIgnoreCase ("CHROMA") || n.containsIgnoreCase ("Tuna")) && (n.containsIgnoreCase ("NINE HANDS") || n.containsIgnoreCase ("Studio Wiga"));
 }
 
 int OctopusEngine::chromaIndex() const

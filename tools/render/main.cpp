@@ -43,7 +43,7 @@ int main (int argc, char** argv)
     check (chainText (e) == chainB, "rappel 1B");
 
     e.remove (e.blocks()[9]);                                   // retire Holyverb
-    e.addFx ({ "VST3: Pipeline (Studio Wiga)", "" }, 0);         // ajoute Pipeline en tête
+    e.addFx ({ "VST3: Pipeline (NINE HANDS | DSP)", "" }, 0);         // ajoute Pipeline en tête
     e.moveBlock (e.blocks()[0], 3);
     const auto chainC = chainText (e);
     e.toggleAssign (0, e.chain().getReference (e.blocks()[1]).guid);
@@ -175,7 +175,7 @@ int main (int argc, char** argv)
     ed->screenSearch ({}, 2);
     ed->screenPick (5); ed->screenPick (1); ed->screenPick (9);
     shot ("octopus_add_effect");
-    ed->screenHover ({ 16.0f + 200.0f, 182.0f + 34.0f * 3.0f + 15.0f });      // survol d'un plugin Studio Wiga : sa description
+    ed->screenHover ({ 16.0f + 200.0f, 182.0f + 34.0f * 3.0f + 15.0f });      // survol d'un plugin NINE HANDS | DSP : sa description
     shot ("octopus_add_hover_early");                                         // tout de suite : pas encore de bulle
     Thread::sleep (850);
     shot ("octopus_add_hover");                                              // au bout de 0,8 s : la bulle
@@ -467,7 +467,7 @@ int main (int argc, char** argv)
     // famille utilitaire (blanc) : un bloc allumé, un bloc éteint
     {
         e.addFx ({ "JS: Utility/volume", "" }, 0);
-        e.addFx ({ "VST3: Stereo Width (Studio Wiga)", "" }, 1);
+        e.addFx ({ "VST3: Stereo Width (NINE HANDS | DSP)", "" }, 1);
         e.setEnabled (e.blocks()[1], false);
         shot ("octopus_utility_on_off");
         e.remove (e.blocks()[1]);
