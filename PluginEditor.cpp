@@ -92,7 +92,7 @@ namespace
     };
     enum CardAction { cLoad, cSave, cRename, cCopy, cPaste, cClear, numCardActions };
     const char* const kCardText[numCardActions] = { "LOAD", "SAVE", "RENAME", "COPY", "PASTE", "CLEAR" };
-    const char* const kChips[] = { "All", "Favorites", "Nine Hands", "VST3", "VST", "CLAP", "JS", "AU" };
+    const char* const kChips[] = { "All", "Favorites", "NINE HANDS | DSP", "VST3", "VST", "CLAP", "JS", "AU" };
     constexpr int kNumChips = 8;
     constexpr int kChipFavourites = 1;
 
@@ -937,7 +937,8 @@ private:
             float x = 360.0f;
             for (int c = 0; c < kNumChips; ++c)
             {
-                const float w = 26.0f + 9.4f * (float) String (kChips[c]).length();
+                const String t (kChips[c]);
+                const float w = 26.0f + (t == t.toUpperCase() ? 10.5f : 9.4f) * (float) t.length();   // capitales plus larges
                 v.push_back ({ { x, 130.0f, w, 38.0f }, bChip + c, kChips[c], chip == c });
                 x += w + 6.0f;
             }
