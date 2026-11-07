@@ -11,7 +11,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AS = 2.0
 W, H = 1249, 934
 CW, CH = int(W * AS), int(H * AS)
-BX0, BY0, BX1, BY1, BR = 0.5, 0.5, W - 0.5, H - 0.5, 24.0             # boîtier
+BX0, BY0, BX1, BY1, BR = 0.5, 0.5, W - 0.5, H - 0.5, 24.0     # boîtier (plan du 07/11)
 GX0, GY0, GR = 35.85, 67.2, 7.5                                         # vitre (Layout.h : glass)
 GW = 1176.95; GX1 = GX0 + GW; GY1 = GY0 + 651.0 * GW / 1064.0
 
@@ -27,14 +27,23 @@ d_box = sd_rr(xx, yy, BX0, BY0, BX1, BY1, BR)
 alpha = np.clip(0.5 - d_box * AS, 0, 1)
 tex = np.asarray(Image.open(os.path.join(ROOT, "design", "brushed_texture.png")).convert("RGB").resize((CW, CH), Image.LANCZOS)).astype(np.float64)
 
-# arête du boîtier : biseau arrondi de 9 unités, éclairé en haut à gauche
-hgt = 7.0 * smooth(0.0, 9.0, -d_box)
-gy_, gx_ = np.gradient(cv2.GaussianBlur(hgt, (0, 0), 0.8 * AS), 1.0 / AS)
+# arête du boîtier : arrondi en quart de cercle (rayon 14) qui donne du volume : la pente est forte au bord et s'adoucit
+# vers la façade, la lumière (haut gauche) glisse donc progressivement sur l'arrondi au lieu d'un biseau plat
+RR = 14.0
+t = np.clip(-d_box, 0.0, RR)
+hgt = RR * np.sqrt(np.clip(1.0 - ((RR - t) / RR) ** 2, 0.0, 1.0))
+gy_, gx_ = np.gradient(cv2.GaussianBlur(hgt, (0, 0), 0.6 * AS), 1.0 / AS)
+gx_ = np.clip(gx_, -6, 6); gy_ = np.clip(gy_, -6, 6)
 nrm = np.dstack([-gx_, -gy_, np.ones_like(hgt)]); nrm /= np.linalg.norm(nrm, axis=2, keepdims=True)
 Lv = np.array([-0.5, -0.62, 0.6]); Lv /= np.linalg.norm(Lv)
 Hv = Lv + np.array([0, 0, 1.0]); Hv /= np.linalg.norm(Hv)
-ndl = np.clip((nrm * Lv).sum(2), 0, 1); spec = np.clip((nrm * Hv).sum(2), 0, 1) ** 60
-img = tex * (0.35 + 0.65 * ndl / Lv[2])[..., None] + (spec * 210.0 * smooth(0, 1.5, -d_box))[..., None] * np.array([0.97, 1.0, 1.05])
+ndl = np.clip((nrm * Lv).sum(2), 0, 1)
+spec = np.clip((nrm * Hv).sum(2), 0, 1)
+on_round = 1.0 - smooth(RR - 3.0, RR, t)                                  # 1 sur l'arrondi, 0 sur la façade plate
+base = tex + (on_round * 7.2)[..., None]                                 # métal un peu plus clair sur l'arrondi (sinon noyé dans le noir)
+shade = 0.30 + 0.70 * ndl / Lv[2]
+sheen = (spec ** 14) * 40.5 + (spec ** 80) * 58.5                       # reflet large + reflet vif (discrets, 07/11)
+img = base * shade[..., None] + (sheen * on_round * smooth(0, 1.2, -d_box))[..., None] * np.array([0.97, 1.0, 1.05])
 
 # lunette de l'écran : fente sombre, flanc mat, fine gorge, petite lèvre claire, puis la façade
 d_g = sd_rr(xx, yy, GX0, GY0, GX1, GY1, GR)
@@ -60,9 +69,10 @@ def logo(name, x0, y0, x1, y1, op=0.96):
     out.alpha_composite(Image.fromarray(a.astype(np.uint8), "RGBA"), (int(round(x0 * AS)), int(round(y0 * AS))))
 # centrés en hauteur entre le bord extérieur du boîtier (0) et le bord extérieur de la lunette (GY0 - 13) ;
 # OCTOPUS réduit à 80 % (132 x 34,4), bord gauche à 35,1 ; NINE HANDS | DSP, bord droit à 1204,9, en bas du logo OCTOPUS
-MID = (GY0 - 13.0) / 2.0
+MID = (GY0 - 13.0) / 2.0 + 3.8                 # + 3,8 (10 px à 100 %) vers le bas (07/11)
 OW, OH = 164.9 * 0.80, 43.0 * 0.80
-logo("logo_octopus_v003.png", 35.1, MID - OH / 2, 35.1 + OW, MID + OH / 2)
+OY = 0.75                                        # OCTOPUS seul : encore 2 px plus bas (à 100 %)
+logo("logo_octopus_v003.png", 35.1, MID - OH / 2 + OY, 35.1 + OW, MID + OH / 2 + OY)
 NW, NH = 145.3, 12.4
 logo("logo_ninehands.png", 1204.9 - NW, MID + OH / 2 - NH, 1204.9, MID + OH / 2)      # bas aligné sur celui du logo OCTOPUS
 out.save(os.path.join(ROOT, "background.png"), optimize=True)

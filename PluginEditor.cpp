@@ -488,7 +488,7 @@ private:
     }
 
     // ---- nom du preset chargé : clic sur le nom en haut de l'écran pour le changer
-    Rectangle<float> headerNameRect() const { return { 132.0f, 8.0f, jmax (120.0f, chromaRect().getX() - 10.0f - 132.0f), 36.0f }; }
+    Rectangle<float> headerNameRect() const { return { 132.0f, 8.0f, jmax (120.0f, chromaRect().getX() - kHdrGap - 132.0f), 36.0f }; }
     void startHeaderRename()
     {
         const int cur = eng.current();
@@ -912,9 +912,9 @@ private:
         const auto& p = semi::get (proc.semitonesPreset());
         const float tw = jmax (unitsOf (font (tfBold, 13.3f), p.name), unitsOf (semiLabelFont(), "SEMITONES"));
         const float w = jlimit (96.0f, 170.0f, 5.3f + 26.0f + 7.1f + tw + 9.5f);
-        return { 507.0f - w, 19.0f, w, 36.0f };
+        return { kBankPrevX - kHdrGap - w, 19.0f, w, 36.0f };
     }
-    Rectangle<float> chromaRect() const { return { semiRect().getX() - 13.0f - 36.0f, 19.0f, 36.0f, 36.0f }; }
+    Rectangle<float> chromaRect() const { return { semiRect().getX() - kHdrGap - 36.0f, 19.0f, 36.0f, 36.0f }; }
 
     // anneau lumineux : halo (opacité glowPc %) puis trait net
     void glowArc (Graphics& g, Point<float> c, float rad, float w, float from, float to, Colour col, int glowPc)
@@ -1205,15 +1205,21 @@ private:
     }
 
     // ------------------------------------------------------------ boutons
+    // en-tête : marge de 14 avec les bords de l'écran (badge du preset à gauche, BANKS à droite) et 14 entre tous les éléments
+    static constexpr float kHdrGap = 14.0f;
+    static constexpr float kBanksX = kSW - kHdrGap - 78.0f, kSaveX = kBanksX - kHdrGap - 72.0f, kStompX = kSaveX - kHdrGap - 84.0f,
+                           kPresetX = kStompX - kHdrGap - 84.0f, kBankNextX = kPresetX - kHdrGap - 34.0f,
+                           kBankTextX = kBankNextX - 106.0f, kBankPrevX = kBankTextX - 34.0f;
     std::vector<Btn> headerButtons() const
     {
         std::vector<Btn> v;
-        v.push_back ({ { 520.0f, 19.0f, 34.0f, 36.0f }, bBankPrev, CharPointer_UTF8 ("\xe2\x97\x80") });
-        v.push_back ({ { 660.0f, 19.0f, 34.0f, 36.0f }, bBankNext, CharPointer_UTF8 ("\xe2\x96\xb6") });
-        v.push_back ({ { 706.0f, 19.0f, 84.0f, 36.0f }, bModePreset, "PRESET", eng.mode() == OctopusEngine::presetMode });
-        v.push_back ({ { 798.0f, 19.0f, 84.0f, 36.0f }, bModeStomp, "STOMP", eng.mode() == OctopusEngine::stompMode });
-        v.push_back ({ { 892.0f, 19.0f, 72.0f, 36.0f }, bSave, "SAVE", false, eng.isReady() });
-        v.push_back ({ { 972.0f, 19.0f, 78.0f, 36.0f }, bBanks, "BANKS", overlay == Overlay::banks });
+        // de droite à gauche, même écart (kHdrGap = marge du bord de l'écran) entre tous les éléments de l'en-tête
+        v.push_back ({ { kBankPrevX, 19.0f, 34.0f, 36.0f }, bBankPrev, CharPointer_UTF8 ("\xe2\x97\x80") });
+        v.push_back ({ { kBankNextX, 19.0f, 34.0f, 36.0f }, bBankNext, CharPointer_UTF8 ("\xe2\x96\xb6") });
+        v.push_back ({ { kPresetX, 19.0f, 84.0f, 36.0f }, bModePreset, "PRESET", eng.mode() == OctopusEngine::presetMode });
+        v.push_back ({ { kStompX, 19.0f, 84.0f, 36.0f }, bModeStomp, "STOMP", eng.mode() == OctopusEngine::stompMode });
+        v.push_back ({ { kSaveX, 19.0f, 72.0f, 36.0f }, bSave, "SAVE", false, eng.isReady() });
+        v.push_back ({ { kBanksX, 19.0f, 78.0f, 36.0f }, bBanks, "BANKS", overlay == Overlay::banks });
         return v;
     }
 
@@ -1405,7 +1411,7 @@ private:
         // bank affichée
         g.setFont (font (tfBold, 17.0f));
         g.setColour (kText);
-        g.drawText ("BANK " + String (eng.bank() + 1).paddedLeft ('0', 2), S (Rectangle<float> (554.0f, 19.0f, 106.0f, 36.0f)), Justification::centred);
+        g.drawText ("BANK " + String (eng.bank() + 1).paddedLeft ('0', 2), S (Rectangle<float> (kBankTextX, 19.0f, 106.0f, 36.0f)), Justification::centred);
         for (auto& b : headerButtons()) drawButton (g, b);
         drawMiniChroma (g);
         drawSemiButton (g);
@@ -2268,16 +2274,35 @@ private:
         const float w = kTW * tunerScale(), h = kTH * tunerScale();
         return { (kTunerColX - w) * 0.5f, (kSH - h) * 0.5f, w, h };
     }
+    // ---- écran de l'accordeur (07/11/2026) : ligne d'infos centrée, note, mètre fin qui s'efface aux bouts,
+    // écart en cents, boutons en mots sur 4 colonnes. Repère de l'écran (1064 x 651), centre en x = kSW / 2.
+    static constexpr float kTx0 = 170.4f, kTw = 723.2f;             // mètre : -50 .. +50 cents, centré sur l'écran
     std::vector<Btn> tunerButtons() const
     {
-        const float w = 196.0f, x = kTunerColX + (kSW - kTunerColX - w) * 0.5f;
         const auto& c = proc.chroma();
+        static const char* names[3] = { "MONO", "POLY", "STROBE" };
         std::vector<Btn> v;
-        v.push_back ({ { x, 134.0f, w, 58.0f }, bTunerTunings, "TUNINGS" });
-        v.push_back ({ { x, 206.0f, w, 58.0f }, bTunerMute, c.muted ? "MUTED" : "MUTE", c.muted });
-        v.push_back ({ { x, 278.0f, w, 72.0f }, bTunerMode, "MODE" });
-        v.push_back ({ { x, 520.0f, w, 58.0f }, bTunerExit, "EXIT" });
+        const float cw = 135.6f, x0 = kSW * 0.5f - cw * 2.0f;
+        v.push_back ({ { x0,            580.0f, cw, 40.0f }, bTunerTunings, "TUNINGS" });
+        v.push_back ({ { x0 + cw,       580.0f, cw, 40.0f }, bTunerMute, c.muted ? "MUTED" : "MUTE", c.muted });
+        v.push_back ({ { x0 + cw * 2.0f, 580.0f, cw, 40.0f }, bTunerMode, names[jlimit (0, 2, c.mode)] });
+        v.push_back ({ { x0 + cw * 3.0f, 580.0f, cw, 40.0f }, bTunerExit, "EXIT" });
         return v;
+    }
+    Font monoS (float units) const { return Font (FontOptions (tfMono).withHeight (units * L::kG * s)); }
+    // ligne d'infos : zones cliquables (mode, accordage, La de référence)
+    struct TunerTop { Rectangle<float> mode, name, ref; };
+    TunerTop tunerTop() const
+    {
+        const auto& c = proc.chroma();
+        const auto f = monoS (21.0f).withExtraKerningFactor (0.22f);
+        const float nameW = unitsOf (f, c.tuningName.toUpperCase());
+        const float cx = kSW * 0.5f, y = 38.0f, h = 26.0f;
+        TunerTop t;
+        t.name = { cx - nameW * 0.5f, y, nameW, h };
+        t.mode = { t.name.getX() - 10.0f - 240.0f, y, 240.0f, h };      // même écart visible des deux côtés du nom
+        t.ref  = { t.name.getRight() + 19.0f, y, 240.0f, h };
+        return t;
     }
     Rectangle<float> tuningBox() const { return { 414.0f - 165.0f, 16.0f, 330.0f, 66.0f }; }   // repère de CHROMA
 
@@ -2365,125 +2390,129 @@ private:
     {
         const auto& c = proc.chroma();
         const auto sn = proc.tunerSnapshot();
-        g.setColour (Colour (0xff050706));
+        g.setColour (Colour (0xff08090c));
         g.fillRect (S (Rectangle<float> (0.0f, 0.0f, kSW, kSH)));
+        const bool autoMono = c.mode == 1 && sn.monoOffTuning && ! sn.anyStringActive;
+        // ligne d'infos : MODE · ACCORDAGE · A 440, le nom de l'accordage centré sur l'écran
         {
-            Graphics::ScopedSaveState ss (g);
-            const auto o = S (tunerRect().getPosition());
-            g.addTransform (AffineTransform::scale (tunerScale() * L::kG * s).translated (o.x, o.y));
-            g.setColour (Colour (0xff050706));
-            g.fillRect (0.0f, 0.0f, kTW, kTH);
-            const bool autoMono = c.mode == 1 && sn.monoOffTuning && ! sn.anyStringActive;
-            tunerHeader (g, sn, c, autoMono);
-            if (c.mode == 0 || autoMono) tunerMono (g, sn);
-            else if (c.mode == 1)        tunerPoly (g, sn);
-            else                         tunerStrobe (g, sn);
+            static const char* names[3] = { "MONO", "POLY", "STROBE" };
+            const auto t = tunerTop();
+            const auto f = monoS (21.0f).withExtraKerningFactor (0.22f);
+            const bool green = c.mode == 1 && ! autoMono && sn.allInTune;
+            g.setFont (f);
+            g.setColour (Colour (0xff9aa3b2));
+            // points séparateurs à égale distance du nom, mode et La à égale distance des points
+            const float trail = 21.0f * 0.22f * 0.6f;                     // espace d'approche ajouté après la dernière lettre
+            const float dl = t.name.getX() - 30.0f, dr = t.name.getRight() - trail + 30.0f;
+            g.drawText (String (CharPointer_UTF8 ("\xc2\xb7")), S (Rectangle<float> (dl - 10.0f, t.name.getY(), 20.0f, t.name.getHeight())), Justification::centred);
+            g.drawText (String (CharPointer_UTF8 ("\xc2\xb7")), S (Rectangle<float> (dr - 10.0f, t.name.getY(), 20.0f, t.name.getHeight())), Justification::centred);
+            g.drawText (autoMono ? String ("POLY>MONO") : String (names[jlimit (0, 2, c.mode)]), S (t.mode.withRightX (dl - 30.0f + trail)), Justification::centredRight);
+            g.drawText ("A " + String (c.ref), S (t.ref.withX (dr + 30.0f)), Justification::centredLeft);
+            g.setColour (green ? TC::green() : TC::amber());
+            g.drawText (c.tuningName.toUpperCase(), S (t.name.expanded (4.0f, 0.0f)), Justification::centred);
         }
-        // colonne de droite
-        const auto colR = Rectangle<float> (kTunerColX, 0.0f, kSW - kTunerColX, kSH);
-        g.setColour (Colour (0xff07090a));
-        g.fillRect (S (colR));
-        g.setColour (TC::amber().withAlpha (0.25f));
-        g.fillRect (S (Rectangle<float> (colR.getX(), 24.0f, 1.5f, kSH - 48.0f)));
-        g.setFont (Font (FontOptions (tfMono).withHeight (S (26.0f))));
-        g.setColour (TC::orange());
-        g.drawText ("TUNER", S (Rectangle<float> (colR.getX(), 40.0f, colR.getWidth(), 34.0f)), Justification::centred);
-        g.setFont (Font (FontOptions (tfMono).withHeight (S (13.0f))));
-        g.setColour (TC::grey().withAlpha (0.7f));
-        g.drawText (proc.chroma().internal ? "BUILT-IN  B+C" : "CHROMA", S (Rectangle<float> (colR.getX(), 74.0f, colR.getWidth(), 20.0f)), Justification::centred);
+        if (c.mode == 0 || autoMono) tunerMono (g, sn);
+        else if (c.mode == 1)        tunerPoly (g, sn);
+        else
+        {
+            Graphics::ScopedSaveState ss (g);       // stroboscope : dessin d'origine, centré sous la ligne d'infos
+            const float sc = 0.8f * kSH / kTH, w = kTW * sc;
+            const auto o = S (Point<float> ((kSW - w) * 0.5f, 18.0f));
+            g.addTransform (AffineTransform::scale (sc * L::kG * s).translated (o.x, o.y));
+            tunerStrobe (g, sn);
+        }
+        // boutons en mots, 4 colonnes centrées : celui du mode en couleur et souligné, MUTE en rouge quand il coupe
         for (auto& b : tunerButtons())
         {
-            const auto rr = S (b.r);
             const bool hov = hoverBtn == b.id;
             const bool red = b.id == bTunerMute && b.active;
-            const auto ac = red ? Colour (0xffff2a18) : TC::amber();
-            g.setColour (ac.withAlpha (red ? 0.85f : (hov ? 0.16f : 0.06f)));
-            g.fillRoundedRectangle (rr, S (8.0f));
-            g.setColour (ac.withAlpha (0.65f));
-            g.drawRoundedRectangle (rr.reduced (S (1.0f)), S (8.0f), S (1.4f));
-            g.setFont (Font (FontOptions (tfMono).withHeight (S (21.0f))));
-            g.setColour (red ? Colour (0xff140806) : ac);
-            if (b.id == bTunerMode)
+            const bool acc = b.id == bTunerMode;
+            const auto col = red ? Colour (0xffff4d4d) : acc ? TC::amber() : Colour (0xffc7cdd6).withAlpha (hov ? 1.0f : 0.85f);
+            const auto f = monoS (18.8f).withExtraKerningFactor (0.19f);
+            g.setFont (f);
+            g.setColour (hov && ! red && ! acc ? Colours::white : col);
+            g.drawText (b.text, S (b.r), Justification::centred);
+            if (acc || red || hov)
             {
-                static const char* names[3] = { "MONO", "POLY", "STROBE" };
-                g.drawText (b.text, rr.withTrimmedBottom (rr.getHeight() * 0.38f).translated (0.0f, S (4.0f)), Justification::centred);
-                g.setFont (Font (FontOptions (tfMono).withHeight (S (13.0f))));
-                g.setColour (TC::grey().withAlpha (0.7f));
-                g.drawText (names[jlimit (0, 2, c.mode)], rr.withTrimmedTop (rr.getHeight() * 0.58f), Justification::centredTop);
+                const float tw = unitsOf (f, b.text) - 3.0f;
+                g.setColour ((hov && ! red && ! acc ? Colours::white : col).withAlpha (acc || red ? 1.0f : 0.5f));
+                g.fillRect (S (Rectangle<float> (b.r.getCentreX() - tw * 0.5f, b.r.getCentreY() + 13.5f, tw, 1.8f)));
             }
-            else g.drawText (b.text, rr, Justification::centred);
         }
     }
 
-    void tunerHeader (Graphics& g, const tuna::Snapshot& sn, const ChromaState& c, bool autoMono)
+    // mètre fin : traits blancs (un par cent, moyens tous les 5, grands tous les 10) qui s'effacent vers les bouts,
+    // barre blanche au centre, aiguille fine qui grandit en approchant du centre et en prend la taille à 0
+    void fineMeter (Graphics& g, float y, float hh, bool labels, bool centre, bool needle, float cents, Colour needleCol, float alpha)
     {
-        static const char* names[3] = { "MONO", "POLY", "STROBE" };
-        g.setFont (mono (42.0f));
-        g.setColour (TC::orange());
-        g.drawText (autoMono ? String ("POLY>MONO") : String (names[jlimit (0, 2, c.mode)]), Rectangle<float> (28, 18, 230, 62), Justification::centredLeft);
-        g.drawText ("A=" + String (c.ref), Rectangle<float> (kTW - 28 - 200, 18, 200, 62), Justification::centredRight);
-        // nom de l'accordage choisi dans CHROMA (+ étiquette d'instrument : G7, B5...)
-        const bool green = c.mode == 1 && ! autoMono && sn.allInTune;
-        const auto col = green ? TC::green() : TC::amber();
-        const Rectangle<float> r (414.0f - 165.0f, 16.0f, 330.0f, 66.0f);
-        g.setColour (col.withAlpha (0.07f));
-        g.fillRoundedRectangle (r, 7.0f);
-        g.setColour (col.withAlpha (green ? 0.85f : 0.55f));
-        g.drawRoundedRectangle (r.reduced (1), 7.0f, 2.0f);
-        const int n = (int) c.notes.size();
-        const String tag = (c.tuningKey.startsWith ("user|") ? "P" : (c.tuningKey.contains ("|BASSE") ? "B" : "G")) + String (n);
-        g.setFont (mono (20.0f));
-        g.setColour (col.withAlpha (0.6f));
-        g.drawText (tag, Rectangle<float> (r.getX() + 12, r.getY(), 40, r.getHeight()), Justification::centredLeft);
-        const String nm = c.tuningName.toUpperCase();
-        float fh = 38.0f;
-        while (fh > 18.0f && GlyphArrangement::getStringWidth (mono (fh), nm) > r.getWidth() - 70) fh -= 1.0f;
-        g.setFont (mono (fh));
-        g.setColour (col);
-        g.drawText (nm, Rectangle<float> (r.getX() + 48, r.getY(), r.getWidth() - 60, r.getHeight()), Justification::centred, true);
-        g.setColour (TC::amber().withAlpha (0.25f));
-        g.fillRect (28.0f, 96.0f, kTW - 56.0f, 2.0f);
+        const float px1 = jmax (S (0.9f), 1.0f) / S (1.0f);          // trait d'au moins 1 pixel
+        auto X = [] (float c) { return kTx0 + (c + 50.0f) * kTw / 100.0f; };
+        for (int c = -50; c <= 50; ++c)
+        {
+            const bool maj = c % 10 == 0, mid = c % 5 == 0;
+            const float fade = jmax (0.05f, 1.0f - std::pow (std::abs ((float) c) / 50.0f, 1.8f));
+            const float h = hh * (maj ? 1.0f : mid ? 0.65f : 0.35f);
+            g.setColour (Colours::white.withAlpha ((maj ? 0.85f : mid ? 0.6f : 0.38f) * fade));
+            g.fillRect (S (Rectangle<float> (X ((float) c) - px1 * 0.5f, y + (hh - h) * 0.5f, px1, h)));
+            if (labels && maj)
+            {
+                g.setFont (monoS (14.0f));
+                g.setColour (Colour (0xffa0a8b6).withAlpha (jmax (0.15f, fade)));
+                g.drawText ((c > 0 ? "+" : "") + String (c), S (Rectangle<float> (X ((float) c) - 25.0f, y + hh + 22.0f, 50.0f, 16.0f)), Justification::centred);
+            }
+        }
+        const float ce = hh * 0.25f;                                  // la barre du centre dépasse les grands traits
+        const auto bar = Rectangle<float> (X (0.0f) - 1.8f, y - ce, 3.6f, hh + 2.0f * ce);
+        if (centre)
+        {
+            g.setColour (Colours::white.withAlpha (0.12f));
+            g.fillRoundedRectangle (S (bar.expanded (2.5f, 2.5f)), S (3.0f));
+            g.setColour (Colours::white.withAlpha (0.95f));
+            g.fillRoundedRectangle (S (bar), S (1.8f));
+        }
+        if (needle)
+        {
+            const float k = jmax (0.0f, 1.0f - std::abs (cents) / 3.0f);
+            const float ext = ce * (0.375f + 0.625f * k), w = 1.8f + 1.8f * k;
+            const auto r = Rectangle<float> (X (jlimit (-50.0f, 50.0f, cents)) - w * 0.5f, y - ext, w, hh + 2.0f * ext);
+            g.setColour (needleCol.withAlpha (0.25f * alpha));
+            g.fillRoundedRectangle (S (r.expanded (2.5f, 2.0f)), S (2.5f));
+            g.setColour (needleCol.withAlpha (alpha));
+            g.fillRoundedRectangle (S (r), S (w * 0.5f));
+        }
     }
 
     void tunerPoly (Graphics& g, const tuna::Snapshot& sn)
     {
         const int n = jmax (1, sn.numStrings);
-        const float top = 112.0f, area = 420.0f;
-        const float rowH = jmin (68.0f, area / n);
-        const float y0 = top + (area - rowH * n) * 0.5f;
-        const float x0 = 166.0f, x1 = 800.0f;
-        // résolution doublée : 49 graduations de 2 cents (au lieu de 25 de 4 cents), traits plus fins
-        const int segs = 49, mid = 24;
-        const float pitch = (x1 - x0) / segs, segW = pitch * 0.52f;
-        g.setColour (TC::green().withAlpha (0.13f));
-        for (float y = y0; y < y0 + rowH * n; y += 9.0f) g.fillRect (x0 + pitch * (mid + 0.5f) - 0.75f, y, 1.5f, 4.0f);
+        const float pitch = jmin (68.7f, 412.0f / (float) n), hh = jmin (27.1f, pitch * 0.4f);
+        const float y0 = 292.0f - pitch * (float) n * 0.5f;
         for (int row = 0; row < n; ++row)
         {
             const int idx = n - 1 - row;   // corde la plus aiguë en haut
             const auto& st = sn.strings[idx];
-            const float cy = y0 + rowH * (row + 0.5f);
-            float alpha = 0.32f;
+            const float cy = y0 + pitch * ((float) row + 0.5f);
+            float alpha = 1.0f;
             if (st.measured) alpha = st.active ? 1.0f : jmap (jlimit (0.4f, 6.0f, st.age), 0.4f, 6.0f, 1.0f, 0.45f);
             const bool inTune = st.measured && std::abs (st.cents) <= (float) tuna::TunerEngine::kPolyInTune;
-            g.setFont (mono (jmin (46.0f, rowH * 0.72f)));
-            g.setColour ((inTune ? TC::green() : TC::amber()).withAlpha (alpha));
-            g.drawText (String (tuna::noteName (st.midi)), Rectangle<float> (28, cy - rowH * 0.5f, 132, rowH), Justification::centredLeft);
-            const int lit = st.measured ? jlimit (0, segs - 1, mid + (int) std::lround (st.cents / 2.0f)) : -1;
-            const float h = rowH * 0.50f;
-            for (int k = 0; k < segs; ++k)
+            const auto col = st.measured ? (inTune ? TC::green() : TC::amber()).withAlpha (alpha) : Colour (0xff4a5060);
+            g.setFont (font (tfBold, jmin (38.0f, pitch * 0.55f)));
+            g.setColour (col);
+            g.drawText (String (tuna::noteName (st.midi)), S (Rectangle<float> (72.3f, cy - pitch * 0.5f, 95.0f, pitch)), Justification::centredLeft);
+            fineMeter (g, cy - hh * 0.5f, hh, false, st.measured, st.measured, st.cents, inTune ? TC::green() : TC::amber(), alpha);
+            if (st.measured)
             {
-                const float hh = (k == mid ? rowH * 0.66f : ((k - mid) % 5 == 0 ? h * 1.18f : h));   // repère tous les 10 cents
-                Rectangle<float> r (x0 + pitch * k + (pitch - segW) * 0.5f, cy - hh * 0.5f, segW, hh);
-                if (k == lit) segment (g, r, (inTune ? TC::green() : TC::amber()).withAlpha (alpha), true);
-                else if (lit >= 0 && ((k > mid && k < lit) || (k < mid && k > lit))) segment (g, r, TC::amber().withAlpha (0.30f * alpha), false);
-                else segment (g, r, k == mid ? TC::greenDim() : TC::amberDim(), false);
+                g.setFont (monoS (18.8f));
+                g.setColour (col);
+                g.drawText (sign1 (st.cents), S (Rectangle<float> (900.0f, cy - 12.0f, 91.6f, 24.0f)), Justification::centredRight);   // alignés sur le point
             }
         }
-        g.setFont (mono (27.0f));
-        g.setColour (TC::grey().withAlpha (0.75f));
-        g.drawText ("-50", Rectangle<float> (x0 - 4, 544, 100, 36), Justification::centredLeft);
-        g.drawText ("0", Rectangle<float> (x0 + pitch * (mid + 0.5f) - 50, 544, 100, 36), Justification::centred);
-        g.drawText ("+50", Rectangle<float> (x1 - 96, 544, 100, 36), Justification::centredRight);
+        g.setFont (monoS (15.3f));
+        g.setColour (Colour (0xff9aa3b2));
+        const float ly = y0 + pitch * (float) n + 22.0f;
+        g.drawText ("-50", S (Rectangle<float> (kTx0 - 30.0f, ly, 60.0f, 18.0f)), Justification::centred);
+        g.drawText ("0", S (Rectangle<float> (kTx0 + kTw * 0.5f - 30.0f, ly, 60.0f, 18.0f)), Justification::centred);
+        g.drawText ("+50", S (Rectangle<float> (kTx0 + kTw - 30.0f, ly, 60.0f, 18.0f)), Justification::centred);
     }
 
     void tunerMono (Graphics& g, const tuna::Snapshot& sn)
@@ -2492,64 +2521,42 @@ private:
         const float alpha = ! has ? 0.3f : (sn.monoActive ? 1.0f : jmap (jlimit (0.25f, 2.0f, sn.monoAge), 0.25f, 2.0f, 1.0f, 0.4f));
         const float c = has ? sn.monoCents : 0.0f;
         const bool inTune = has && sn.monoPrecise && std::abs (c) <= (float) tuna::TunerEngine::kMonoInTune;
-        const auto col = (inTune ? TC::green() : TC::amber()).withAlpha (alpha);
+        const auto state = inTune ? TC::green() : TC::amber();
+        const auto col = state.withAlpha (alpha);
+        // note : lettre en Poppins Bold, altération en exposant, octave en indice ; le groupe est centré sur l'écran
         const String pc = has ? String (tuna::pitchClassName (sn.monoMidi)) : String ("--");
-        const String letter = pc.substring (0, 1), acc = pc.substring (1);
+        const String letter = has ? pc.substring (0, 1) : pc, accd = has ? pc.substring (1) : String();
         const String oct = has ? String (tuna::octaveOf (sn.monoMidi)) : String();
-        const auto big = mono (230.0f), small = mono (82.0f);
-        auto tw = [] (const Font& f, const String& t) { return GlyphArrangement::getStringWidth (f, t); };
-        const float wL = tw (big, has ? letter : pc), wA = tw (small, acc), wO = tw (small, oct);
-        const float total = wL + jmax (wA, wO) + 6.0f;
-        const float x = 414.0f - total * 0.5f;
-        g.setColour (col.withAlpha (alpha * 0.18f));
-        g.setFont (big);
-        g.drawText (has ? letter : pc, Rectangle<float> (x - 3, 98, wL + 6, 250), Justification::centredLeft);
-        g.setColour (col);
-        g.drawText (has ? letter : pc, Rectangle<float> (x, 100, wL + 4, 250), Justification::centredLeft);
-        g.setFont (small);
-        if (acc.isNotEmpty()) g.drawText (acc, Rectangle<float> (x + wL + 6, 128, wA + 6, 90), Justification::centredLeft);
-        g.drawText (oct, Rectangle<float> (x + wL + 6, 240, wO + 6, 90), Justification::centredLeft);
-        // résolution doublée : 81 graduations de 1,25 cent (au lieu de 41 de 2,5 cents), traits et aiguille plus fins
-        const int segs = 81, mid = 40;
-        const float x0 = 64.0f, x1 = kTW - 64.0f, pitch = (x1 - x0) / segs, segW = pitch * 0.5f;
-        const float cy = 392.0f;
-        for (int k = 0; k < segs; ++k)
+        const auto big = font (tfBold, 189.8f), small = font (tfBold, 63.3f);
+        const float wL = GlyphArrangement::getStringWidth (big, letter);
+        const float wS = jmax (GlyphArrangement::getStringWidth (small, accd), GlyphArrangement::getStringWidth (small, oct));
+        const float baseline = S (Point<float> (0.0f, 223.8f)).y, capTop = S (Point<float> (0.0f, 129.0f)).y;
+        const float x = S (Point<float> (kSW * 0.5f, 0.0f)).x - (wL + wS) * 0.5f;
+        Path p;
         {
-            if (k == mid) continue;
-            const float hh = (k - mid) % 8 == 0 ? 56.0f : ((k - mid) % 4 == 0 ? 44.0f : 32.0f);   // repères tous les 10 et 5 cents
-            segment (g, Rectangle<float> (x0 + pitch * k + (pitch - segW) * 0.5f, cy - hh * 0.5f, segW, hh), TC::amberDim(), false);
+            GlyphArrangement ga;
+            ga.addLineOfText (big, letter, x, baseline);
+            if (oct.isNotEmpty()) ga.addLineOfText (small, oct, x + wL, baseline);
+            if (accd.isNotEmpty()) ga.addLineOfText (small, accd, x + wL, capTop + small.getAscent() * 0.72f);
+            ga.createPath (p);
         }
-        const float markW = segW * 1.3f, markH = 118.0f, curW = segW * 1.0f, curH = 92.0f;
-        const float centreX = x0 + pitch * (mid + 0.5f);
-        const Rectangle<float> centre (centreX - markW * 0.5f, cy - markH * 0.5f, markW, markH);
-        if (inTune) segment (g, centre, TC::green().withAlpha (alpha), true);
-        else
-        {
-            g.setColour (Colours::white.withAlpha (0.10f)); g.fillRoundedRectangle (centre.expanded (4, 3), 4.0f);
-            g.setColour (Colours::white.withAlpha (has ? 0.95f : 0.55f)); g.fillRoundedRectangle (centre, 2.5f);
-            if (has)
-            {
-                const float cx = centreX + jlimit (-50.0f, 50.0f, c) / 1.25f * pitch;
-                segment (g, Rectangle<float> (cx - curW * 0.5f, cy - curH * 0.5f, curW, curH), TC::amber().withAlpha (alpha), true);
-            }
-        }
-        g.setFont (mono (26.0f));
-        g.setColour (TC::grey().withAlpha (0.7f));
-        g.drawText ("-50", Rectangle<float> (x0 - 4, 448, 100, 32), Justification::centredLeft);
-        g.drawText ("+50", Rectangle<float> (x1 - 96, 448, 100, 32), Justification::centredRight);
-        g.setFont (mono (56.0f));
+        if (has) DropShadow (state.withAlpha (0.30f * alpha), (int) S (22.0f), {}).drawForPath (g, p);
         g.setColour (col);
-        g.drawText (has ? ((sn.monoPrecise ? String() : String ("~")) + sign1 (c) + " c") : String ("-- c"), Rectangle<float> (234, 466, 360, 80), Justification::centred);
-        g.setFont (mono (28.0f));
-        g.setColour (TC::grey().withAlpha (0.75f * jmax (0.4f, alpha)));
-        if (has) g.drawText (String (sn.monoHz, sn.monoHz < 100 ? 2 : 1) + " Hz", Rectangle<float> (28, 476, 220, 66), Justification::centredLeft);
+        g.fillPath (p);
+        fineMeter (g, 318.0f, 57.9f, true, true, has, c, state, alpha);
+        g.setFont (monoS (37.6f));
+        g.setColour (col);
+        g.drawText (has ? ((sn.monoPrecise ? String() : String ("~")) + sign1 (c) + " c") : String ("-- c"), S (Rectangle<float> (kSW * 0.5f - 200.0f, 424.0f, 400.0f, 42.0f)), Justification::centred);
+        String info;
         if (has)
+        {
+            info = String (sn.monoHz, sn.monoHz < 100 ? 2 : 1) + " Hz";
             for (int i = 0; i < sn.numStrings; ++i)
-                if (sn.strings[i].midi == sn.monoMidi)
-                {
-                    g.drawText ("STRING " + String (sn.numStrings - i), Rectangle<float> (kTW - 248, 476, 220, 66), Justification::centredRight);
-                    break;
-                }
+                if (sn.strings[i].midi == sn.monoMidi) { info += String (CharPointer_UTF8 ("   \xc2\xb7   STRING ")) + String (sn.numStrings - i); break; }
+        }
+        g.setFont (monoS (17.6f).withExtraKerningFactor (0.13f));
+        g.setColour (Colour (0xff8b93a3).withAlpha (jmax (0.4f, alpha)));
+        g.drawText (info, S (Rectangle<float> (kSW * 0.5f - 300.0f, 466.0f, 600.0f, 22.0f)), Justification::centred);
     }
 
     void tunerStrobe (Graphics& g, const tuna::Snapshot& sn)
@@ -2704,14 +2711,10 @@ private:
         if (tunerShown())
         {
             if (e.mods.isPopupMenu()) { pedalMenu(); return; }
-            if (tunerRect().contains (p))
-            {
-                // comme sur CHROMA : clic sur le nom du mode = mode suivant
-                const auto t = (p - tunerRect().getPosition()) / tunerScale();
-                if (tuningBox().expanded (6.0f).contains (t)) tuningMenu();          // comme sur CHROMA : clic sur le nom de l'accordage
-                else if (t.y < 90.0f && t.x > 640.0f) referenceMenu();               // clic sur « A=440 » : La de référence
-                else if (t.y < 90.0f && t.x < 260.0f) proc.chromaNextMode();
-            }
+            const auto t = tunerTop();
+            if (t.name.expanded (8.0f, 6.0f).contains (p)) tuningMenu();          // clic sur le nom de l'accordage
+            else if (t.ref.expanded (0.0f, 6.0f).contains (p)) referenceMenu();     // clic sur « A 440 » : La de référence
+            else if (t.mode.expanded (0.0f, 6.0f).contains (p)) proc.chromaNextMode();
             return;
         }
         if (headerNameRect().contains (p) && ! e.mods.isPopupMenu() && eng.isReady()) { startHeaderRename(); return; }
