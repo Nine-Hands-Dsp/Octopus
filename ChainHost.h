@@ -58,6 +58,9 @@ public:
     virtual bool tokenClash() { return false; }
     // piste d'Octopus : 0 = non armée, 1 = armée (enregistrement prêt), 2 = armée et REAPER enregistre
     virtual int recState() { return 0; }
+    // voies parallèles : dossier où écrire les effets JS de routage (Effects de REAPER), nombre de canaux de la piste
+    virtual juce::File routingFolder() { return {}; }
+    virtual void ensureChannels (int) {}
 
     // lecture de la chaîne (celle où se trouve Octopus)
     virtual int count() = 0;
@@ -157,6 +160,8 @@ public:
     void beginUndo() override {}
     void endUndo (const juce::String&) override {}
 
+    int channels = 2;
+    void ensureChannels (int n) override { channels = juce::jmax (channels, n); }
     bool isChroma (int i) const { return ok (i) && chain[i].original.containsIgnoreCase ("CHROMA"); }
     static constexpr int kDemoParams = 16;
     int numParams (int i) override { return ok (i) ? (isChroma (i) ? 3 : kDemoParams) : 0; }
@@ -189,7 +194,7 @@ public:
     {
         auto k = chain[i].guid + "/" + juce::String (p);
         double v = values.contains (k) ? (double) values[k] : (p == 9 ? 1.0 : 0.25 + 0.06 * (double) ((p * 7 + i * 3) % 10));
-        const int st = paramSteps (i, p);
+        const int st = chain[i].original.contains ("nh_") ? 0 : paramSteps (i, p);     // effets JS de routage : valeurs continues
         if (st >= 2) v = std::round (v * (st - 1)) / (st - 1);
         return v;
     }

@@ -1,5 +1,6 @@
 #include "OctopusEngine.h"
 #include "FxCategory.h"
+#include "Routing.h"
 
 OctopusEngine::OctopusEngine (ChainHost& h) : host (h)
 {
@@ -68,7 +69,7 @@ void OctopusEngine::refreshNow()
         for (int i = 0; i < n; ++i)
         {
             auto& f = now.getReference (i);
-            if (f.isSelf || ! f.enabled) continue;
+            if (f.isSelf || ! f.enabled || Routing::roleOf (f) != Routing::none) continue;
             bool inv = false;
             const bool pedal = usesPedalBypassFor (f, i, inv);
             if (pedal) { const int p = bypassCache[f.guid].param; const bool v = host.getParam (i, p) >= 0.5; f.enabled = inv ? ! v : v; }
@@ -76,6 +77,14 @@ void OctopusEngine::refreshNow()
     }
     const int rs = r ? host.recState() : 0;
     if (rs != recSt) { recSt = rs; ++gen; }
+    // voies parallèles : le Split affiche l'état du groupe (curseur Group du Merge)
+    juce::Array<int> roles;
+    auto gs = parseGroups (now, roles);
+    for (auto& g : gs)
+    {
+        g.on = now.getReference (g.merge).enabled && host.getParam (g.merge, Routing::pGroupOn) >= 0.5;
+        now.getReference (g.split).enabled = g.on;
+    }
     const auto st = host.statusText();
     const auto tn = r ? host.trackName() : juce::String();
 
@@ -89,6 +98,18 @@ void OctopusEngine::refreshNow()
         for (int i = 0; i < fx.size(); ++i) if (! fx.getReference (i).isSelf) blk.add (i);
         ++gen;
     }
+    grp = std::move (gs);
+    roleOf = roles;
+    groupOf.clearQuick(); laneOf.clearQuick();
+    for (int i = 0; i < fx.size(); ++i) { groupOf.add (-1); laneOf.add (-1); }
+    for (int k = 0; k < (int) grp.size(); ++k)
+    {
+        const auto& g = grp[(size_t) k];
+        groupOf.set (g.split, k); groupOf.set (g.merge, k);
+        for (auto m : g.markers) groupOf.set (m, k);
+        for (int l = 0; l < (int) g.lanes.size(); ++l) for (auto i : g.lanes[(size_t) l]) { groupOf.set (i, k); laneOf.set (i, l); }
+    }
+    if (r && ! grp.empty()) syncGroups();
     if (r && host.tokenClash() && onTokenClash) onTokenClash();
     if (r && sigPending) { sigPending = false; sigLoaded = signature(); ++gen; }
 }
@@ -188,6 +209,13 @@ void OctopusEngine::setBypassPref (const juce::String& plugin, int pref)
 
 void OctopusEngine::setOn (int i, bool on)
 {
+    if (roleAt (i) == Routing::split)          // un groupe : son curseur Group (sinon le signal passe sec)
+    {
+        const int g = groupAt (i);
+        if (g >= 0) host.setParam (grp[(size_t) g].merge, Routing::pGroupOn, on ? 1.0 : 0.0);
+        return;
+    }
+    if (roleAt (i) != Routing::none) return;
     bool inv = false;
     if (usesPedalBypass (i))
     {
@@ -312,6 +340,264 @@ void OctopusEngine::setParallel (int i, bool on)
     host.setParallel (i, on ? 1 : 0);
     host.endUndo ("parallel");
     refreshNow();
+}
+
+// ------------------------------------------------------------------ voies parallèles (split / merge)
+std::vector<OctopusEngine::Group> OctopusEngine::parseGroups (const juce::Array<FxInfo>& chain, juce::Array<int>& roles)
+{
+    roles.clearQuick();
+    for (auto& f : chain) roles.add (f.isSelf ? Routing::none : Routing::roleOf (f));
+    std::vector<Group> out;
+    for (int i = 0; i < chain.size(); ++i)
+    {
+        if (roles[i] != Routing::split) continue;
+        Group g; g.split = i; g.guid = chain.getReference (i).guid; g.lanes.emplace_back();
+        int j = i + 1;
+        for (; j < chain.size(); ++j)
+        {
+            const int r = roles[j];
+            if (r == Routing::split) break;                                  // Split sans Merge : pas un groupe
+            if (r == Routing::merge) { g.merge = j; break; }
+            if (r == Routing::pathB || r == Routing::pathC)
+            {
+                if ((int) g.lanes.size() >= Routing::kMaxLanes) break;
+                g.markers.add (j); g.lanes.emplace_back(); continue;
+            }
+            if (! chain.getReference (j).isSelf) g.lanes.back().add (j);
+        }
+        if (g.merge < 0) continue;                                           // repères orphelins : affichés comme des blocs
+        out.push_back (g);
+        i = g.merge;
+    }
+    // les repères qui n'appartiennent à aucun groupe redeviennent des blocs ordinaires (on peut les supprimer)
+    juce::Array<int> used;
+    for (auto& g : out) { used.add (g.split); used.add (g.merge); used.addArray (g.markers); }
+    for (int i = 0; i < roles.size(); ++i) if (roles[i] != Routing::none && ! used.contains (i)) roles.set (i, Routing::none);
+    return out;
+}
+
+int OctopusEngine::roleAt (int i) const  { return juce::isPositiveAndBelow (i, roleOf.size()) ? roleOf[i] : Routing::none; }
+int OctopusEngine::groupAt (int i) const { return juce::isPositiveAndBelow (i, groupOf.size()) ? groupOf[i] : -1; }
+int OctopusEngine::laneAt (int i) const  { return juce::isPositiveAndBelow (i, laneOf.size()) ? laneOf[i] : -1; }
+
+int OctopusEngine::laneEndBlock (int g, int lane) const
+{
+    if (! juce::isPositiveAndBelow (g, (int) grp.size())) return blk.size();
+    const auto& G = grp[(size_t) g];
+    const int end = lane + 1 < (int) G.lanes.size() ? G.markers[lane] : G.merge;   // repère qui ferme cette voie
+    return blk.indexOf (end);
+}
+
+juce::String OctopusEngine::blockName (int i) const
+{
+    if (! juce::isPositiveAndBelow (i, fx.size())) return {};
+    if (roleAt (i) == Routing::split && groupAt (i) >= 0)
+    {
+        juce::StringArray n;
+        for (auto& l : grp[(size_t) groupAt (i)].lanes) n.add (l.isEmpty() ? juce::String ("-") : FxCat::shortName (fx.getReference (l[0]).name));
+        return n.joinIntoString (" || ");
+    }
+    return FxCat::shortName (fx.getReference (i).name);
+}
+
+int OctopusEngine::blockKind (int i) const
+{
+    if (! juce::isPositiveAndBelow (i, fx.size())) return -1;
+    if (roleAt (i) == Routing::split && groupAt (i) >= 0)
+    {
+        for (auto& l : grp[(size_t) groupAt (i)].lanes) if (! l.isEmpty()) return FxCat::classify (fx.getReference (l[0]).original);
+        return FxCat::utility;
+    }
+    return FxCat::classify (fx.getReference (i).original);
+}
+
+bool OctopusEngine::installRouting()
+{
+    const auto folder = host.routingFolder();
+    if (folder == juce::File()) return true;                 // hôte de démonstration : rien à écrire
+    return Routing::install (folder);
+}
+
+int OctopusEngine::addRouting (int role, int at) { return host.add (Routing::addName (role), at); }
+
+int OctopusEngine::indexOfGuid (const juce::String& guid) const
+{
+    const int n = host.count();
+    for (int i = 0; i < n; ++i) if (host.info (i).guid == guid) return i;
+    return -1;
+}
+
+void OctopusEngine::moveBefore (const juce::String& moving, const juce::String& target)
+{
+    const int from = indexOfGuid (moving), t = indexOfGuid (target);
+    if (from < 0 || t < 0 || from == t) return;
+    host.move (from, from < t ? t - 1 : t);
+}
+
+// Merge suit la forme du groupe : nombre de voies, voies vides muettes ; la piste garde ses 8 canaux
+void OctopusEngine::syncGroups()
+{
+    host.ensureChannels (Routing::kChannels);
+    for (auto& g : grp)
+    {
+        const int n = (int) g.lanes.size();
+        auto put = [this, &g] (int p, double v) { if (std::abs (host.getParam (g.merge, p) - v) > 1.0e-4) host.setParam (g.merge, p, v); };
+        put (Routing::pPaths, Routing::pathsNorm (n));
+        for (int l = 0; l < Routing::kMaxLanes; ++l)
+            put (Routing::laneParam (l, Routing::mixPresent), l < n && ! g.lanes[(size_t) l].isEmpty() ? 1.0 : 0.0);
+    }
+}
+
+bool OctopusEngine::split (int i, int moving)
+{
+    if (! ready || ! juce::isPositiveAndBelow (i, fx.size()) || fx.getReference (i).isSelf || roleAt (i) != Routing::none || groupAt (i) >= 0) return false;
+    if (moving >= 0 && (! juce::isPositiveAndBelow (moving, fx.size()) || roleAt (moving) != Routing::none || moving == i || fx.getReference (moving).isSelf)) return false;
+    if (! installRouting()) { say ("Split : could not write the routing effects in REAPER's Effects folder", 5000.0); return false; }
+    const auto target = fx.getReference (i).guid;
+    const auto mov = moving >= 0 ? fx.getReference (moving).guid : juce::String();
+    const auto name = FxCat::shortName (fx.getReference (i).name);
+    host.beginUndo();
+    host.ensureChannels (Routing::kChannels);
+    juce::StringArray added;
+    bool ok = true;
+    for (int role : { (int) Routing::merge, (int) Routing::pathB, (int) Routing::split })   // -> Split, bloc, Path B, Merge
+    {
+        const int t = indexOfGuid (target);
+        const int at = addRouting (role, role == Routing::split ? t : t + 1);
+        if (at < 0) { ok = false; break; }
+        added.add (host.info (at).guid);
+    }
+    if (! ok)
+    {
+        for (auto& gd : added) { const int k = indexOfGuid (gd); if (k >= 0) host.remove (k); }
+        host.endUndo ("split");
+        refreshNow();
+        say ("Split : REAPER could not load the routing effects (REAPER 6 or newer, JS effects)", 5000.0);
+        return false;
+    }
+    if (mov.isNotEmpty()) moveBefore (mov, added[0]);          // le bloc glissé : en voie B
+    {
+        // réglages de départ du mélange : groupe actif, voies à 0 dB, au centre, phase normale
+        const int mi = indexOfGuid (added[0]);
+        host.setParam (mi, Routing::pGroupOn, 1.0);
+        for (int l = 0; l < Routing::kMaxLanes; ++l)
+        {
+            host.setParam (mi, Routing::laneParam (l, Routing::mixLevel), Routing::toNorm (Routing::mixLevel, 0.0));
+            host.setParam (mi, Routing::laneParam (l, Routing::mixPan), 0.5);
+            host.setParam (mi, Routing::laneParam (l, Routing::mixPhase), 0.0);
+            host.setParam (mi, Routing::laneParam (l, Routing::mixMute), 0.0);
+        }
+    }
+    host.endUndo ("split " + name);
+    refreshNow();
+    say (mov.isNotEmpty() ? "Split : " + name + " || " + FxCat::shortName (fx.getReference (indexOfGuid (mov)).name)
+                          : "Split : " + name + " on path A, path B is empty (click its +)");
+    changed();
+    return true;
+}
+
+bool OctopusEngine::addPath (int g, int moving)
+{
+    if (! ready || ! juce::isPositiveAndBelow (g, (int) grp.size())) return false;
+    const auto G = grp[(size_t) g];
+    if ((int) G.lanes.size() >= Routing::kMaxLanes) { say ("A group has 3 paths at most"); return false; }
+    if (moving >= 0 && (roleAt (moving) != Routing::none || fx.getReference (moving).isSelf)) return false;
+    if (! installRouting()) { say ("Could not write the routing effects", 4000.0); return false; }
+    const auto mergeGuid = fx.getReference (G.merge).guid;
+    const auto mov = moving >= 0 ? fx.getReference (moving).guid : juce::String();
+    host.beginUndo();
+    const int at = addRouting (Routing::markerRole ((int) G.lanes.size()), indexOfGuid (mergeGuid));
+    if (at >= 0 && mov.isNotEmpty()) moveBefore (mov, mergeGuid);
+    host.endUndo ("add path");
+    refreshNow();
+    if (at < 0) { say ("REAPER could not load the routing effect", 4000.0); return false; }
+    say ("Path " + juce::String::charToString ((juce::juce_wchar) ('A' + (int) G.lanes.size())) + " added");
+    changed();
+    return true;
+}
+
+bool OctopusEngine::unsplit (int g)
+{
+    if (! ready || ! juce::isPositiveAndBelow (g, (int) grp.size())) return false;
+    const auto G = grp[(size_t) g];
+    juce::Array<int> idx { G.split, G.merge };
+    idx.addArray (G.markers);
+    idx.sort();
+    host.beginUndo();
+    for (int k = idx.size(); --k >= 0;) host.remove (idx[k]);
+    host.endUndo ("merge paths in series");
+    for (auto& s : stompGuids) s.removeString (G.guid);
+    folded.removeString (G.guid);
+    refreshNow();
+    say ("Paths merged in series");
+    changed();
+    return true;
+}
+
+bool OctopusEngine::removePath (int g, int lane)
+{
+    if (! ready || ! juce::isPositiveAndBelow (g, (int) grp.size())) return false;
+    const auto G = grp[(size_t) g];
+    if (! juce::isPositiveAndBelow (lane, (int) G.lanes.size())) return false;
+    juce::StringArray gone;
+    for (auto i : G.lanes[(size_t) lane]) gone.add (fx.getReference (i).guid);
+    if ((int) G.lanes.size() <= 2)
+    {
+        // il ne reste qu'une voie : le groupe disparaît, l'autre voie reste en série
+        juce::Array<int> idx { G.split, G.merge };
+        idx.addArray (G.markers);
+        idx.addArray (G.lanes[(size_t) lane]);
+        idx.sort();
+        host.beginUndo();
+        for (int k = idx.size(); --k >= 0;) host.remove (idx[k]);
+        host.endUndo ("remove path");
+        for (auto& s : stompGuids) { s.removeString (G.guid); for (auto& gd : gone) s.removeString (gd); }
+        folded.removeString (G.guid);
+    }
+    else
+    {
+        // 3 voies -> 2 : on retire les effets de la voie et les repères, puis on remet Path B à la nouvelle frontière
+        juce::Array<int> idx;
+        idx.addArray (G.markers);
+        idx.addArray (G.lanes[(size_t) lane]);
+        idx.sort();
+        int firstLen = 0;
+        for (int l = 0; l < (int) G.lanes.size(); ++l) if (l != lane) { firstLen = G.lanes[(size_t) l].size(); break; }
+        const auto splitGuid = G.guid;
+        host.beginUndo();
+        for (int k = idx.size(); --k >= 0;) host.remove (idx[k]);
+        addRouting (Routing::pathB, indexOfGuid (splitGuid) + 1 + firstLen);
+        host.endUndo ("remove path");
+        for (auto& s : stompGuids) for (auto& gd : gone) s.removeString (gd);
+    }
+    refreshNow();
+    say ("Path " + juce::String::charToString ((juce::juce_wchar) ('A' + lane)) + " removed");
+    changed();
+    return true;
+}
+
+double OctopusEngine::mixValue (int g, int lane, int what) const
+{
+    if (! ready || ! juce::isPositiveAndBelow (g, (int) grp.size())) return 0.0;
+    return Routing::fromNorm (what, host.getParam (grp[(size_t) g].merge, Routing::laneParam (lane, what)));
+}
+
+void OctopusEngine::setMix (int g, int lane, int what, double v)
+{
+    if (! ready || ! juce::isPositiveAndBelow (g, (int) grp.size())) return;
+    host.setParam (grp[(size_t) g].merge, Routing::laneParam (lane, what), Routing::toNorm (what, v));
+    ++gen;
+}
+
+bool OctopusEngine::isFolded (int g) const { return juce::isPositiveAndBelow (g, (int) grp.size()) && folded.contains (grp[(size_t) g].guid); }
+
+void OctopusEngine::toggleFold (int g)
+{
+    if (! juce::isPositiveAndBelow (g, (int) grp.size())) return;
+    const auto& gd = grp[(size_t) g].guid;
+    if (folded.contains (gd)) folded.removeString (gd); else folded.add (gd);
+    ++gen;
+    changed();
 }
 
 const juce::Array<InstalledFx>& OctopusEngine::installedList (bool reload)
@@ -542,7 +828,7 @@ juce::String OctopusEngine::fsText (int f) const
     for (auto& g : stompGuids[f])
     {
         const int b = blockOf (g);
-        if (b >= 0) names.add (FxCat::shortName (fx.getReference (blk[b]).name));
+        if (b >= 0) names.add (blockName (blk[b]));
     }
     return names.isEmpty() ? juce::String ("-") : names.joinIntoString (" + ");
 }
@@ -563,7 +849,7 @@ int OctopusEngine::fsKind (int f) const
     for (auto& g : stompGuids[f])
     {
         const int b = blockOf (g);
-        if (b >= 0) return FxCat::classify (fx.getReference (blk[b]).original);
+        if (b >= 0) return blockKind (blk[b]);
     }
     return -1;
 }
@@ -652,6 +938,7 @@ bool OctopusEngine::load (int idx)
         return true;
     }
 
+    for (auto& e : p.entries) if (e.contains ("nh_split")) { installRouting(); host.ensureChannels (Routing::kChannels); break; }
     juce::StringArray now; int nowSelf = 0; juce::String err;
     if (! host.capture (now, nowSelf, err)) { say ("Load failed : " + err, 4000.0); return false; }
 
@@ -922,6 +1209,7 @@ juce::ValueTree OctopusEngine::toTree() const
     root.setProperty ("cc", c.joinIntoString (","), nullptr);
     root.setProperty ("latch", l.joinIntoString (","), nullptr);
     for (int f = 0; f < kKeys; ++f) root.setProperty ("stompGuids" + juce::String (f), stompGuids[f].joinIntoString (";"), nullptr);
+    root.setProperty ("folded", folded.joinIntoString (";"), nullptr);
     for (int f = 0; f < kFs; ++f) root.setProperty ("fsColour" + juce::String (f), juce::String::toHexString ((int) fsCol[(size_t) f]), nullptr);
     for (int k = 0; k < kCombos; ++k)
     {
@@ -977,6 +1265,7 @@ void OctopusEngine::fromTree (const juce::ValueTree& root)
     for (int f = 0; f < kKeys; ++f)
         stompGuids[f] = juce::StringArray::fromTokens (root["stompGuids" + juce::String (f)].toString(), ";", "");
     for (auto& s : stompGuids) s.removeEmptyStrings();
+    folded = juce::StringArray::fromTokens (root["folded"].toString(), ";", ""); folded.removeEmptyStrings();
     for (int f = 0; f < kFs; ++f)
     {
         const auto hex = root["fsColour" + juce::String (f)].toString();

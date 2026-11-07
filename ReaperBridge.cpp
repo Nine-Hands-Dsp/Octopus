@@ -90,6 +90,8 @@ struct ReaperBridge::Api
     const char* (*GetAppVersion)() = nullptr;
     double (*GetMediaTrackInfo_Value) (void* track, const char* parm) = nullptr;
     int   (*GetPlayStateEx) (void* proj) = nullptr;
+    bool  (*SetMediaTrackInfo_Value) (void* track, const char* parm, double v) = nullptr;
+    const char* (*GetResourcePath)() = nullptr;
 
     bool core() const
     {
@@ -179,6 +181,8 @@ void ReaperBridge::resolve()
     getApi (reaper, a.GetAppVersion, "GetAppVersion");
     getApi (reaper, a.GetMediaTrackInfo_Value, "GetMediaTrackInfo_Value");
     getApi (reaper, a.GetPlayStateEx, "GetPlayStateEx");
+    getApi (reaper, a.SetMediaTrackInfo_Value, "SetMediaTrackInfo_Value");
+    getApi (reaper, a.GetResourcePath, "GetResourcePath");
 }
 
 // la piste qui héberge CETTE instance (pas les autres pistes du projet) : armée ? REAPER enregistre-t-il ?
@@ -188,6 +192,21 @@ int ReaperBridge::recState()
     if (api->GetMediaTrackInfo_Value (track, "I_RECARM") < 0.5) return 0;
     const int ps = api->GetPlayStateEx != nullptr ? api->GetPlayStateEx (project) : 0;   // &4 : enregistrement
     return (ps & 4) != 0 ? 2 : 1;
+}
+
+juce::File ReaperBridge::routingFolder()
+{
+    if (api->GetResourcePath == nullptr) return {};
+    const auto p = utf8 (api->GetResourcePath());
+    if (p.isEmpty()) return {};
+    return juce::File (p).getChildFile ("Effects").getChildFile ("NINE HANDS").getChildFile ("Routing");
+}
+
+// voies parallèles : la piste doit avoir assez de canaux (jamais réduits)
+void ReaperBridge::ensureChannels (int n)
+{
+    if (track == nullptr || api->GetMediaTrackInfo_Value == nullptr || api->SetMediaTrackInfo_Value == nullptr) return;
+    if (api->GetMediaTrackInfo_Value (track, "I_NCHAN") < (double) n - 0.5) api->SetMediaTrackInfo_Value (track, "I_NCHAN", (double) n);
 }
 
 juce::String ReaperBridge::reaperVersion()

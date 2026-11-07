@@ -26,6 +26,8 @@ public:
     bool isInputChain() override { return chainFlag != 0; }
     bool tokenClash() override { return clash; }
     int recState() override;
+    juce::File routingFolder() override;
+    void ensureChannels (int n) override;
     int count() override;
     FxInfo info (int index) override;
     void setEnabled (int index, bool on) override;

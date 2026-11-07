@@ -1,3 +1,4 @@
+#include "Routing.h"
 #include "../../ColourPicker.h"
 #include "../../OctoSettings.h"
 #include "../../FxCategory.h"
@@ -152,6 +153,42 @@ int main (int argc, char** argv)
     for (auto* c : ed->getChildren()) if (auto* l = dynamic_cast<OctoPickerLayer*> (c)) l->dismiss();
     pump (2);
     ed->showScreen (12, 0); pump (2);
+
+    // voies parallèles (split / merge)
+    {
+        e.load (14);                                                       // preset vide
+        for (auto* n : { "VST3: NGATE (NINE HANDS | DSP)", "VST3: Doorn (NINE HANDS | DSP)", "VST3: Genome (Two notes Audio Engineering)",
+                         "VST3: Impulse (NINE HANDS | DSP)", "VST3: Holyverb (NINE HANDS | DSP)", "VST3: ECHOFLEX (NINE HANDS | DSP)",
+                         "VST3: Small Tone (NINE HANDS | DSP)", "VST3: ReaEQ (Cockos)", "VST3: Wharry (NINE HANDS | DSP)", "VST3: Crycat (NINE HANDS | DSP)" })
+            e.addFx ({ n, n }, e.blocks().size());
+        auto idxOf = [&] (const String& s, int nth = 0) { for (int i = 0; i < e.chain().size(); ++i) if (e.chain().getReference (i).name.contains (s) && nth-- == 0) return i; return -1; };
+        e.split (idxOf ("Genome"));
+        check (e.groups().size() == 1 && e.groups()[0].lanes[1].isEmpty(), "split : groupe créé, voie B vide");
+        shot ("octopus_split_empty");
+        e.moveBlock (idxOf ("Impulse"), e.laneEndBlock (0, 0));            // IR dans la voie A, derrière l'ampli
+        e.addFx ({ "VST3: Anode (NINE HANDS | DSP)", "" }, e.laneEndBlock (0, 1));
+        e.addFx ({ "VST3: Impulse (NINE HANDS | DSP)", "" }, e.laneEndBlock (0, 1));
+        check (e.groups()[0].lanes[0].size() == 2 && e.groups()[0].lanes[1].size() == 2, "voies A et B : ampli + IR chacune");
+        e.rename (14, "Stack Amps");
+        e.save (14);
+        shot ("octopus_split");
+        e.setMix (0, 1, Routing::mixLevel, -4.5);
+        e.setMix (0, 0, Routing::mixPan, -30.0); e.setMix (0, 1, Routing::mixPan, 30.0);
+        e.setMix (0, 1, Routing::mixPhase, 1.0);
+        ed->showScreen (15, 0); pump (3);
+        shot ("octopus_split_mixer");
+        ed->showScreen (15, -1);
+        e.toggleFold (0);
+        shot ("octopus_split_folded");
+        e.toggleFold (0);
+        e.addPath (0);
+        e.addFx ({ "JS: Volume Adjustment", "" }, e.laneEndBlock (0, 2));
+        check (e.groups()[0].lanes.size() == 3, "voie C ajoutée");
+        shot ("octopus_split_3paths");
+        e.toggle (e.groups()[0].split);
+        shot ("octopus_split_off");
+        e.load (0);
+    }
 
     ed->screenHover ({ 840.0f, 37.0f });                                      // survol de STOMP : orange
     shot ("octopus_stomp_hover");

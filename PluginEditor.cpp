@@ -4,6 +4,7 @@
 #include "UserFxPresets.h"
 #include "OctoSettings.h"
 #include "ColourPicker.h"
+#include "Routing.h"
 #include <BinaryData.h>
 
 using namespace juce;
@@ -364,6 +365,9 @@ private:
     int firstRow = 0;                              // défilement de la grille (rangées)
     int hoverCombo = -1;
     int hoverSlot = -1, hoverBtn = bNone, hoverItem = -1, hoverFooter = -1, hoverParam = -1;
+    int hoverLaneAdd = -1, hoverNodeKey = -1;      // case « + » d'une voie vide, point Y / M survolé (groupe * 2 + merge)
+    Point<float> hoverPos { -100.0f, -100.0f };
+    int mixGroup = -1, mixDragLane = -1, mixDragWhat = -1;   // mixeur d'un groupe (clic sur M)
     // clic / glisser sur un bloc
     int downSlot = -1;
     Point<float> downPos;
@@ -673,36 +677,205 @@ private:
     }
 
     // ------------------------------------------------------------ grille de blocs
+    // 7 colonnes ; un groupe de voies parallèles (Routing.h) occupe autant de colonnes que sa voie la plus longue,
+    // ne se coupe jamais entre deux rangées, et sa rangée grandit d'un écart de voie par voie en plus (blocs de même taille).
+    static constexpr float kLanePitch = 124.0f;
+    enum CellKind { cBlock = 0, cAdd, cLaneAdd, cFolded };
+    struct GCell { int slot = -1, kind = cBlock, group = -1, lane = 0, col = 0, row = 0; };
+    struct GGroup { int group = -1, row = 0, col0 = 0, width = 1, lanes = 2; bool folded = false; };
+    struct GRow { float top = 0.0f; int lanes = 1, lastCol = 0; };
+    mutable std::vector<GCell> gCells;
+    mutable std::vector<GGroup> gGroups;
+    mutable std::vector<GRow> gRows;
+    mutable int gridGen = -1;
+
+    void buildGrid() const
+    {
+        if (gridGen == eng.generation() && ! gRows.empty()) return;
+        gridGen = eng.generation();
+        gCells.clear(); gGroups.clear(); gRows.clear();
+        const auto& b = eng.blocks();
+        int row = 0, col = 0;
+        gRows.push_back ({});
+        auto place = [&] (int w)
+        {
+            if (col > 0 && col + w > kCols) { gRows.back().lastCol = col - 1; ++row; col = 0; gRows.push_back ({}); }
+        };
+        for (int k = 0; k < b.size();)
+        {
+            const int i = b[k];
+            const int gi = eng.groupAt (i);
+            if (eng.roleAt (i) == Routing::split && gi >= 0)
+            {
+                const auto& G = eng.groups()[(size_t) gi];
+                const bool fold = eng.isFolded (gi);
+                int w = 1;
+                if (! fold) for (auto& l : G.lanes) w = jmax (w, l.size());
+                place (w);
+                GGroup gg; gg.group = gi; gg.row = row; gg.col0 = col; gg.width = w; gg.lanes = (int) G.lanes.size(); gg.folded = fold;
+                gGroups.push_back (gg);
+                if (fold) gCells.push_back ({ k, cFolded, gi, 0, col, row });
+                else
+                {
+                    for (int l = 0; l < (int) G.lanes.size(); ++l)
+                    {
+                        const auto& ln = G.lanes[(size_t) l];
+                        if (ln.isEmpty()) gCells.push_back ({ -1, cLaneAdd, gi, l, col, row });
+                        for (int j = 0; j < ln.size(); ++j) gCells.push_back ({ b.indexOf (ln[j]), cBlock, gi, l, col + j, row });
+                    }
+                    gRows.back().lanes = jmax (gRows.back().lanes, (int) G.lanes.size());
+                }
+                col += w;
+                const int mk = b.indexOf (G.merge);
+                k = mk >= 0 ? mk + 1 : k + 1;
+                continue;
+            }
+            place (1);
+            gCells.push_back ({ k, cBlock, -1, 0, col, row });
+            ++col; ++k;
+        }
+        place (1);
+        gCells.push_back ({ b.size(), cAdd, -1, 0, col, row });
+        gRows.back().lastCol = col;
+        float top = kGridTop;
+        for (auto& r : gRows) { r.top = top; top += kRowPitch + kLanePitch * (float) (r.lanes - 1); }
+    }
+
     int numSlots() const { return eng.blocks().size() + 1; }           // blocs + case « ajouter »
-    int totalRows() const { return jmax (kRows, (numSlots() + kCols - 1) / kCols); }
-    int maxFirstRow() const { return jmax (0, totalRows() - kRows); }
-    float rowTop (int row) const { return kGridTop + kRowPitch * (float) (row - firstRow); }
-    Point<float> slotCentre (int slot) const { return { kColX0 + kColPitch * (float) (slot % kCols), rowTop (slot / kCols) + kTileDy }; }
+    int totalRows() const { buildGrid(); return (int) gRows.size(); }
+    float rowTop (int row) const
+    {
+        buildGrid();
+        const int f = jlimit (0, (int) gRows.size() - 1, firstRow);
+        if (row >= (int) gRows.size()) return gRows.back().top - gRows[(size_t) f].top + kGridTop + kRowPitch * (float) (row - (int) gRows.size() + 1) + kLanePitch * (float) (gRows.back().lanes - 1);
+        return gRows[(size_t) row].top - gRows[(size_t) f].top + kGridTop;
+    }
+    int rowLanes (int row) const { buildGrid(); return isPositiveAndBelow (row, (int) gRows.size()) ? gRows[(size_t) row].lanes : 1; }
+    float rowCy (int row) const { return rowTop (row) + kTileDy; }
+    bool rowFits (int row) const { return rowCy (row) + kLanePitch * (float) (rowLanes (row) - 1) + kTile * 0.5f + 26.0f <= kFooterLine + 4.0f; }
+    bool rowVisible (int row) const { return row >= firstRow && row < totalRows() && rowFits (row); }
+    int visibleRows() const { int n = 0; for (int r = firstRow; r < totalRows() && rowVisible (r); ++r) ++n; return jmax (1, n); }
+    int maxFirstRow() const
+    {
+        const int n = totalRows();
+        for (int f = 0; f < n; ++f)
+        {
+            const float h = gRows[(size_t) n - 1].top - gRows[(size_t) f].top + kTileDy + kLanePitch * (float) (gRows[(size_t) n - 1].lanes - 1) + kTile * 0.5f + 26.0f;
+            if (kGridTop + h <= kFooterLine + 4.0f) return f;
+        }
+        return jmax (0, n - 1);
+    }
+    Point<float> cellCentre (const GCell& c) const { return { kColX0 + kColPitch * (float) c.col, rowCy (c.row) + kLanePitch * (float) c.lane }; }
+    const GCell* cellOfSlot (int slot) const
+    {
+        buildGrid();
+        for (auto& c : gCells) if (c.slot == slot && c.kind != cLaneAdd) return &c;
+        return nullptr;
+    }
+    // points Y (split) et M (merge) d'un groupe déplié
+    Point<float> nodeY (const GGroup& gg) const { return { kColX0 + kColPitch * ((float) gg.col0 - 0.5f), rowCy (gg.row) }; }
+    Point<float> nodeM (const GGroup& gg) const { return { kColX0 + kColPitch * ((float) (gg.col0 + gg.width - 1) + 0.5f), rowCy (gg.row) }; }
+    const GGroup* gridGroup (int g) const { buildGrid(); for (auto& gg : gGroups) if (gg.group == g) return &gg; return nullptr; }
+    Point<float> slotCentre (int slot) const
+    {
+        if (auto* c = cellOfSlot (slot)) return cellCentre (*c);
+        // repère d'un groupe (masqué) : son point Y / M
+        if (isPositiveAndBelow (slot, eng.blocks().size()))
+        {
+            const int i = eng.blocks()[slot];
+            if (auto* gg = gridGroup (eng.groupAt (i))) return eng.roleAt (i) == Routing::merge ? nodeM (*gg) : nodeY (*gg);
+        }
+        return { -1000.0f, -1000.0f };
+    }
     Rectangle<float> tileRect (int slot) const { return Rectangle<float> (kTile, kTile).withCentre (slotCentre (slot)); }
-    bool slotVisible (int slot) const { const int row = slot / kCols; return row >= firstRow && row < firstRow + kRows; }
+    bool slotVisible (int slot) const { auto* c = cellOfSlot (slot); return c != nullptr && rowVisible (c->row); }
+    Point<float> inDot() const  { return { kColX0 - kColPitch * 0.5f - 6.0f, rowCy (0) }; }
+    Point<float> outDot() const { const auto* c = cellOfSlot (eng.blocks().size()); return { kColX0 + kColPitch * ((float) kCols - 0.5f) + 6.0f, rowCy (c != nullptr ? c->row : 0) }; }
+    bool inVisible() const  { return firstRow == 0; }
+    bool outVisible() const { const auto* c = cellOfSlot (eng.blocks().size()); return c != nullptr && rowVisible (c->row); }
 
     int slotAt (Point<float> p) const
     {
         if (p.y < kGridTop - 6.0f || p.y > kFooterLine) return -1;
-        for (int k = firstRow * kCols; k < jmin (numSlots(), (firstRow + kRows) * kCols); ++k)
-            if (tileRect (k).expanded (12.0f, 6.0f).withHeight (kTile + 34.0f).contains (p)) return k;
+        buildGrid();
+        for (auto& c : gCells)
+            if (c.kind != cLaneAdd && rowVisible (c.row)
+                && Rectangle<float> (kTile, kTile).withCentre (cellCentre (c)).expanded (12.0f, 6.0f).withHeight (kTile + 34.0f).contains (p)) return c.slot;
+        return -1;
+    }
+    int laneAddAt (Point<float> p) const          // case « + » d'une voie vide (indice dans gCells), -1 sinon
+    {
+        if (p.y < kGridTop - 6.0f || p.y > kFooterLine) return -1;
+        buildGrid();
+        for (int k = 0; k < (int) gCells.size(); ++k)
+        {
+            const auto& c = gCells[(size_t) k];
+            if (c.kind == cLaneAdd && rowVisible (c.row) && Rectangle<float> (kTile, kTile).withCentre (cellCentre (c)).expanded (8.0f).contains (p)) return k;
+        }
+        return -1;
+    }
+    // point Y ou M sous la souris : groupe (et merge = true pour M), -1 sinon
+    int nodeAt (Point<float> p, bool& isMerge) const
+    {
+        buildGrid();
+        for (auto& gg : gGroups)
+        {
+            if (gg.folded || ! rowVisible (gg.row)) continue;
+            if (nodeY (gg).getDistanceFrom (p) < 16.0f) { isMerge = false; return gg.group; }
+            if (nodeM (gg).getDistanceFrom (p) < 16.0f) { isMerge = true; return gg.group; }
+        }
         return -1;
     }
 
-    // position d'insertion pendant un glisser (0 .. nombre de blocs) : devant la case la plus proche
+    // position d'insertion pendant un glisser (0 .. nombre de blocs) et repère à dessiner ; sous un bloc : split (ou voie de plus)
     int dropAt (Point<float> p) const
     {
+        dropSplitSlot = -1; dropPathGroup = -1;
+        buildGrid();
         const int n = eng.blocks().size();
-        int best = n; float bestD = 1.0e9f;
-        for (int k = 0; k <= n; ++k)
+        // sous un bloc hors groupe : split ; sous un bloc de la dernière voie d'un groupe (moins de 3 voies) : nouvelle voie
+        for (auto& c : gCells)
         {
-            if (! slotVisible (k) && k < n) continue;
-            const auto c = slotCentre (k) - Point<float> (kColPitch * 0.5f, 0.0f);
-            const float d = c.getDistanceFrom (p);
-            if (d < bestD) { bestD = d; best = k; }
+            if (c.kind != cBlock || c.slot == downSlot || ! rowVisible (c.row)) continue;
+            const auto cc = cellCentre (c);
+            if (std::abs (p.x - cc.x) > 52.0f || p.y < cc.y + 44.0f || p.y > cc.y + 104.0f) continue;
+            if (c.group < 0) { dropSplitSlot = c.slot; dropMark = cc + Point<float> (0.0f, kLanePitch); return -1; }
+            const auto* gg = gridGroup (c.group);
+            if (gg != nullptr && c.lane == gg->lanes - 1 && gg->lanes < Routing::kMaxLanes)
+            { dropPathGroup = c.group; dropMark = { kColX0 + kColPitch * (float) gg->col0, cc.y + kLanePitch }; return -1; }
+        }
+        int best = n; float bestD = 1.0e9f;
+        auto consider = [&] (int pos, Point<float> at)
+        {
+            const float d = at.getDistanceFrom (p);
+            if (d < bestD) { bestD = d; best = pos; dropMark = at; }
+        };
+        for (auto& c : gCells)
+        {
+            if (! rowVisible (c.row)) continue;
+            const auto cc = cellCentre (c);
+            if (c.kind == cLaneAdd) { consider (eng.laneEndBlock (c.group, c.lane), cc); continue; }
+            if (c.kind == cFolded) { consider (c.slot, cc - Point<float> (kColPitch * 0.5f, 0.0f)); continue; }
+            // premier bloc de la voie A d'un groupe : devant le groupe (au point Y) ou au début de la voie (plus près du bloc)
+            if (c.group >= 0 && c.col == gridGroup (c.group)->col0)
+            {
+                const auto& G = eng.groups()[(size_t) c.group];
+                consider (c.slot, cc - Point<float> (kColPitch * 0.3f, 0.0f));
+                if (c.lane == 0) consider (eng.blocks().indexOf (G.split), cc - Point<float> (kColPitch * 0.62f, 0.0f));
+            }
+            else consider (c.slot, cc - Point<float> (kColPitch * 0.5f, 0.0f));
+            // fin de voie : derrière le dernier bloc de la voie
+            if (c.group >= 0)
+            {
+                const auto& ln = eng.groups()[(size_t) c.group].lanes[(size_t) c.lane];
+                if (! ln.isEmpty() && eng.blocks().indexOf (ln.getLast()) == c.slot)
+                    consider (eng.laneEndBlock (c.group, c.lane), cc + Point<float> (kColPitch * 0.3f, 0.0f));
+            }
         }
         return best;
     }
+    mutable int dropSplitSlot = -1, dropPathGroup = -1;
+    mutable Point<float> dropMark;
 
     int recPreview = -1;         // rendus de test : -1 = état réel, 0 = non armée, 1 = armée, 2 = en enregistrement
     bool recBlinkOn = true;      // phase du clignotement (piste armée)
@@ -722,16 +895,13 @@ private:
     float connXR() const { return kColX0 + kColPitch * (float) (kCols - 1) + kTile * 0.5f + (kColPitch - kTile) * 0.5f + 6.0f; }   // point OUT
     bool recMarkAt (Point<float> p) const
     {
-        const int n = numSlots();
         auto zone = [] (Point<float> d) { return Rectangle<float> (d.x - 24.0f, d.y - 26.0f, 48.0f, 54.0f); };
-        return (firstRow == 0 && zone ({ connXL(), slotCentre (0).y }).contains (p))
-            || (slotVisible (n - 1) && zone ({ connXR(), slotCentre (n - 1).y }).contains (p));
+        return (inVisible() && zone (inDot()).contains (p)) || (outVisible() && zone (outDot()).contains (p));
     }
     void recColourMenu()
     {
-        const int n = numSlots();
-        const auto near = firstRow == 0 ? Rectangle<float> (connXL() - 24.0f, slotCentre (0).y - 26.0f, 48.0f, 54.0f)
-                                        : Rectangle<float> (connXR() - 24.0f, slotCentre (n - 1).y - 26.0f, 48.0f, 54.0f);
+        const auto d = inVisible() ? inDot() : outDot();
+        const auto near = Rectangle<float> (d.x - 24.0f, d.y - 26.0f, 48.0f, 54.0f);
         auto touched = [this] { recEditMs = Time::getMillisecondCounterHiRes(); askRepaint (screenPx()); };
         openPicker ("Record colour", recColour(), S (near), true,
                     [this, touched] (Colour c) { recCol = c.getARGB(); OctoSettings::setColourOf ("rec", recCol); touched(); },
@@ -742,30 +912,37 @@ private:
     }
     void drawConnections (Graphics& g)
     {
-        const int n = numSlots();
+        buildGrid();
         Path path;
         // lignes de retour : même débord à gauche et à droite des carrés (un demi-écart)
-        const float xL = kColX0 - kTile * 0.5f - (kColPitch - kTile) * 0.5f;
-        const float xR = kColX0 + kColPitch * (float) (kCols - 1) + kTile * 0.5f + (kColPitch - kTile) * 0.5f;
+        const float xL = kColX0 - kColPitch * 0.5f;
+        const float xR = kColX0 + kColPitch * ((float) kCols - 0.5f);
         auto P = [this] (float x, float y) { return S (Point<float> (x, y)); };
-        // entrée
+        const int rows = totalRows();
+        for (int r = 0; r < rows; ++r)
         {
-            const auto c0 = slotCentre (0);
-            path.startNewSubPath (P (xL - 6.0f, c0.y));
-            path.lineTo (S (c0));
+            const float cy = rowCy (r);
+            const bool lastRow = r == rows - 1;
+            path.startNewSubPath (P (r == 0 ? xL - 6.0f : xL, cy));
+            path.lineTo (P (lastRow ? xR + 6.0f : xR, cy));
+            if (! lastRow)
+            {
+                // retour sous la rangée (sous sa dernière voie), puis descente vers la rangée suivante
+                const float ry = cy + kLanePitch * (float) (rowLanes (r) - 1) + 75.0f;
+                path.lineTo (P (xR, ry)); path.lineTo (P (xL, ry)); path.lineTo (P (xL, rowCy (r + 1)));
+            }
         }
-        for (int k = 1; k < n; ++k)
+        // voies des groupes dépliés : du point Y au point M
+        for (auto& gg : gGroups)
         {
-            const auto a = slotCentre (k - 1), b = slotCentre (k);
-            if (k % kCols != 0) { path.lineTo (S (b)); continue; }
-            // retour sous la rangée : au milieu de l'espace libre entre le nom des blocs et le haut des carrés de la rangée suivante
-            const float nameBottom = kTileDy + kTile * 0.5f + 4.0f + 22.0f;
-            const float nextTop = kRowPitch + kTileDy - kTile * 0.5f;
-            const float ry = rowTop ((k - 1) / kCols) + (nameBottom + nextTop) * 0.5f - 8.0f;   // un peu au-dessus du milieu
-            path.lineTo (P (xR, a.y)); path.lineTo (P (xR, ry)); path.lineTo (P (xL, ry)); path.lineTo (P (xL, b.y)); path.lineTo (S (b));
+            if (gg.folded) continue;
+            const auto y0 = nodeY (gg), m0 = nodeM (gg);
+            for (int l = 1; l < gg.lanes; ++l)
+            {
+                const float y = y0.y + kLanePitch * (float) l;
+                path.startNewSubPath (S (y0)); path.lineTo (P (y0.x, y)); path.lineTo (P (m0.x, y)); path.lineTo (S (m0));
+            }
         }
-        const auto last = slotCentre (n - 1);
-        path.lineTo (P (xR + 6.0f, last.y));
         g.setColour (kLine.withAlpha (0.75f));
         g.strokePath (path, PathStrokeType (2.0f * s, PathStrokeType::mitered, PathStrokeType::rounded));
 
@@ -810,8 +987,8 @@ private:
             g.fillEllipse (Rectangle<float> (S (7.0f), S (7.0f)).withCentre (S (dot)));
             if (withRec) glowText ("REC", { dot.x - 22.0f, dot.y + 6.0f, 44.0f, 18.0f });   // même taille que IN / OUT
         };
-        if (firstRow == 0) mark ("IN", { xL - 6.0f, slotCentre (0).y }, true);
-        if (slotVisible (n - 1)) mark ("OUT", { xR + 6.0f, last.y }, false);
+        if (inVisible()) mark ("IN", inDot(), true);
+        if (outVisible()) mark ("OUT", outDot(), false);
     }
 
     void drawBlock (Graphics& g, int slot, const FxInfo& f, Point<float> centre, float alpha, bool ghost)
@@ -883,8 +1060,40 @@ private:
         }
     }
 
+    void drawAddTile (Graphics& g, Point<float> centre, bool hov, const String& label, bool small)
+    {
+        const auto t = S (Rectangle<float> (kTile, kTile).withCentre (centre));
+        g.setColour (kScrBg);
+        g.fillRoundedRectangle (t, S (11.0f));
+        Path dash, outline;
+        outline.addRoundedRectangle (t.reduced (S (1.0f)), S (11.0f));
+        const float dl[2] = { S (5.0f), S (4.0f) };
+        PathStrokeType (S (1.6f)).createDashedStroke (dash, outline, dl, 2);
+        g.setColour (hov ? kAccent : (small ? kAmber.withAlpha (0.65f) : kDim.withAlpha (0.7f)));
+        g.fillPath (dash);
+        const auto cc = t.getCentre();
+        const float a = S (small ? 11.0f : 13.0f);
+        g.drawLine (cc.x - a, cc.y, cc.x + a, cc.y, S (2.6f));
+        g.drawLine (cc.x, cc.y - a, cc.x, cc.y + a, S (2.6f));
+        g.setFont (font (tfMedium, small ? 14.0f : 16.0f));
+        g.drawText (label, S (Rectangle<float> (centre.x - 70.0f, centre.y + kTile * 0.5f + 3.0f, 140.0f, 22.0f)), Justification::centredTop, true);
+    }
+
+    // point Y / M d'un groupe (ambre ; gris quand le groupe est coupé)
+    void drawNode (Graphics& g, Point<float> c, const String& txt, bool on, bool hov)
+    {
+        const auto col = on ? kAmber : kDim;
+        const auto r = S (Rectangle<float> (22.0f, 22.0f).withCentre (c));
+        if (hov) { g.setColour (col.withAlpha (0.18f)); g.fillEllipse (r.expanded (S (5.0f))); }
+        g.setColour (kScrBg); g.fillEllipse (r);
+        g.setColour (col); g.drawEllipse (r, S (1.8f));
+        g.setFont (font (tfBold, 14.0f));
+        g.drawText (txt, r, Justification::centred);
+    }
+
     void drawGrid (Graphics& g)
     {
+        buildGrid();
         const auto& blocks = eng.blocks();
         const auto& fx = eng.chain();
         Graphics::ScopedSaveState ss (g);
@@ -892,52 +1101,91 @@ private:
 
         drawConnections (g);
 
-        // cases vides (repères discrets)
-        for (int k = numSlots(); k < (firstRow + kRows) * kCols; ++k)
+        // cases vides (repères discrets) : fin des rangées, puis rangées vides jusqu'en bas
+        for (int r = firstRow; r < totalRows() + kRows; ++r)
         {
-            if (k / kCols < firstRow) continue;
-            g.setColour (kFaint.withAlpha (0.5f));
-            g.fillEllipse (Rectangle<float> (S (4.0f), S (4.0f)).withCentre (S (slotCentre (k))));
+            if (r < totalRows() ? ! rowVisible (r) : ! rowFits (r)) break;
+            for (int col = r < totalRows() ? gRows[(size_t) r].lastCol + 1 : 0; col < kCols; ++col)
+            {
+                g.setColour (kFaint.withAlpha (0.5f));
+                g.fillEllipse (Rectangle<float> (S (4.0f), S (4.0f)).withCentre (S (Point<float> (kColX0 + kColPitch * (float) col, rowCy (r)))));
+            }
         }
 
         const int dragFrom = dragging ? downSlot : -1;
-        for (int k = 0; k < blocks.size(); ++k)
+        for (size_t k = 0; k < gCells.size(); ++k)
         {
-            if (! slotVisible (k)) continue;
-            drawBlock (g, k, fx.getReference (blocks[k]), slotCentre (k), k == dragFrom ? 0.25f : 1.0f, false);
+            const auto& cell = gCells[k];
+            if (! rowVisible (cell.row)) continue;
+            const auto cc = cellCentre (cell);
+            if (cell.kind == cBlock) drawBlock (g, cell.slot, fx.getReference (blocks[cell.slot]), cc, cell.slot == dragFrom ? 0.25f : 1.0f, false);
+            else if (cell.kind == cAdd) drawAddTile (g, cc, hoverSlot == cell.slot, blocks.isEmpty() ? "Add an effect" : "Add", false);
+            else if (cell.kind == cLaneAdd) drawAddTile (g, cc, hoverLaneAdd == (int) k, String ("Path ") + String::charToString ((juce_wchar) ('A' + cell.lane)), true);
+            else if (cell.kind == cFolded)
+            {
+                // groupe replié : un bloc empilé (premier bloc de la voie B derrière, de la voie A devant)
+                const auto& G = eng.groups()[(size_t) cell.group];
+                auto front = fx.getReference (G.split);
+                auto back = front;
+                if (! G.lanes[0].isEmpty()) front = fx.getReference (G.lanes[0][0]);
+                if (G.lanes.size() > 1 && ! G.lanes[1].isEmpty()) back = fx.getReference (G.lanes[1][0]);
+                front.enabled = back.enabled = G.on;
+                front.name = eng.blockName (G.split);
+                front.guid = G.guid;
+                front.parallel = 0; back.parallel = 0;
+                drawBlock (g, -1, back, cc + Point<float> (7.0f, -7.0f), 0.85f, true);
+                drawBlock (g, cell.slot, front, cc, cell.slot == dragFrom ? 0.25f : 1.0f, false);
+                const auto badge = S (Rectangle<float> (cc.x - 41.0f, cc.y - kTile * 0.5f - 15.0f, 82.0f, 16.0f));
+                g.setColour (G.on ? kAmber : kDim);
+                g.fillRoundedRectangle (badge, S (4.0f));
+                g.setColour (kScrBg);
+                g.setFont (font (tfBold, 11.0f));
+                g.drawText ("|| " + String ((int) G.lanes.size()) + " PATHS", badge, Justification::centred);
+            }
         }
 
-        // case « ajouter »
-        const int add = blocks.size();
-        if (slotVisible (add))
+        // groupes dépliés : points Y / M et lettres des voies
+        bool hovMerge = false;
+        const int hovNode = nodeAt (hoverPos, hovMerge);
+        for (auto& gg : gGroups)
         {
-            const auto t = S (tileRect (add));
-            const bool hov = hoverSlot == add;
-            g.setColour (kScrBg);
-            g.fillRoundedRectangle (t, S (11.0f));
-            Path dash, outline;
-            outline.addRoundedRectangle (t.reduced (S (1.0f)), S (11.0f));
-            const float dl[2] = { S (5.0f), S (4.0f) };
-            PathStrokeType (S (1.6f)).createDashedStroke (dash, outline, dl, 2);
-            g.setColour (hov ? kAccent : kDim.withAlpha (0.7f));
-            g.fillPath (dash);
-            const auto c = t.getCentre();
-            const float a = S (13.0f);
-            g.drawLine (c.x - a, c.y, c.x + a, c.y, S (2.6f));
-            g.drawLine (c.x, c.y - a, c.x, c.y + a, S (2.6f));
-            g.setFont (font (tfMedium, 16.0f));
-            g.drawText (blocks.isEmpty() ? "Add an effect" : "Add", S (Rectangle<float> (slotCentre (add).x - 70.0f, slotCentre (add).y + kTile * 0.5f + 3.0f, 140.0f, 22.0f)),
-                        Justification::centredTop, true);
+            if (gg.folded || ! rowVisible (gg.row)) continue;
+            const bool on = eng.groups()[(size_t) gg.group].on;
+            const auto y0 = nodeY (gg);
+            for (int l = 0; l < gg.lanes; ++l)
+            {
+                const auto pr = S (Rectangle<float> (y0.x + 13.0f, y0.y + kLanePitch * (float) l - 22.0f, 15.0f, 14.0f));
+                g.setColour ((on ? kAmber : kDim).withAlpha (0.16f));
+                g.fillRoundedRectangle (pr, S (3.0f));
+                g.setColour (on ? kAmber : kDim);
+                g.setFont (font (tfBold, 11.0f));
+                g.drawText (String::charToString ((juce_wchar) ('A' + l)), pr, Justification::centred);
+            }
+            drawNode (g, y0, "Y", on, hovNode == gg.group && ! hovMerge);
+            drawNode (g, nodeM (gg), "M", on, hovNode == gg.group && hovMerge);
         }
 
-        // glisser : repère d'insertion + bloc qui suit la souris
+        // glisser : repère d'insertion (ou case de la nouvelle voie) + bloc qui suit la souris
         if (dragging && downSlot >= 0 && downSlot < blocks.size())
         {
-            if (dropPos >= 0)
+            if (dropSplitSlot >= 0 || dropPathGroup >= 0)
             {
-                const auto c = slotCentre (jmin (dropPos, numSlots() - 1)) - Point<float> (kColPitch * 0.5f, 0.0f);
+                const auto t = S (Rectangle<float> (kTile, kTile).withCentre (dropMark));
+                g.setColour (kAmber.withAlpha (0.12f));
+                g.fillRoundedRectangle (t, S (11.0f));
+                Path dash, outline;
+                outline.addRoundedRectangle (t, S (11.0f));
+                const float dl[2] = { S (6.0f), S (4.0f) };
+                PathStrokeType (S (2.0f)).createDashedStroke (dash, outline, dl, 2);
+                g.setColour (kAmber);
+                g.fillPath (dash);
+                g.setFont (font (tfBold, 13.0f));
+                g.drawText (dropSplitSlot >= 0 ? "SPLIT" : "NEW PATH", S (Rectangle<float> (dropMark.x - 60.0f, dropMark.y + kTile * 0.5f + 3.0f, 120.0f, 18.0f)), Justification::centredTop);
+            }
+            else if (dropPos >= 0)
+            {
                 g.setColour (kAccent);
-                g.fillRoundedRectangle (S (Rectangle<float> (5.0f, kTile + 14.0f).withCentre (c)), S (2.5f));
+                g.fillRoundedRectangle (S (Rectangle<float> (5.0f, kTile + 14.0f).withCentre (dropMark)), S (2.5f));
             }
             drawBlock (g, -1, fx.getReference (blocks[downSlot]), dragPos, 0.9f, true);
         }
@@ -947,11 +1195,13 @@ private:
         {
             g.setFont (font (tfBold, 14.0f));
             g.setColour (kDim);
-            const String t = String (firstRow + 1) + "-" + String (jmin (totalRows(), firstRow + kRows)) + " / " + String (totalRows());
+            const String t = String (firstRow + 1) + "-" + String (jmin (totalRows(), firstRow + visibleRows())) + " / " + String (totalRows());
             g.drawText (t, S (Rectangle<float> (kSW - 120.0f, kFooterLine - 20.0f, 112.0f, 18.0f)), Justification::centredRight);
             if (firstRow > 0) g.drawText (CharPointer_UTF8 ("\xe2\x96\xb2"), S (Rectangle<float> (kSW - 30.0f, kGridTop - 6.0f, 24.0f, 18.0f)), Justification::centred);
             if (firstRow < maxFirstRow()) g.drawText (CharPointer_UTF8 ("\xe2\x96\xbc"), S (Rectangle<float> (kSW - 30.0f, kFooterLine - 38.0f, 24.0f, 18.0f)), Justification::centred);
         }
+
+        if (mixGroup >= 0) drawMixer (g);
     }
 
     // ------------------------------------------------------------ mini CHROMA + Semitones (en-tête)
@@ -2690,6 +2940,15 @@ private:
         }
         else if (overlay == Overlay::params)
             for (int k = 0; k < params.size(); ++k) if (paramCell (k).contains (p)) { hp = k; break; }
+        hoverPos = p;
+        int hla = -1, hnk = -1;
+        if (overlay == Overlay::none && eng.isReady())
+        {
+            hla = laneAddAt (p);
+            bool m = false; const int ng = nodeAt (p, m);
+            hnk = ng >= 0 ? ng * 2 + (m ? 1 : 0) : -1;
+        }
+        if (hla != hoverLaneAdd || hnk != hoverNodeKey) { hoverLaneAdd = hla; hoverNodeKey = hnk; askRepaint (screenPx()); }
         if (hb != hoverBtn || hs != hoverSlot || hi != hoverItem || hf != hoverFooter || hp != hoverParam)
         {
             if (hi != hoverItem) { hoverItemMs = Time::getMillisecondCounterHiRes(); tipShown = false; }   // la bulle attend 0,8 s
@@ -2840,8 +3099,41 @@ private:
             else eng.press (ft);
             return;
         }
+        // voies parallèles : mixeur ouvert, points Y / M, case « + » d'une voie vide, groupe replié
+        if (mixGroup >= 0)
+        {
+            if (mixerRect().contains (p)) { mixerDown (p); return; }
+            mixGroup = -1; askRepaint (screenPx());
+            bool m0 = false;
+            if (nodeAt (p, m0) >= 0 && m0) return;              // clic sur M : le mixeur se ferme seulement
+        }
+        {
+            bool isM = false;
+            const int ng = nodeAt (p, isM);
+            if (ng >= 0)
+            {
+                if (e.mods.isPopupMenu()) groupMenu (ng);
+                else if (isM) { mixGroup = ng; askRepaint (screenPx()); }
+                else eng.toggleFold (ng);
+                return;
+            }
+            const int la = laneAddAt (p);
+            if (la >= 0)
+            {
+                const auto cell = gCells[(size_t) la];
+                if (e.mods.isPopupMenu()) groupMenu (cell.group);
+                else openBrowser (eng.laneEndBlock (cell.group, cell.lane));
+                return;
+            }
+        }
         const int slot = slotAt (p);
         const int n = eng.blocks().size();
+        if (isPositiveAndBelow (slot, n) && eng.roleAt (eng.blocks()[slot]) == Routing::split)      // groupe replié
+        {
+            const int gi = eng.groupAt (eng.blocks()[slot]);
+            if (e.mods.isPopupMenu()) groupMenu (gi); else eng.toggleFold (gi);
+            return;
+        }
         if (e.mods.isPopupMenu())
         {
             if (slot >= 0 && slot < n) blockMenu (slot);
@@ -2916,6 +3208,7 @@ private:
     {
         const auto p = toLocal (e.position);
         if (overlay == Overlay::params && paramDrag >= 0) { setParamFromX (paramDrag, p.x); return; }
+        if (mixGroup >= 0 && mixDragLane >= 0) { mixerDrag (p); return; }
         if (downSlot < 0) return;
         if (! dragging && p.getDistanceFrom (downPos) > 7.0f) dragging = true;
         if (dragging)
@@ -2938,6 +3231,7 @@ private:
             askRepaint (r (Rectangle<float> (L::fsSprite, L::fsSprite).withCentre ({ L::fsX[f], L::fsY })).toNearestInt());
         }
         paramDrag = -1;
+        mixDragLane = -1; mixDragWhat = -1;
         if (downSlot >= 0)
         {
             const int slot = downSlot;
@@ -2946,8 +3240,11 @@ private:
             {
                 dragging = false;
                 const int from = slot, to = dropPos;
-                dropPos = -1;
-                if (to >= 0 && to != from && to != from + 1)
+                const int splitAt = dropSplitSlot, pathOf = dropPathGroup;
+                dropPos = -1; dropSplitSlot = -1; dropPathGroup = -1;
+                if (splitAt >= 0) eng.split (eng.blocks()[splitAt], eng.blocks()[from]);          // posé sous un bloc : split
+                else if (pathOf >= 0) eng.addPath (pathOf, eng.blocks()[from]);                     // sous la dernière voie : voie de plus
+                else if (to >= 0 && to != from && to != from + 1)
                     eng.moveBlock (eng.blocks()[from], to > from ? to - 1 : to);
                 askRepaint (screenPx());
                 return;
@@ -2994,6 +3291,7 @@ private:
         if (k == KeyPress::escapeKey && semiOpen) { closeSemiDrum(); return true; }
         if (k == KeyPress::returnKey && semiOpen) { chooseSemi (semiTarget); closeSemiDrum(); return true; }
         if (k == KeyPress::escapeKey && overlay != Overlay::none) { closeOverlay(); return true; }
+        if (k == KeyPress::escapeKey && mixGroup >= 0) { mixGroup = -1; askRepaint (screenPx()); return true; }
         if ((k == KeyPress::deleteKey || k == KeyPress::backspaceKey) && overlay == Overlay::none
             && isPositiveAndBelow (hoverSlot, eng.blocks().size()))
         {
@@ -3147,6 +3445,206 @@ private:
     }
 
     // ------------------------------------------------------------ menus (clic droit)
+    // ------------------------------------------------------------ voies parallèles : menu d'un groupe, mixeur
+    void groupMenu (int g)
+    {
+        if (! isPositiveAndBelow (g, (int) eng.groups().size())) return;
+        const auto& G = eng.groups()[(size_t) g];
+        const String guid = G.guid;
+        PopupMenu m, assign;
+        m.addSectionHeader ("Parallel paths : " + eng.blockName (G.split));
+        m.addItem (1, "Mix the paths (level, pan, phase)...");
+        m.addItem (2, G.on ? "Bypass the group (dry signal)" : "Enable the group");
+        m.addItem (3, eng.isFolded (g) ? "Unfold" : "Fold into one block");
+        m.addSeparator();
+        m.addItem (4, "Add path " + String::charToString ((juce_wchar) ('A' + (int) G.lanes.size())), (int) G.lanes.size() < Routing::kMaxLanes);
+        for (int l = 0; l < (int) G.lanes.size(); ++l)
+            m.addItem (10 + l, "Remove path " + String::charToString ((juce_wchar) ('A' + l)) + (G.lanes[(size_t) l].isEmpty() ? String() : " (and its effects)"));
+        m.addItem (5, "Merge the paths in series");
+        m.addSeparator();
+        for (int k = 0; k < OctopusEngine::kKeys; ++k)
+        {
+            if (k == 4) assign.addSeparator();
+            assign.addItem (20 + k, "Footswitch " + fsLetter (k) + (k == 4 ? "  (A+B)" : k == 5 ? "  (C+D)" : ""), true, eng.isAssigned (k, guid));
+        }
+        m.addSubMenu ("Assign the group to footswitch (STOMP)", assign);
+        SafePointer<PedalView> sp (this);
+        m.showMenuAsync (PopupMenu::Options(), [sp, guid] (int r)
+        {
+            if (sp == nullptr || r <= 0) return;
+            auto& e = sp->eng;
+            int gi = -1;
+            for (int k = 0; k < (int) e.groups().size(); ++k) if (e.groups()[(size_t) k].guid == guid) gi = k;
+            if (gi < 0) return;
+            switch (r)
+            {
+                case 1: sp->mixGroup = gi; sp->askRepaint (sp->screenPx()); break;
+                case 2: e.toggle (e.groups()[(size_t) gi].split); break;
+                case 3: e.toggleFold (gi); break;
+                case 4: e.addPath (gi); break;
+                case 5: e.unsplit (gi); break;
+                default:
+                    if (r >= 10 && r < 10 + Routing::kMaxLanes) e.removePath (gi, r - 10);
+                    else if (r >= 20 && r < 20 + OctopusEngine::kKeys) e.toggleAssign (r - 20, guid);
+                    break;
+            }
+        });
+    }
+
+    // mixeur : sous le point M (ou au-dessus s'il n'y a pas la place)
+    static constexpr float kMixW = 392.0f, kMixRowH = 38.0f;
+    Rectangle<float> mixerRect() const
+    {
+        if (! isPositiveAndBelow (mixGroup, (int) eng.groups().size())) return {};
+        const int n = (int) eng.groups()[(size_t) mixGroup].lanes.size();
+        const float h = 46.0f + kMixRowH * (float) n + 8.0f;
+        Point<float> m { kSW * 0.5f, kGridTop + 20.0f };
+        float below = m.y + 40.0f;
+        if (auto* gg = gridGroup (mixGroup))
+        {
+            if (gg->folded) { const auto* cl = cellOfSlot (eng.blocks().indexOf (eng.groups()[(size_t) mixGroup].split)); if (cl != nullptr) m = cellCentre (*cl); below = m.y + 62.0f; }
+            else { m = nodeM (*gg); below = m.y + kLanePitch * (float) (gg->lanes - 1) + 62.0f; }
+        }
+        float x = jlimit (12.0f, kSW - kMixW - 12.0f, m.x - kMixW * 0.5f);
+        float y = below;
+        if (y + h > kFooterLine - 4.0f) y = jmax (kGridTop - 4.0f, m.y - 30.0f - h);
+        return { x, y, kMixW, h };
+    }
+    Rectangle<float> mixRow (int l) const { const auto r = mixerRect(); return { r.getX(), r.getY() + 42.0f + kMixRowH * (float) l, r.getWidth(), kMixRowH }; }
+    // zones d'une ligne : 0 niveau, 1 pan, 2 phase, 3 mute, 4 valeur (dB) ; 5 bouton fermer (ligne -1)
+    Rectangle<float> mixZone (int l, int what) const
+    {
+        const auto r = mixRow (l);
+        const float y = r.getCentreY();
+        switch (what)
+        {
+            case 0: return { r.getX() + 132.0f, y - 9.0f, 104.0f, 18.0f };
+            case 4: return { r.getX() + 240.0f, y - 9.0f, 50.0f, 18.0f };
+            case 1: return { r.getX() + 294.0f, y - 9.0f, 42.0f, 18.0f };
+            case 2: return { r.getX() + 342.0f, y - 10.0f, 20.0f, 20.0f };
+            case 3: return { r.getX() + 366.0f, y - 10.0f, 20.0f, 20.0f };
+            default: break;
+        }
+        const auto m = mixerRect();
+        return { m.getRight() - 30.0f, m.getY() + 8.0f, 22.0f, 22.0f };
+    }
+
+    void drawMixer (Graphics& g)
+    {
+        if (! isPositiveAndBelow (mixGroup, (int) eng.groups().size())) { mixGroup = -1; return; }
+        const auto& G = eng.groups()[(size_t) mixGroup];
+        const auto r = S (mixerRect());
+        g.setColour (Colours::black.withAlpha (0.45f));
+        g.fillRoundedRectangle (r.translated (0.0f, S (6.0f)).expanded (S (4.0f)), S (14.0f));
+        g.setColour (kScrPanel);
+        g.fillRoundedRectangle (r, S (10.0f));
+        g.setColour (Colour (0xff2a303a));
+        g.drawRoundedRectangle (r, S (10.0f), S (1.0f));
+        const auto m = mixerRect();
+        g.setFont (font (tfBold, 13.0f).withExtraKerningFactor (0.14f));
+        g.setColour (kDim);
+        g.drawText ("MERGE  -  MIX", S (Rectangle<float> (m.getX() + 16.0f, m.getY() + 10.0f, 200.0f, 20.0f)), Justification::centredLeft);
+        {
+            const auto cz = S (mixZone (-1, 5));
+            g.setColour (kDim);
+            g.drawLine (cz.getX() + cz.getWidth() * 0.28f, cz.getY() + cz.getHeight() * 0.28f, cz.getRight() - cz.getWidth() * 0.28f, cz.getBottom() - cz.getHeight() * 0.28f, S (1.6f));
+            g.drawLine (cz.getRight() - cz.getWidth() * 0.28f, cz.getY() + cz.getHeight() * 0.28f, cz.getX() + cz.getWidth() * 0.28f, cz.getBottom() - cz.getHeight() * 0.28f, S (1.6f));
+        }
+        const auto& fx = eng.chain();
+        for (int l = 0; l < (int) G.lanes.size(); ++l)
+        {
+            const auto row = mixRow (l);
+            const bool empty = G.lanes[(size_t) l].isEmpty();
+            const double lev = eng.mixValue (mixGroup, l, Routing::mixLevel), pan = eng.mixValue (mixGroup, l, Routing::mixPan);
+            const bool ph = eng.mixValue (mixGroup, l, Routing::mixPhase) > 0.5, mu = eng.mixValue (mixGroup, l, Routing::mixMute) > 0.5;
+            const auto act = (empty || mu) ? kDim : kAmber;
+            // lettre + nom du premier bloc
+            const auto pr = S (Rectangle<float> (row.getX() + 14.0f, row.getCentreY() - 8.0f, 16.0f, 16.0f));
+            g.setColour (kAmber.withAlpha (0.16f)); g.fillRoundedRectangle (pr, S (3.0f));
+            g.setColour (kAmber); g.setFont (font (tfBold, 12.0f));
+            g.drawText (String::charToString ((juce_wchar) ('A' + l)), pr, Justification::centred);
+            g.setColour (empty ? kDim : kText); g.setFont (font (tfMedium, 15.0f));
+            g.drawText (empty ? String ("(empty)") : FxCat::shortName (fx.getReference (G.lanes[(size_t) l][0]).name),
+                        S (Rectangle<float> (row.getX() + 36.0f, row.getY(), 94.0f, row.getHeight())), Justification::centredLeft, true);
+            // niveau
+            const auto lz = mixZone (l, 0);
+            const float t = (float) jlimit (0.0, 1.0, (lev + 60.0) / 72.0);
+            const auto track = S (Rectangle<float> (lz.getX(), lz.getCentreY() - 2.0f, lz.getWidth(), 4.0f));
+            g.setColour (Colour (0xff2a303a)); g.fillRoundedRectangle (track, S (2.0f));
+            g.setColour (act); g.fillRoundedRectangle (track.withWidth (track.getWidth() * t), S (2.0f));
+            g.setColour (kFaint); g.fillRect (S (Rectangle<float> (lz.getX() + lz.getWidth() * (60.0f / 72.0f) - 0.5f, lz.getCentreY() - 6.0f, 1.0f, 12.0f)));   // 0 dB
+            g.setColour (kText); g.fillEllipse (S (Rectangle<float> (12.0f, 12.0f).withCentre ({ lz.getX() + lz.getWidth() * t, lz.getCentreY() })));
+            g.setColour (kDim); g.setFont (font (tfBold, 13.0f));
+            g.drawText (lev <= -59.9 ? String ("-inf") : (lev > 0.04 ? "+" : "") + String (lev, 1) + " dB", S (mixZone (l, 4)), Justification::centredRight);
+            // pan
+            const auto pz = mixZone (l, 1);
+            const float tp = (float) ((pan + 100.0) / 200.0);
+            g.setColour (Colour (0xff2a303a)); g.fillRoundedRectangle (S (Rectangle<float> (pz.getX(), pz.getCentreY() - 2.0f, pz.getWidth(), 4.0f)), S (2.0f));
+            g.setColour (kFaint); g.fillRect (S (Rectangle<float> (pz.getCentreX() - 0.5f, pz.getCentreY() - 6.0f, 1.0f, 12.0f)));
+            g.setColour (act); g.fillEllipse (S (Rectangle<float> (10.0f, 10.0f).withCentre ({ pz.getX() + pz.getWidth() * tp, pz.getCentreY() })));
+            g.setColour (kDim); g.setFont (font (tfBold, 10.0f));
+            const int pi = roundToInt (pan);
+            g.drawText (pi == 0 ? String ("C") : (pi < 0 ? "L" : "R") + String (std::abs (pi)), S (pz.translated (0.0f, 12.0f)), Justification::centred);
+            // phase / mute
+            auto toggleBox = [&] (Rectangle<float> z, const String& txt, bool on, Colour onCol)
+            {
+                const auto zz = S (z);
+                g.setColour (on ? onCol.withAlpha (0.18f) : Colours::transparentBlack); g.fillRoundedRectangle (zz, S (4.0f));
+                g.setColour (on ? onCol : kFaint); g.drawRoundedRectangle (zz, S (4.0f), S (1.0f));
+                g.setColour (on ? onCol : kDim); g.setFont (font (tfBold, 12.0f));
+                g.drawText (txt, zz, Justification::centred);
+            };
+            toggleBox (mixZone (l, 2), CharPointer_UTF8 ("\xc3\x98"), ph, kAmber);
+            toggleBox (mixZone (l, 3), "M", mu, Colour (0xffff4d4d));
+        }
+    }
+
+    void mixerSet (Point<float> p)
+    {
+        const int l = mixDragLane;
+        if (l < 0) return;
+        if (mixDragWhat == 0)
+        {
+            const auto z = mixZone (l, 0);
+            double v = -60.0 + 72.0 * jlimit (0.0, 1.0, (double) ((p.x - z.getX()) / z.getWidth()));
+            if (std::abs (v) < 0.8) v = 0.0;                               // aimanté sur 0 dB
+            eng.setMix (mixGroup, l, Routing::mixLevel, v);
+        }
+        else if (mixDragWhat == 1)
+        {
+            const auto z = mixZone (l, 1);
+            double v = -100.0 + 200.0 * jlimit (0.0, 1.0, (double) ((p.x - z.getX()) / z.getWidth()));
+            if (std::abs (v) < 8.0) v = 0.0;                               // aimanté au centre
+            eng.setMix (mixGroup, l, Routing::mixPan, v);
+        }
+        askRepaint (screenPx());
+    }
+    void mixerDown (Point<float> p)
+    {
+        if (mixZone (-1, 5).expanded (4.0f).contains (p)) { mixGroup = -1; askRepaint (screenPx()); return; }
+        const int n = isPositiveAndBelow (mixGroup, (int) eng.groups().size()) ? (int) eng.groups()[(size_t) mixGroup].lanes.size() : 0;
+        for (int l = 0; l < n; ++l)
+        {
+            if (mixZone (l, 0).expanded (6.0f, 8.0f).contains (p)) { mixDragLane = l; mixDragWhat = 0; mixerSet (p); return; }
+            if (mixZone (l, 1).expanded (4.0f, 8.0f).contains (p)) { mixDragLane = l; mixDragWhat = 1; mixerSet (p); return; }
+            if (mixZone (l, 4).contains (p)) { eng.setMix (mixGroup, l, Routing::mixLevel, 0.0); askRepaint (screenPx()); return; }
+            for (int w : { 2, 3 })
+                if (mixZone (l, w).expanded (3.0f).contains (p))
+                {
+                    const int what = w == 2 ? Routing::mixPhase : Routing::mixMute;
+                    eng.setMix (mixGroup, l, what, eng.mixValue (mixGroup, l, what) > 0.5 ? 0.0 : 1.0);
+                    askRepaint (screenPx());
+                    return;
+                }
+        }
+    }
+    void mixerDrag (Point<float> p) { mixerSet (p); }
+
+public:
+    void openMixer (int g) { mixGroup = g; askRepaint (screenPx()); }
+    void unfoldAllForTest() {}
+private:
+
     void blockMenu (int slot)
     {
         const int i = eng.blocks()[slot];
@@ -3172,7 +3670,14 @@ private:
             bm.addItem (31, "REAPER bypass (plug-in stops, saves CPU)", true, ! pedal);
             m.addSubMenu ("Bypass mode", bm);
         }
-        m.addItem (4, "Process in parallel with previous", slot > 0, f.parallel > 0);
+        const int gOf = eng.groupAt (i);
+        if (gOf < 0) m.addItem (4, "Split here (parallel paths)");
+        else
+        {
+            const int ln = eng.laneAt (i);
+            m.addItem (8, "Mix the paths...");
+            m.addItem (9, "Remove path " + String::charToString ((juce_wchar) ('A' + jmax (0, ln))) + " (and its effects)");
+        }
         m.addSeparator();
         moveM.addItem (20, "Move left", slot > 0);
         moveM.addItem (21, "Move right", slot < eng.blocks().size() - 1);
@@ -3198,7 +3703,9 @@ private:
                 case 1: e.toggle (idx); break;
                 case 2: sp->openParams (idx); break;
                 case 3: e.openWindow (idx, ! e.chain().getReference (idx).open); break;
-                case 4: e.setParallel (idx, e.chain().getReference (idx).parallel == 0); break;
+                case 4: e.split (idx); break;
+                case 8: if (e.groupAt (idx) >= 0) { sp->mixGroup = e.groupAt (idx); sp->askRepaint (sp->screenPx()); } break;
+                case 9: if (e.groupAt (idx) >= 0) e.removePath (e.groupAt (idx), jmax (0, e.laneAt (idx))); break;
                 case 5: sp->openBrowser (b); break;
                 case 6: sp->openBrowser (b + 1); break;
                 case 7: e.remove (idx); break;
@@ -3567,6 +4074,7 @@ void OctopusEditor::showScreen (int which, int arg)
         case 8: view->openBanks(); view->tunerColourMenu (view->S (PedalView::colourBtnRect (OctopusEngine::kFs))); break;
         case 9: view->openSemiDrum(); break;                                      // tambour de Semitones
         case 10: view->semiTarget = jlimit (0, semi::kCount - 1, view->semiTarget + arg); break;   // molette
+        case 15: view->openMixer (arg); break;   // rendus : mixeur d'un groupe (-1 : fermé)
         case 13: view->recGlowPc = arg; view->askRepaint (view->screenPx()); break;   // rendus : glow de l'effet record
         case 14: view->recColourMenu(); break;
         case 12: view->recPreview = arg == 0 ? -1 : (arg == 3 ? 2 : 1); view->recBlinkOn = arg != 2; view->askRepaint (view->screenPx()); break;   // rendus : 1 = armée (allumé), 2 = armée (éteint), 3 = enregistrement

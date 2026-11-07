@@ -7,6 +7,7 @@
 #include "OctopusEngine.h"
 #include "FxCategory.h"
 #include "OctoSettings.h"
+#include "Routing.h"
 #include <map>
 
 using juce::String;
@@ -28,7 +29,8 @@ struct FakeFx
 static const juce::StringArray kFactoryPresets { "Default", "Bright", "Dark" };
 static const juce::StringArray kUserPresets { "My lead" };
 static juce::File gUserIni;
-struct FakeTrack { String name; std::vector<FakeFx> fx, rec; int recArm = 0; };
+struct FakeTrack { String name; std::vector<FakeFx> fx, rec; int recArm = 0, nchan = 2; };
+static juce::File gResource;              // dossier de ressources de REAPER simulé (effets JS de routage)
 static int gPlayState = 0;
 
 static std::vector<std::unique_ptr<FakeTrack>> gTracks;
@@ -155,10 +157,19 @@ namespace api
     bool TrackFX_SetParamNormalized (void* t, int fx, int p, double v) { auto* f = fxAt (t, fx); if (! f || f->token || p >= (int) f->params.size()) return false; f->params[(size_t) p] = v; return true; }
     int TrackFX_AddByName (void* t, const char* n, bool rec, int inst)
     {
-        if (! gInstalled.contains (String (n))) return -1;
+        const String name (n);
+        const bool js = name.startsWith ("JS:NINE HANDS/Routing/") && gResource.getChildFile ("Effects").getChildFile (name.fromFirstOccurrenceOf ("JS:", false, false)).existsAsFile();
+        if (! js && ! gInstalled.contains (name)) return -1;
         auto& c = rec ? T (t)->rec : T (t)->fx;
         const int at = inst <= -1000 ? juce::jlimit (0, (int) c.size(), -inst - 1000) : (int) c.size();
-        c.insert (c.begin() + at, makeFx (n));
+        auto f = makeFx (n);
+        if (name.contains ("nh_merge"))      // curseurs du JS Merge (valeurs normalisées par défaut)
+        {
+            f.params = { 0.0, 1.0 };
+            for (int l = 0; l < 3; ++l) for (double v : { 60.0 / 72.0, 0.5, 0.0, 0.0, 1.0 }) f.params.push_back (v);
+        }
+        else if (js) f.params.clear();
+        c.insert (c.begin() + at, f);
         return at;
     }
     bool TrackFX_Delete (void* t, int fx) { auto& c = chainOf (t, fx); if (fx < 0 || fx >= (int) c.size()) return false; c.erase (c.begin() + fx); return true; }
@@ -174,7 +185,9 @@ namespace api
         dc.insert (dc.begin() + dfx, f);
     }
     void TrackFX_Show (void* t, int fx, int flag) { if (auto* f = fxAt (t, fx)) f->open = flag == 3; }
-    double GetMediaTrackInfo_Value (void* t, const char* p) { return String (p) == "I_RECARM" ? (double) T (t)->recArm : 0.0; }
+    double GetMediaTrackInfo_Value (void* t, const char* p) { return String (p) == "I_RECARM" ? (double) T (t)->recArm : String (p) == "I_NCHAN" ? (double) T (t)->nchan : 0.0; }
+    bool SetMediaTrackInfo_Value (void* t, const char* p, double v) { if (String (p) == "I_NCHAN") { T (t)->nchan = (int) v; return true; } return false; }
+    const char* GetResourcePath() { static std::string s; s = gResource.getFullPathName().toStdString(); return s.c_str(); }
     int GetPlayStateEx (void*) { return gPlayState; }
     bool GetTrackName (void* t, char* b, int sz) { copyOut (T (t)->name, b, sz); return true; }
     bool ValidatePtr2 (void*, void* p, const char*) { for (auto& tr : gTracks) if (tr.get() == p) return true; return false; }
@@ -191,7 +204,8 @@ namespace api
             for (auto& x : e)
             {
                 auto f = parseFx (x);
-                if (gInstalled.contains (f.name)) tr->fx.push_back (f);      // plugin absent : REAPER ne le charge pas
+                const bool js = f.name.startsWith ("JS:NINE HANDS/Routing/") && gResource.getChildFile ("Effects").getChildFile (f.name.fromFirstOccurrenceOf ("JS:", false, false)).existsAsFile();
+                if (js || gInstalled.contains (f.name)) tr->fx.push_back (f);      // plugin absent : REAPER ne le charge pas
             }
         return true;
     }
@@ -295,7 +309,7 @@ public:
             F(guidToString), F(TrackFX_GetNumParams), F(TrackFX_GetParamName), F(TrackFX_GetFormattedParamValue), F(TrackFX_GetParamNormalized),
             F(TrackFX_SetParamNormalized), F(TrackFX_AddByName), F(TrackFX_Delete), F(TrackFX_CopyToTrack), F(TrackFX_Show), F(GetTrackName),
             F(ValidatePtr2), F(Undo_BeginBlock2), F(Undo_EndBlock2), F(PreventUIRefresh), F(GetTrackStateChunk), F(SetTrackStateChunk),
-            F(InsertTrackInProject), F(DeleteTrack), F(GetTrack), F(CountTracks), F(EnumInstalledFX), F(GetAppVersion), F(GetMediaTrackInfo_Value), F(GetPlayStateEx)
+            F(InsertTrackInProject), F(DeleteTrack), F(GetTrack), F(CountTracks), F(EnumInstalledFX), F(GetAppVersion), F(GetMediaTrackInfo_Value), F(GetPlayStateEx), F(SetMediaTrackInfo_Value), F(GetResourcePath)
             #undef F
         };
         auto it = m.find (name);
@@ -326,6 +340,19 @@ public:
 // ------------------------------------------------------------------ tests
 static int failures = 0;
 static void check (bool ok, const String& what) { std::printf ("%s %s\n", ok ? "  OK  " : "  FAIL", what.toRawUTF8()); if (! ok) ++failures; }
+static String rnames (const FakeTrack& t)      // chaîne avec les repères de voies : < = Split, |B |C, > = Merge
+{
+    juce::StringArray s;
+    for (auto& f : t.fx)
+    {
+        FxInfo fi; fi.name = fi.original = f.name;
+        const int r = Routing::roleOf (fi);
+        s.add (f.token ? String ("[OCTO]") : r == Routing::split ? String ("<") : r == Routing::pathB ? String ("|B") : r == Routing::pathC ? String ("|C")
+               : r == Routing::merge ? String (">") : FxCat::shortName (f.name) + (f.enabled ? "" : "(off)"));
+    }
+    return s.joinIntoString (" ");
+}
+
 static String names (const FakeTrack& t)
 {
     juce::StringArray s;
@@ -534,6 +561,55 @@ int main()
     gParent = nullptr;
     eng.refreshNow();
     check (! eng.isReady(), "piste absente : " + eng.statusText());
+
+    // voies parallèles (split / merge)
+    {
+        gResource = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("octo_sim_reaper");
+        gResource.deleteRecursively(); gResource.createDirectory();
+        gParent = &tr;
+        eng.setMode (OctopusEngine::presetMode);
+        tr.fx.clear(); tr.rec.clear(); tr.nchan = 2;
+        auto o = makeFx ("VST3: Octopus (NINE HANDS | DSP)"); o.token = &token; tr.fx.push_back (o);
+        for (auto* n : { "VST3: Doorn (NINE HANDS | DSP)", "VST3: Pipeline (NINE HANDS | DSP)", "VST3: Holyverb (NINE HANDS | DSP)" }) tr.fx.push_back (makeFx (n));
+        eng.refreshNow();
+        const bool okSplit = eng.split (eng.blocks()[0]);
+        check (okSplit && rnames (tr) == "[OCTO] < Doorn |B > Pipeline Holyverb" && tr.nchan == 8
+               && gResource.getChildFile ("Effects/NINE HANDS/Routing/nh_merge.jsfx").existsAsFile(),
+               "split : Doorn en voie A, voie B vide, piste à 8 canaux, effets JS écrits : " + rnames (tr));
+        check (eng.groups().size() == 1 && eng.groups()[0].lanes.size() == 2 && eng.groups()[0].lanes[1].isEmpty()
+               && tr.fx[4].params[(size_t) Routing::laneParam (1, Routing::mixPresent)] < 0.5, "groupe lu : 2 voies, voie B vide et muette");
+        eng.addFx ({ "VST3: Holyverb (NINE HANDS | DSP)", "" }, eng.laneEndBlock (0, 1));
+        check (rnames (tr) == "[OCTO] < Doorn |B Holyverb > Pipeline Holyverb" && eng.laneAt (4) == 1
+               && tr.fx[5].params[(size_t) Routing::laneParam (1, Routing::mixPresent)] > 0.5, "ajout au bout de la voie B (la voie n'est plus muette) : " + rnames (tr));
+        eng.setMix (0, 1, Routing::mixLevel, -6.0);
+        eng.setMix (0, 0, Routing::mixPan, -30.0);
+        check (std::abs (eng.mixValue (0, 1, Routing::mixLevel) + 6.0) < 0.05 && std::abs (eng.mixValue (0, 0, Routing::mixPan) + 30.0) < 0.5, "mixeur : niveau B -6 dB, pan A L30");
+        eng.toggle (eng.groups()[0].split);
+        check (! eng.groups()[0].on && tr.fx[5].params[(size_t) Routing::pGroupOn] < 0.5 && tr.fx[2].enabled, "groupe coupé : signal sec (curseur Group), les blocs gardent leur état");
+        eng.toggle (eng.groups()[0].split);
+        check (eng.groups()[0].on, "groupe rallumé");
+        eng.addPath (0, eng.blocks()[eng.blocks().size() - 2]);      // Pipeline glissé sous la voie B -> voie C
+        check (rnames (tr) == "[OCTO] < Doorn |B Holyverb |C Pipeline > Holyverb" && eng.groups()[0].lanes.size() == 3
+               && tr.fx[7].params[(size_t) Routing::pPaths] > 0.5, "voie C avec Pipeline : " + rnames (tr));
+        eng.moveBlock (eng.groups()[0].lanes[2][0], eng.blocks().indexOf (eng.groups()[0].lanes[1][0]));
+        check (rnames (tr) == "[OCTO] < Doorn |B Pipeline Holyverb |C > Holyverb", "Pipeline déplacé dans la voie B : " + rnames (tr));
+        eng.save (20);
+        eng.unsplit (0);
+        check (rnames (tr) == "[OCTO] Doorn Pipeline Holyverb Holyverb" && eng.groups().empty(), "voies remises en série : " + rnames (tr));
+        eng.load (20);
+        check (rnames (tr) == "[OCTO] < Doorn |B Pipeline Holyverb |C > Holyverb" && eng.groups().size() == 1 && eng.groups()[0].lanes.size() == 3,
+               "preset rappelé : groupe à 3 voies rétabli : " + rnames (tr));
+        eng.removePath (0, 0);
+        check (rnames (tr) == "[OCTO] < Pipeline Holyverb |B > Holyverb" && eng.groups()[0].lanes.size() == 2 && eng.groups()[0].lanes[1].isEmpty(),
+               "voie A retirée : B devient A, C (vide) devient B : " + rnames (tr));
+        eng.removePath (0, 1);
+        check (rnames (tr) == "[OCTO] Pipeline Holyverb Holyverb" && eng.groups().empty(), "dernière voie retirée : le groupe disparaît : " + rnames (tr));
+        eng.split (eng.blocks()[2], eng.blocks()[0]);                  // Pipeline glissé sous le 2e Holyverb
+        check (rnames (tr) == "[OCTO] Holyverb < Holyverb |B Pipeline >", "glisser un bloc sous un autre : split avec ce bloc en voie B : " + rnames (tr));
+        eng.toggleFold (0);
+        check (eng.isFolded (0) && eng.blockName (eng.groups()[0].split) == "Holyverb || Pipeline", "groupe replié : " + eng.blockName (eng.groups()[0].split));
+        gParent = nullptr;
+    }
 
     // nuancier : les réglages de couleur / glow ne sont écrits sur le disque qu'une fois, à la fermeture
     {

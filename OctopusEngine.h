@@ -62,6 +62,31 @@ public:
     void openWindow (int chainIndex, bool show);
     void setParallel (int chainIndex, bool on);
 
+    // ---- voies parallèles (split / merge, voir Routing.h) : les voies sont les tronçons de la chaîne entre les repères
+    struct Group
+    {
+        juce::String guid;                       // guid du Split : identifie le groupe
+        int split = -1, merge = -1;              // indices REAPER
+        juce::Array<int> markers;                // Path B, Path C
+        std::vector<juce::Array<int>> lanes;     // indices REAPER des effets de chaque voie (A, B, C)
+        bool on = true;                          // groupe actif (sinon signal sec)
+    };
+    const std::vector<Group>& groups() const noexcept { return grp; }
+    int roleAt (int chainIndex) const;            // Routing::Role
+    int groupAt (int chainIndex) const;           // groupe dont cet effet (ou repère) fait partie, -1 sinon
+    int laneAt (int chainIndex) const;            // voie (0 = A) d'un effet d'un groupe, -1 sinon
+    int laneEndBlock (int g, int lane) const;     // position de bloc où insérer pour être à la fin de cette voie
+    juce::String blockName (int chainIndex) const;   // nom court (un groupe : « Genome || Anode »)
+    int blockKind (int chainIndex) const;            // famille (un groupe : celle du premier bloc de la voie A)
+    bool split (int chainIndex, int moving = -1);    // crée un groupe : ce bloc en voie A, voie B vide (ou le bloc 'moving')
+    bool addPath (int g, int moving = -1);           // voie C (vide ou avec le bloc 'moving')
+    bool removePath (int g, int lane);               // retire la voie et ses effets (2 voies : le groupe disparaît)
+    bool unsplit (int g);                            // voies remises en série
+    double mixValue (int g, int lane, int what) const;   // Routing::MixParam, valeurs réelles (dB, pan -100..100, 0 / 1)
+    void setMix (int g, int lane, int what, double value);
+    bool isFolded (int g) const;
+    void toggleFold (int g);
+
     const juce::Array<InstalledFx>& installedList (bool reload = false);
 
     // ---- footswitchs
@@ -168,6 +193,15 @@ private:
     ChainHost& host;
     juce::Array<FxInfo> fx;
     juce::Array<int> blk;
+    std::vector<Group> grp;
+    juce::Array<int> roleOf, groupOf, laneOf;            // par indice REAPER
+    juce::StringArray folded;                            // groupes repliés (guid du Split)
+    static std::vector<Group> parseGroups (const juce::Array<FxInfo>& chain, juce::Array<int>& roles);
+    bool installRouting();
+    int  addRouting (int role, int at);
+    int  indexOfGuid (const juce::String& guid) const;
+    void moveBefore (const juce::String& moving, const juce::String& target);   // place 'moving' juste devant 'target'
+    void syncGroups();
     bool ready = false;
     int recSt = 0;
     juce::String status, track;
