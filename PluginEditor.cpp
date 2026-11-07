@@ -27,8 +27,8 @@ namespace
     constexpr float kGridTop = 106.0f, kRowPitch = 140.0f, kColPitch = 140.0f, kColX0 = (kSW - kColPitch * (float) (kCols - 1)) * 0.5f;   // grille centrée
     constexpr float kTile = 70.0f, kTileDy = 40.0f;              // carré du bloc, centre à rowTop + kTileDy
     // cases des footswitchs : même écart entre elles et avec les bords de l'écran, décollées du bas
-    constexpr float kFooterY = kSH - 77.0f, kFooterH = 58.0f, kFooterGap = 14.0f, kFooterSplit = 12.0f, kFooterW = (kSW - 7.0f * kFooterGap - kFooterSplit) / 6.0f;   // A B C D | E F
-    constexpr float kFooterLine = kSH - 96.0f;                                       // trait au-dessus des cases
+    constexpr float kFooterGap = 14.0f, kFooterH = 58.0f, kFooterY = kSH - kFooterH - kFooterGap, kFooterSplit = 0.0f, kFooterW = (kSW - 7.0f * kFooterGap - kFooterSplit) / 6.0f;   // A-F : même écart entre les cases et avec les bords de l'écran (côtés et bas)
+    constexpr float kFooterLine = kFooterY - 19.0f;                                       // trait au-dessus des cases
     const Rectangle<float> kOverlay (0.0f, kHeaderH, kSW, kSH - kHeaderH);
 
     Image loadPng (const void* d, int n) { return ImageFileFormat::loadFrom (d, (size_t) n).convertedToFormat (Image::ARGB); }
