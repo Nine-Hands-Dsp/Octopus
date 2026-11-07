@@ -74,6 +74,8 @@ void OctopusEngine::refreshNow()
             if (pedal) { const int p = bypassCache[f.guid].param; const bool v = host.getParam (i, p) >= 0.5; f.enabled = inv ? ! v : v; }
         }
     }
+    const int rs = r ? host.recState() : 0;
+    if (rs != recSt) { recSt = rs; ++gen; }
     const auto st = host.statusText();
     const auto tn = r ? host.trackName() : juce::String();
 

@@ -258,6 +258,7 @@ public:
     OctoColourPicker& colourPicker() { return *picker; }
     void dismiss()
     {
+        OctoSettings::flush();                     // réglages de couleur / glow écrits une fois, à la fermeture
         setVisible (false);
         juce::Component::SafePointer<OctoPickerLayer> sp (this);
         juce::MessageManager::callAsync ([sp] { if (sp != nullptr) delete sp.getComponent(); });

@@ -88,6 +88,8 @@ struct ReaperBridge::Api
     void  (*TrackFX_GetUserPresetFilename) (void* track, int fx, char* buf, int sz) = nullptr;
     bool  (*EnumInstalledFX) (int index, const char** nameOut, const char** identOut) = nullptr;
     const char* (*GetAppVersion)() = nullptr;
+    double (*GetMediaTrackInfo_Value) (void* track, const char* parm) = nullptr;
+    int   (*GetPlayStateEx) (void* proj) = nullptr;
 
     bool core() const
     {
@@ -175,6 +177,17 @@ void ReaperBridge::resolve()
     getApi (reaper, a.TrackFX_GetUserPresetFilename, "TrackFX_GetUserPresetFilename");
     getApi (reaper, a.EnumInstalledFX, "EnumInstalledFX");
     getApi (reaper, a.GetAppVersion, "GetAppVersion");
+    getApi (reaper, a.GetMediaTrackInfo_Value, "GetMediaTrackInfo_Value");
+    getApi (reaper, a.GetPlayStateEx, "GetPlayStateEx");
+}
+
+// la piste qui héberge CETTE instance (pas les autres pistes du projet) : armée ? REAPER enregistre-t-il ?
+int ReaperBridge::recState()
+{
+    if (track == nullptr || api->GetMediaTrackInfo_Value == nullptr) return 0;
+    if (api->GetMediaTrackInfo_Value (track, "I_RECARM") < 0.5) return 0;
+    const int ps = api->GetPlayStateEx != nullptr ? api->GetPlayStateEx (project) : 0;   // &4 : enregistrement
+    return (ps & 4) != 0 ? 2 : 1;
 }
 
 juce::String ReaperBridge::reaperVersion()

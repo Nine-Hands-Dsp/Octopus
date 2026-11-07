@@ -6,6 +6,7 @@
 #include "ReaperBridge.h"
 #include "OctopusEngine.h"
 #include "FxCategory.h"
+#include "OctoSettings.h"
 #include <map>
 
 using juce::String;
@@ -27,7 +28,8 @@ struct FakeFx
 static const juce::StringArray kFactoryPresets { "Default", "Bright", "Dark" };
 static const juce::StringArray kUserPresets { "My lead" };
 static juce::File gUserIni;
-struct FakeTrack { String name; std::vector<FakeFx> fx, rec; };
+struct FakeTrack { String name; std::vector<FakeFx> fx, rec; int recArm = 0; };
+static int gPlayState = 0;
 
 static std::vector<std::unique_ptr<FakeTrack>> gTracks;
 static FakeTrack* gParent = nullptr;
@@ -172,6 +174,8 @@ namespace api
         dc.insert (dc.begin() + dfx, f);
     }
     void TrackFX_Show (void* t, int fx, int flag) { if (auto* f = fxAt (t, fx)) f->open = flag == 3; }
+    double GetMediaTrackInfo_Value (void* t, const char* p) { return String (p) == "I_RECARM" ? (double) T (t)->recArm : 0.0; }
+    int GetPlayStateEx (void*) { return gPlayState; }
     bool GetTrackName (void* t, char* b, int sz) { copyOut (T (t)->name, b, sz); return true; }
     bool ValidatePtr2 (void*, void* p, const char*) { for (auto& tr : gTracks) if (tr.get() == p) return true; return false; }
     void Undo_BeginBlock2 (void*) { ++gUndoOpen; }
@@ -291,7 +295,7 @@ public:
             F(guidToString), F(TrackFX_GetNumParams), F(TrackFX_GetParamName), F(TrackFX_GetFormattedParamValue), F(TrackFX_GetParamNormalized),
             F(TrackFX_SetParamNormalized), F(TrackFX_AddByName), F(TrackFX_Delete), F(TrackFX_CopyToTrack), F(TrackFX_Show), F(GetTrackName),
             F(ValidatePtr2), F(Undo_BeginBlock2), F(Undo_EndBlock2), F(PreventUIRefresh), F(GetTrackStateChunk), F(SetTrackStateChunk),
-            F(InsertTrackInProject), F(DeleteTrack), F(GetTrack), F(CountTracks), F(EnumInstalledFX), F(GetAppVersion)
+            F(InsertTrackInProject), F(DeleteTrack), F(GetTrack), F(CountTracks), F(EnumInstalledFX), F(GetAppVersion), F(GetMediaTrackInfo_Value), F(GetPlayStateEx)
             #undef F
         };
         auto it = m.find (name);
@@ -398,6 +402,16 @@ int main()
     check (names (tr) == "[OCTO] > Pipeline > Doorn > ReaEQ > Holyverb", "déplacement de ReaEQ après Doorn : " + names (tr));
     eng.moveBlock (eng.blocks()[0], 99);
     check (names (tr) == "[OCTO] > Doorn > ReaEQ > Holyverb > Pipeline", "déplacement de Pipeline à la fin : " + names (tr));
+    // piste armée : seulement celle d'Octopus compte
+    {
+        eng.refreshNow(); const bool idle = eng.recState() == 0;
+        gTracks.back()->recArm = gTracks.back().get() != &tr ? 1 : 0; gPlayState = 5; eng.refreshNow();
+        const bool other = eng.recState() == 0;
+        tr.recArm = 1; gPlayState = 1; eng.refreshNow(); const bool armed = eng.recState() == 1;
+        gPlayState = 5; eng.refreshNow(); const bool recording = eng.recState() == 2;
+        tr.recArm = 0; gPlayState = 0; for (auto& t : gTracks) t->recArm = 0; eng.refreshNow();
+        check (idle && other && armed && recording && eng.recState() == 0, "piste armée (clignote) / en enregistrement (fixe), autres pistes ignorées");
+    }
     eng.addFx ({ "VST3: Inexistant (X)", "" }, 0);
     check (eng.message().contains ("could not"), "plugin introuvable signalé : " + eng.message());
 
@@ -520,6 +534,18 @@ int main()
     gParent = nullptr;
     eng.refreshNow();
     check (! eng.isReady(), "piste absente : " + eng.statusText());
+
+    // nuancier : les réglages de couleur / glow ne sont écrits sur le disque qu'une fois, à la fermeture
+    {
+        const auto f = OctoSettings::file();
+        const bool existed = f.existsAsFile(); const auto before = f.loadFileAsString();
+        for (int pc = 0; pc <= 200; pc += 10) OctoSettings::setGlowOf ("simTest", pc);     // curseur qu'on fait glisser
+        const bool untouched = f.loadFileAsString() == before && OctoSettings::glowOf ("simTest") == 200;
+        OctoSettings::flush();
+        const bool written = f.loadFileAsString().contains ("simTestGlow=\"200\"");
+        if (existed) f.replaceWithText (before); else f.deleteFile();
+        check (untouched && written, "nuancier : glow gardé en mémoire pendant le glissement, écrit une fois à la fermeture");
+    }
 
     std::printf ("%s\n", failures == 0 ? "TOUS LES TESTS OK" : (String (failures) + " ECHEC(S)").toRawUTF8());
     return failures == 0 ? 0 : 1;

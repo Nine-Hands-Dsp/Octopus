@@ -25,6 +25,7 @@ public:
     juce::String trackName() override;
     bool isInputChain() override { return chainFlag != 0; }
     bool tokenClash() override { return clash; }
+    int recState() override;
     int count() override;
     FxInfo info (int index) override;
     void setEnabled (int index, bool on) override;

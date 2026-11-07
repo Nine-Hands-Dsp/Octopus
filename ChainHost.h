@@ -56,6 +56,8 @@ public:
     virtual juce::String trackName() = 0;
     virtual bool isInputChain() = 0;         // Octopus est dans les effets d'entrée (enregistrement) de la piste
     virtual bool tokenClash() { return false; }
+    // piste d'Octopus : 0 = non armée, 1 = armée (enregistrement prêt), 2 = armée et REAPER enregistre
+    virtual int recState() { return 0; }
 
     // lecture de la chaîne (celle où se trouve Octopus)
     virtual int count() = 0;

@@ -38,6 +38,7 @@ public:
     bool isReady() const noexcept { return ready; }
     juce::String statusText() const { return status; }
     juce::String trackName() const { return track; }
+    int recState() const noexcept { return recSt; }      // 0 = piste non armée, 1 = armée, 2 = en enregistrement
     const juce::Array<FxInfo>& chain() const noexcept { return fx; }
     const juce::Array<int>& blocks() const noexcept { return blk; }      // indices (chaîne REAPER) des blocs affichés, Octopus exclu
     int blockOf (const juce::String& guid) const;                         // position de bloc, -1 si absent
@@ -168,6 +169,7 @@ private:
     juce::Array<FxInfo> fx;
     juce::Array<int> blk;
     bool ready = false;
+    int recSt = 0;
     juce::String status, track;
     int gen = 1, tickCount = 0;
 

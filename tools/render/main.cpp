@@ -144,6 +144,15 @@ int main (int argc, char** argv)
     e.save (3); e.rename (3, "Doom Drop G");
     e.load (0);
     shot ("octopus_preset");
+    // piste armée : IN / OUT / REC rouges (clignotants si armée, fixes en enregistrement)
+    for (int v = 1; v <= 3; ++v) { ed->showScreen (12, v); pump (4); shot (v == 1 ? "octopus_rec_armed_on" : v == 2 ? "octopus_rec_armed_off" : "octopus_rec_recording"); }
+    ed->showScreen (12, 3);
+    for (int gp : { 0, 200 }) { ed->showScreen (13, gp); pump (4); shot ("octopus_rec_glow_" + String (gp)); }
+    ed->showScreen (13, 100); ed->showScreen (14); pump (6); shot ("octopus_rec_picker");
+    for (auto* c : ed->getChildren()) if (auto* l = dynamic_cast<OctoPickerLayer*> (c)) l->dismiss();
+    pump (2);
+    ed->showScreen (12, 0); pump (2);
+
     ed->screenHover ({ 840.0f, 37.0f });                                      // survol de STOMP : orange
     shot ("octopus_stomp_hover");
     ed->screenHover ({ 2.0f, 2.0f });
