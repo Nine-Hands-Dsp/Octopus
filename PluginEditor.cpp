@@ -1040,7 +1040,19 @@ private:
     }
 
     // ---- tambour : presets sur un cylindre vertical, le preset choisi dans la bande du milieu
-    static constexpr float kDrumX = 334.0f, kDrumW = 214.0f, kDrumMidY = 198.9f, kDrumR = 112.9f, kDrumStep = 16.0f;
+    static constexpr float kDrumMidY = 198.9f, kDrumR = 112.9f, kDrumStep = 16.0f;
+    // tambour aligné sur le bouton SEMITONES : la bande de sélection commence au bord gauche du bouton
+    // colonne valeurs + noms centrée sous le bouton SEMITONES ; la bande de sélection l'entoure (12 de marge)
+    float drumNamesW() const
+    {
+        float w = 0.0f;
+        for (int i = 0; i < semi::kCount; ++i) w = jmax (w, unitsOf (font (tfBold, 18.3f), semi::get (i).name));
+        return w;
+    }
+    float drumCx() const { return semiRect().getCentreX(); }
+    float drumContentW() const { return 33.0f + 9.5f + drumNamesW(); }
+    float drumX() const { return drumCx() - drumContentW() * 0.5f; }      // début de la colonne des valeurs
+    Rectangle<float> drumBand() const { return { drumX() - 12.0f, kDrumMidY - 14.85f, drumContentW() + 24.0f, 29.7f }; }
     void openSemiDrum()
     {
         semiTarget = proc.semitonesPreset(); semiPos = (float) semiTarget; hoverDrum = -1;
@@ -1064,7 +1076,7 @@ private:
     float drumY (float d) const { return kDrumMidY + kDrumR * std::sin (jlimit (-5.5f, 5.5f, d) * kDrumStep * MathConstants<float>::pi / 180.0f); }
     int drumItemAt (Point<float> p) const
     {
-        if (p.x < kDrumX || p.x > kDrumX + kDrumW) return -1;
+        if (p.x < drumBand().getX() || p.x > drumBand().getRight()) return -1;
         int best = -1; float bd = 1.0e9f;
         for (int i = 0; i < semi::kCount; ++i)
         {
@@ -1083,11 +1095,12 @@ private:
         // voile sur l'écran (sous l'en-tête) + zone sombre derrière le tambour
         g.setColour (Colour (0xff05070b).withAlpha (0.8f));
         g.fillRect (S (kOverlay));
-        const auto lc = S (Point<float> (kDrumX + kDrumW * 0.5f, kDrumMidY - 6.0f));
+        const auto lc = S (Point<float> (drumCx(), kDrumMidY - 6.0f));
         g.setGradientFill (ColourGradient (Colour (0xff04060a).withAlpha (0.8f), lc, Colour (0xff04060a).withAlpha (0.0f), lc + Point<float> (S (150.0f), 0.0f), true));
         g.fillEllipse (Rectangle<float> (S (300.0f), S (290.0f)).withCentre (lc));
         // bande du milieu
-        const auto band = S (Rectangle<float> (kDrumX + 3.6f, kDrumMidY - 14.85f, kDrumW - 7.2f, 29.7f));
+        const auto band = S (drumBand());
+        const float namesW = drumNamesW();
         const float k = (float) semiGlowPc / 100.0f;
         for (int l = 3; l >= 1; --l)
         {
@@ -1110,11 +1123,11 @@ private:
             const float sc = 1.0f - ad * 0.08f, sy = std::cos (a);
             const auto& p = semi::get (i);
             const bool sel = ad < 0.5f;
-            const auto cy = S (Point<float> (kDrumX + kDrumW * 0.5f, drumY (d)));
+            const auto cy = S (Point<float> (drumCx(), drumY (d)));
             Graphics::ScopedSaveState ss (g);
             g.addTransform (AffineTransform::scale (sc, sc * sy, cy.x, cy.y));
             const float rowH = S (27.3f);
-            const float x0 = S (kDrumX + 17.8f);
+            const float x0 = S (Point<float> (drumX(), 0.0f)).x;      // S (Point) : avec l'origine de l'écran
             g.setFont (font (tfBold, 15.8f));
             g.setColour (col.withAlpha (op * 0.35f));
             g.drawText (semiValue2 (p.semis), Rectangle<float> (x0, cy.y - rowH * 0.5f, S (33.0f), rowH).expanded (S (0.6f), 0.0f), Justification::centredRight);
@@ -1122,17 +1135,20 @@ private:
             g.drawText (semiValue2 (p.semis), Rectangle<float> (x0, cy.y - rowH * 0.5f, S (33.0f), rowH), Justification::centredRight);
             g.setFont (sel ? font (tfBold, 18.3f) : font (tfMedium, 16.7f));
             g.setColour ((sel ? Colours::white : kText).withAlpha (op));
-            g.drawText (p.name, Rectangle<float> (x0 + S (33.0f + 9.5f), cy.y - rowH * 0.5f, S (kDrumW - 17.8f - 42.5f), rowH), Justification::centredLeft, true);
+            g.drawText (p.name, Rectangle<float> (x0 + S (33.0f + 9.5f), cy.y - rowH * 0.5f, S (namesW + 4.0f), rowH), Justification::centredLeft, true);
         }
         // aide : souris + texte
-        const auto mr = S (Rectangle<float> (363.0f, 336.0f, 13.0f, 19.0f));
+        const auto hintF = font (tfBold, 11.6f).withExtraKerningFactor (0.14f);
+        const String hintT = CharPointer_UTF8 ("SCROLL  \xc2\xb7  CLICK TO CHOOSE");
+        const float hx = drumCx() - (13.0f + 6.0f + unitsOf (hintF, hintT)) * 0.5f;      // aide centrée sous le bouton
+        const auto mr = S (Rectangle<float> (hx, 336.0f, 13.0f, 19.0f));
         g.setColour (Colour (0xff9aa4b4));
         g.drawRoundedRectangle (mr, mr.getWidth() * 0.5f, S (1.2f));
         g.setColour (col);
-        g.fillRoundedRectangle (S (Rectangle<float> (368.3f, 339.6f, 2.4f, 5.4f)), S (1.2f));
-        g.setFont (font (tfBold, 11.6f).withExtraKerningFactor (0.14f));
+        g.fillRoundedRectangle (S (Rectangle<float> (hx + 5.3f, 339.6f, 2.4f, 5.4f)), S (1.2f));
+        g.setFont (hintF);
         g.setColour (Colour (0xff9aa4b4));
-        g.drawText (CharPointer_UTF8 ("SCROLL  \xc2\xb7  CLICK TO CHOOSE"), S (Rectangle<float> (382.0f, 336.0f, 200.0f, 19.0f)), Justification::centredLeft);
+        g.drawText (hintT, S (Rectangle<float> (hx + 19.0f, 336.0f, 220.0f, 19.0f)), Justification::centredLeft);
     }
 
     // clic droit sur Semitones : lien avec le preset chargé, couleur et halo
