@@ -58,7 +58,12 @@ def logo(name, x0, y0, x1, y1, op=0.96):
     im = im.resize((int(round((x1 - x0) * AS)), int(round((y1 - y0) * AS))), Image.LANCZOS)
     a = np.asarray(im).astype(np.float64); a[..., 3] *= op
     out.alpha_composite(Image.fromarray(a.astype(np.uint8), "RGBA"), (int(round(x0 * AS)), int(round(y0 * AS))))
-logo("logo_octopus_v003.png", 35.1, 11.7, 200.0, 54.7)
-logo("logo_ninehands.png", 1059.6, 43.8, 1204.9, 56.2)
+# centrés en hauteur entre le bord extérieur du boîtier (0) et le bord extérieur de la lunette (GY0 - 13) ;
+# OCTOPUS réduit à 80 % (132 x 34,4), bord gauche à 35,1 ; NINE HANDS | DSP, bord droit à 1204,9, en bas du logo OCTOPUS
+MID = (GY0 - 13.0) / 2.0
+OW, OH = 164.9 * 0.80, 43.0 * 0.80
+logo("logo_octopus_v003.png", 35.1, MID - OH / 2, 35.1 + OW, MID + OH / 2)
+NW, NH = 145.3, 12.4
+logo("logo_ninehands.png", 1204.9 - NW, MID + OH / 2 - NH, 1204.9, MID + OH / 2)      # bas aligné sur celui du logo OCTOPUS
 out.save(os.path.join(ROOT, "background.png"), optimize=True)
 print("background.png", out.size)

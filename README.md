@@ -130,3 +130,4 @@ v1.8.6 : logo NINE HANDS | DSP 30 % plus petit sur la pédale.
 v1.9.0 : Semitones intégré (transposition -12 à +12 en entrée, bouton à gauche de la bank, tambour vertical des 21 presets, globale ou enregistrée avec un preset, couleur et halo) ; mini CHROMA dans l'en-tête (note qui sort, anneau vert juste / rouge faux, couleurs et halo).
 v1.9.1 : tambour de Semitones centré sous le bouton SEMITONES, valeurs et noms bien dans l'encadré de sélection.
 v1.10.0 : nouveau cadre (plan du 07/11) : façade en alu brossé noir, écran plus grand (1177 x 720), logos OCTOPUS et NINE HANDS | DSP, footswitchs hexagonaux inox, lettres et marquages ] E [ / ] F [ / accordeur repris des SVG fournis ; icône de lampe et famille ampli pour Anode ; mot SEMITONES plus grand.
+v1.10.1 : lettres A-D à mi-distance entre l'écran et les footswitchs ; logo OCTOPUS réduit et centré entre le bord de la pédale et l'écran ; NINE HANDS | DSP aligné sur le bas du logo OCTOPUS.

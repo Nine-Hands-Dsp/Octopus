@@ -32,7 +32,7 @@ namespace OctoLayout
     constexpr float fsRadius = 44.0f;                           // zone cliquable (cercle)
     // lettres A-D (à la place de celles gravées sur la photo) : centre et hauteur de police
     const float ledXs[4] = { 199.8f, 482.8f, 765.8f, 1048.8f };   // lettre centrée sur son footswitch (plan du 07/11)
-    constexpr float ledY = 808.5f, ledDx = 0.0f, letterFont = 20.0f;
+    constexpr float ledY = 813.0f, ledDx = 0.0f, letterFont = 20.0f;   // à mi-chemin entre la lèvre de la lunette (799) et le haut de l'écrou (827)
     constexpr float ledR = 9.0f;
     // logos OCTOPUS et NINE HANDS | DSP : dans background.png (make_frame.py) ; l'ancien logo dessiné par le plugin n'est plus affiché
     constexpr bool drawLogo = false;
