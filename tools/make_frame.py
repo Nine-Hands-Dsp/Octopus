@@ -1,165 +1,64 @@
-# OCTOPUS (NINE HANDS | DSP) : fond de la pédale à partir du visuel fourni (design/frame_photo.jpg, 1415 x 981).
-# 1. les marquages de la photo sont effacés (logos, lettres A-D) en recopiant le brossage horizontal voisin ;
-#    la vitre est vidée (le plugin y dessine son écran) ;
-# 2. 148 colonnes sont retirées en 5 bandes verticales (bords, entre les footswitchs) pour que l'ouverture de l'écran
-#    ait exactement les proportions de l'écran du plugin (1064 x 624) : le brossage horizontal rend les raccords invisibles ;
-# 3. image en 2x, boîtier détouré (coins arrondis), logo NINE HANDS | DSP net (le logo OCTOPUS est dessiné par le plugin).
-# Repère obtenu (unités du plugin = pixels de l'image recadrée) : 1267 x 981. Valeurs reprises dans Layout.h.
+# OCTOPUS (NINE HANDS | DSP) - cadre de la pédale (background.png, 2x) d'après le plan de l'utilisateur (07/11/2026) :
+# boîtier 1249 x 934 à coins arrondis, façade en alu brossé noir (design/brushed_texture.png), arête éclairée en haut
+# à gauche, lunette régulière autour de l'écran, logos OCTOPUS (haut gauche) et NINE HANDS | DSP (haut droite).
+# Les footswitchs (fs_off.png, tools/make_footswitch.py), les lettres A-D et les marquages ] E [ / ] F [ / accordeur
+# sont dessinés par le plugin (ils s'allument). Positions : Layout.h.
 import os
 import numpy as np, cv2
 from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-AS = 2
-src = np.asarray(Image.open(os.path.join(ROOT, "design", "frame_photo.jpg")).convert("RGB")).astype(np.float64)
-H, W = src.shape[:2]
-
-# redressement : la photo est prise un peu en plongée, la pédale y est plus large en bas qu'en haut. Les arêtes claires
-# des côtés (gauche x 28 -> 17, droite x 1387 -> 1399 entre y 40 et y 900) deviennent verticales : chaque ligne est
-# remise à la largeur du milieu de la pédale, autour de son axe.
-def edges(y):
-    return 28.5 - 0.0107 * (y - 40.0), 1387.0 + 0.01325 * (y - 40.0)
-_l0, _r0 = edges(470.0); C0, W0 = (_l0 + _r0) / 2, _r0 - _l0
-_yy, _xx = np.mgrid[0:H, 0:W].astype(np.float32)
-_l, _r = edges(_yy)
-map_x = ((_l + _r) / 2 + (_xx - C0) * (_r - _l) / W0).astype(np.float32)
-src = cv2.remap(src.astype(np.float32), map_x, _yy, cv2.INTER_LANCZOS4, borderMode=cv2.BORDER_REPLICATE).astype(np.float64)
-if os.environ.get("OCTO_MEASURE"):
-    cv2.imwrite("/tmp/frame_rectified.png", np.clip(src[..., ::-1], 0, 255).astype(np.uint8)); raise SystemExit
+AS = 2.0
+W, H = 1249, 934
+CW, CH = int(W * AS), int(H * AS)
+BX0, BY0, BX1, BY1, BR = 0.5, 0.5, W - 0.5, H - 0.5, 24.0             # boîtier
+GX0, GY0, GR = 35.85, 67.2, 7.5                                         # vitre (Layout.h : glass)
+GW = 1176.95; GX1 = GX0 + GW; GY1 = GY0 + 651.0 * GW / 1064.0
 
 def smooth(e0, e1, v):
-    t = np.clip((v - e0) / (e1 - e0), 0, 1)
-    return t * t * (3 - 2 * t)
-
-def patch_rows(img, x0, y0, x1, y1, dx, feather=4, detail=1.0):
-    """ efface un marquage : chaque ligne reçoit le brossage de la même ligne décalée de dx (bords fondus) """
-    yy, xx = np.mgrid[y0 - feather:y1 + feather, x0 - feather:x1 + feather]
-    d = np.minimum.reduce([xx - (x0 - feather), (x1 + feather - 1) - xx, yy - (y0 - feather), (y1 + feather - 1) - yy])
-    w = smooth(0, feather, d.astype(np.float64))[..., None]
-    reg = img[y0 - feather:y1 + feather, x0 - feather:x1 + feather]
-    srcp = img[y0 - feather:y1 + feather, x0 - feather + dx:x1 + feather + dx].copy()
-    # même niveau de lumière que les bords de la zone, ligne par ligne (le reflet du métal varie le long de la façade)
-    rows = slice(y0 - feather, y1 + feather)
-    lev_l = img[rows, x0 - feather - 10:x0 - feather].mean(axis=1)
-    lev_r = img[rows, x1 + feather:x1 + feather + 10].mean(axis=1)
-    lev_l = cv2.GaussianBlur(lev_l, (1, 0), sigmaX=0.1, sigmaY=3).reshape(lev_l.shape) if lev_l.ndim == 2 else lev_l
-    lev_r = cv2.GaussianBlur(lev_r, (1, 0), sigmaX=0.1, sigmaY=3).reshape(lev_r.shape) if lev_r.ndim == 2 else lev_r
-    tx = np.linspace(0, 1, srcp.shape[1])[None, :, None]
-    target = lev_l[:, None, :] * (1 - tx) + lev_r[:, None, :] * tx
-    smean = cv2.GaussianBlur(srcp, (0, 0), sigmaX=40, sigmaY=3)
-    srcp = (srcp - smean) * detail + target
-    img[y0 - feather:y1 + feather, x0 - feather:x1 + feather] = reg * (1 - w) + srcp * w
-
-img = src.copy()
-patch_rows(img, 59, 40, 241, 68, 260)                          # logo NINE HANDS | DSP
-patch_rows(img, 1103, 16, 1356, 90, -258, feather=14, detail=0.8)   # logo OCTOPUS
-# footswitchs de la photo effacés : le plugin dessine ses propres footswitchs inox vus de dessus (fs_off.png).
-# Lumière (basses fréquences) reconstruite autour des trous, brossage (hautes fréquences) repris sur la même ligne
-# à côté du footswitch : aucune rupture de luminosité ni de grain.
-def erase_discs(img, centres, rad, y0, y1, shift):
-    hgt, wid = img.shape[:2]
-    yy_, xx_ = np.mgrid[0:hgt, 0:wid].astype(np.float64)
-    hole = np.zeros((hgt, wid))
-    for cx, cy in centres:
-        hole = np.maximum(hole, 1 - smooth(rad - 22, rad + 8, np.hypot(xx_ - cx, (yy_ - cy) * 0.92)))
-    keep = 1 - hole
-    bl = lambda a: cv2.GaussianBlur(a, (0, 0), sigmaX=45, sigmaY=3)          # lumière : surtout le long des lignes
-    low = bl(img * keep[..., None]) / np.maximum(bl(keep), 1e-3)[..., None]
-    detail = img - low
-    fill = np.zeros_like(img)
-    for cx, cy in centres:
-        dx = shift if cx + shift + rad + 10 < wid - 60 else -shift
-        xs = slice(int(cx - rad - 12), int(cx + rad + 12))
-        fill[y0:y1, xs] = detail[y0:y1, xs.start + dx:xs.stop + dx]
-    w = hole[..., None]
-    out = img.copy()
-    out[y0:y1] = (img * (1 - w) + (low + fill) * w)[y0:y1]
-    return out
-img = img if True else erase_discs(img, [(227.0, 884.0), (545.0, 884.0), (868.0, 883.0), (1187.0, 883.0)], 74.0, 790, 968, 150)
-for cx in (226.5, 543.0, 864.5, 1183.0):                      # lettres A-D gravées (le plugin les dessine, allumées ou non)
-    patch_rows(img, int(cx - 15), 792, int(cx + 15), 822, 70)
-
-# aluminium brossé assombri (demande du 31/10) : la façade garde son brossage et ses reflets, en plus sombre
-DARKEN = 0.78
-img = img * DARKEN
-
-# vitre : vidée (presque noire), coins arrondis comme l'ouverture de la photo
-GX0, GY0, GX1, GY1, GR = 71.0, 108.0, 1345.0, 769.0, 14.0
-yy, xx = np.mgrid[0:H, 0:W].astype(np.float64) + 0.5
+    t = np.clip((v - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t)
 def sd_rr(x, y, x0, y0, x1, y1, r):
     cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
     qx, qy = np.abs(x - cx) - ((x1 - x0) / 2 - r), np.abs(y - cy) - ((y1 - y0) / 2 - r)
     return np.hypot(np.maximum(qx, 0), np.maximum(qy, 0)) + np.minimum(np.maximum(qx, qy), 0) - r
-g = np.clip(0.5 - sd_rr(xx, yy, GX0, GY0, GX1, GY1, GR), 0, 1)[..., None]
-img = img * (1 - g) + np.array([7.0, 8.0, 10.0]) * g
 
-# bandes retirées (de droite à gauche pour garder les positions) : [début, fin) en pixels de la photo
-CUTS = [(101, 119), (364, 401), (686, 724), (1010, 1047), (1290, 1308)]
-BLEND = 8
-for a, b in sorted(CUTS, reverse=True):
-    t = np.linspace(0, 1, BLEND)[None, :, None]
-    mix = img[:, a - BLEND:a] * (1 - t) + img[:, b - BLEND:b] * t
-    img = np.concatenate([img[:, :a - BLEND], mix, img[:, b:]], axis=1)
-removed = sum(b - a for a, b in CUTS)
-W2 = W - removed
-assert img.shape[1] == W2, img.shape
+yy, xx = (np.mgrid[0:CH, 0:CW].astype(np.float64) + 0.5) / AS
+d_box = sd_rr(xx, yy, BX0, BY0, BX1, BY1, BR)
+alpha = np.clip(0.5 - d_box * AS, 0, 1)
+tex = np.asarray(Image.open(os.path.join(ROOT, "design", "brushed_texture.png")).convert("RGB").resize((CW, CH), Image.LANCZOS)).astype(np.float64)
 
-# bas de la pédale raccourci (demande du 31/10) : boîtier jusqu'à y 931 au lieu de 968 (façade générée sous l'écran)
-BOX_BOTTOM, H = 931.0, 944
-img = img[:H]
-# 2x, détourage du boîtier (photo redressée : boîtier x 12..1403, y 3..BOX_BOTTOM, coins de rayon 42)
-big = cv2.resize(img, (W2 * AS, H * AS), interpolation=cv2.INTER_LANCZOS4)
-yy, xx = (np.mgrid[0:H * AS, 0:W2 * AS].astype(np.float64) + 0.5) / AS
-alpha = np.clip(0.5 - sd_rr(xx, yy, 12.0, 3.0, 1403.0 - removed, BOX_BOTTOM, 42.0) * AS, 0, 1)
-
-# façade : la surface plate de la photo (où étaient logos, lettres et footswitchs effacés) est remplacée par un
-# aluminium brossé entièrement généré (tools/brushed_alu.py) : plus aucune tache de retouche. Les arêtes du boîtier
-# et la lèvre de la lunette restent celles de la photo, raccordées en fondu.
-import sys; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from brushed_alu import brushed_alu
-d_box = sd_rr(xx, yy, 12.0, 3.0, 1403.0 - removed, BOX_BOTTOM, 42.0)
-# lunette de l'écran : profil régulier tout autour (la photo avait un reflet granuleux et irrégulier à droite) :
-# d = distance au bord de la vitre ; fente sombre, bord mat en pente, fine gorge, petite lèvre claire, puis la façade
-d_g = sd_rr(xx, yy, GX0, GY0, GX1 - removed, GY1, GR)
-BEZ_OUT = 13.0
-face = smooth(-0.5, 0.8, -d_box) * smooth(BEZ_OUT - 1.0, BEZ_OUT + 0.6, d_g)
-def bezel_profile(d):
-    v = np.full_like(d, 8.0)
-    v = np.where(d > 0.8, 8.0 + 14.0 * smooth(0.8, 2.2, d), v)                     # sortie de la fente
-    v = np.where(d > 2.2, 22.0 + 4.0 * smooth(2.2, 9.0, d), v)                      # flanc mat, un peu plus clair vers l'extérieur
-    v = v - 13.0 * np.exp(-((d - 10.0) / 0.55) ** 2)                               # gorge
-    v = v + 30.0 * np.exp(-((d - 11.6) / 0.6) ** 2)                                # lèvre claire, régulière
-    return v
-bez_zone = smooth(-0.6, 0.0, d_g) * (1 - smooth(BEZ_OUT - 1.0, BEZ_OUT + 0.6, d_g))
-bz = bezel_profile(d_g)[..., None] * np.array([0.95, 0.98, 1.05])
-big = big * (1 - bez_zone[..., None]) + bz * bez_zone[..., None]
-# arête du boîtier : biseau arrondi de 9 unités, éclairé en haut à gauche (reflet fin et vif sur l'arête,
-# flanc opposé plus sombre), comme un boîtier usiné
+# arête du boîtier : biseau arrondi de 9 unités, éclairé en haut à gauche
 hgt = 7.0 * smooth(0.0, 9.0, -d_box)
 gy_, gx_ = np.gradient(cv2.GaussianBlur(hgt, (0, 0), 0.8 * AS), 1.0 / AS)
 nrm = np.dstack([-gx_, -gy_, np.ones_like(hgt)]); nrm /= np.linalg.norm(nrm, axis=2, keepdims=True)
 Lv = np.array([-0.5, -0.62, 0.6]); Lv /= np.linalg.norm(Lv)
 Hv = Lv + np.array([0, 0, 1.0]); Hv /= np.linalg.norm(Hv)
-flat = Lv[2]
-ndl = np.clip((nrm * Lv).sum(2), 0, 1)
-spec = np.clip((nrm * Hv).sum(2), 0, 1) ** 60
-bevel_shade = (0.35 + 0.65 * ndl / flat)[..., None]
-bevel_spec = (spec * 210.0 * smooth(0, 1.5, -d_box))[..., None]
-ref = (face > 0.99) & (yy > 800) & (yy < 820)                      # bande sans objet sous l'écran : niveau de la photo
-level = float(np.median(big[ref].mean(axis=1)))
-alu = brushed_alu(H * AS, W2 * AS, px=AS, seed=5, level=level * 0.80)        # assombri (31/10, 2e fois)
-alu = alu * bevel_shade + bevel_spec * np.array([0.97, 1.0, 1.05])
-big = big * (1 - face[..., None]) + alu * face[..., None]
-out = Image.fromarray(np.dstack([np.clip(big, 0, 255), alpha * 255]).astype(np.uint8), "RGBA")
+ndl = np.clip((nrm * Lv).sum(2), 0, 1); spec = np.clip((nrm * Hv).sum(2), 0, 1) ** 60
+img = tex * (0.35 + 0.65 * ndl / Lv[2])[..., None] + (spec * 210.0 * smooth(0, 1.5, -d_box))[..., None] * np.array([0.97, 1.0, 1.05])
 
-# logo NINE HANDS | DSP net, à la place de celui de la photo : bord gauche à x 64, centré à y 53.5, 30 % plus petit (120 de large)
-logo = Image.open(os.path.join(ROOT, "design", "logo_studio_wiga_blanc.png")).convert("RGBA")
-lw = int(171 * 0.70 * AS); lh = round(logo.height * lw / logo.width)
-logo = logo.resize((lw, lh), Image.LANCZOS)
-la = np.asarray(logo).astype(np.float64); la[..., 3] *= 0.95
-out.alpha_composite(Image.fromarray(la.astype(np.uint8), "RGBA"), (int(64 * AS), int(53.5 * AS) - lh // 2))
+# lunette de l'écran : fente sombre, flanc mat, fine gorge, petite lèvre claire, puis la façade
+d_g = sd_rr(xx, yy, GX0, GY0, GX1, GY1, GR)
+BEZ_OUT = 13.0
+def bezel_profile(d):
+    v = np.full_like(d, 8.0)
+    v = np.where(d > 0.8, 8.0 + 14.0 * smooth(0.8, 2.2, d), v)
+    v = np.where(d > 2.2, 22.0 + 4.0 * smooth(2.2, 9.0, d), v)
+    v = v - 13.0 * np.exp(-((d - 10.0) / 0.55) ** 2)
+    v = v + 30.0 * np.exp(-((d - 11.6) / 0.6) ** 2)
+    return v
+bez = smooth(-0.6, 0.0, d_g) * (1 - smooth(BEZ_OUT - 1.0, BEZ_OUT + 0.6, d_g))
+img = img * (1 - bez[..., None]) + (bezel_profile(d_g)[..., None] * np.array([0.95, 0.98, 1.05])) * bez[..., None]
+g = np.clip(0.5 - d_g * AS, 0, 1)[..., None]
+img = img * (1 - g) + np.array([7.0, 8.0, 10.0]) * g
+out = Image.fromarray(np.dstack([np.clip(img, 0, 255), alpha * 255]).astype(np.uint8), "RGBA")
 
-# même marge que le haut (3) tout autour du boîtier : 9 unités en moins à gauche, image 1249 x 934 (repère de Layout.h)
-out = out.crop((int(9 * AS), 0, int(9 * AS) + int(1249 * AS), int(934 * AS)))
+# logos (tirés des SVG fournis, design/svg) : OCTOPUS en haut à gauche, NINE HANDS | DSP en haut à droite
+def logo(name, x0, y0, x1, y1, op=0.96):
+    im = Image.open(os.path.join(ROOT, "design", name)).convert("RGBA")
+    im = im.resize((int(round((x1 - x0) * AS)), int(round((y1 - y0) * AS))), Image.LANCZOS)
+    a = np.asarray(im).astype(np.float64); a[..., 3] *= op
+    out.alpha_composite(Image.fromarray(a.astype(np.uint8), "RGBA"), (int(round(x0 * AS)), int(round(y0 * AS))))
+logo("logo_octopus_v003.png", 35.1, 11.7, 200.0, 54.7)
+logo("logo_ninehands.png", 1059.6, 43.8, 1204.9, 56.2)
 out.save(os.path.join(ROOT, "background.png"), optimize=True)
-print("background.png", out.size, "repère", W2, "x", H)
+print("background.png", out.size)

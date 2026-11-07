@@ -2,7 +2,7 @@
 
 Plugin VST3 (Windows / macOS) **pour REAPER** : un écran façon multi-effet (inspiré du Quad Cortex mini) qui pilote
 la chaîne d'effets de la piste où il est inséré. Pédale sans jacks qui occupe toute la fenêtre (tailles 50 %, 60 %, 75 %,
-100 % ; taille par défaut au choix dans le menu, 60 % au départ), écran sur presque toute la façade, 4 footswitchs inox surmontés de leur lettre A-D rétroéclairée.
+100 % ; taille par défaut au choix dans le menu, 60 % au départ), écran sur presque toute la façade, 4 footswitchs hexagonaux inox surmontés de leur lettre A-D rétroéclairée.
 
 ## Ce que fait Octopus
 - **L'écran montre la chaîne de la piste** (tous les effets sauf Octopus), en blocs colorés par famille
@@ -129,3 +129,4 @@ v1.8.5 : B+C n'ouvre plus l'accordeur : il se commande par MIDI learn (clic droi
 v1.8.6 : logo NINE HANDS | DSP 30 % plus petit sur la pédale.
 v1.9.0 : Semitones intégré (transposition -12 à +12 en entrée, bouton à gauche de la bank, tambour vertical des 21 presets, globale ou enregistrée avec un preset, couleur et halo) ; mini CHROMA dans l'en-tête (note qui sort, anneau vert juste / rouge faux, couleurs et halo).
 v1.9.1 : tambour de Semitones centré sous le bouton SEMITONES, valeurs et noms bien dans l'encadré de sélection.
+v1.10.0 : nouveau cadre (plan du 07/11) : façade en alu brossé noir, écran plus grand (1177 x 720), logos OCTOPUS et NINE HANDS | DSP, footswitchs hexagonaux inox, lettres et marquages ] E [ / ] F [ / accordeur repris des SVG fournis ; icône de lampe et famille ampli pour Anode ; mot SEMITONES plus grand.

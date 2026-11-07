@@ -20,15 +20,15 @@ namespace
                  kPresetLed (0xff6fc8ff);
 
     // ---- écran : repère local (unités), origine = coin haut gauche de la vitre (1064 x 624)
-    constexpr float kSW = 1064.0f, kSH = 624.0f;
+    constexpr float kSW = 1064.0f, kSH = L::kScreenH;
     constexpr float kHeaderH = 74.0f;
     // 3 rangées visibles ; même espace entre les carrés horizontalement et verticalement (pas de 140 = carré 70 + 70)
     constexpr int kRows = 3, kCols = 7;
     constexpr float kGridTop = 106.0f, kRowPitch = 140.0f, kColPitch = 140.0f, kColX0 = (kSW - kColPitch * (float) (kCols - 1)) * 0.5f;   // grille centrée
     constexpr float kTile = 70.0f, kTileDy = 40.0f;              // carré du bloc, centre à rowTop + kTileDy
     // cases des footswitchs : même écart entre elles et avec les bords de l'écran, décollées du bas
-    constexpr float kFooterY = 547.0f, kFooterH = 58.0f, kFooterGap = 14.0f, kFooterSplit = 12.0f, kFooterW = (kSW - 7.0f * kFooterGap - kFooterSplit) / 6.0f;   // A B C D | E F
-    constexpr float kFooterLine = 528.0f;                                       // trait au-dessus des cases
+    constexpr float kFooterY = kSH - 77.0f, kFooterH = 58.0f, kFooterGap = 14.0f, kFooterSplit = 12.0f, kFooterW = (kSW - 7.0f * kFooterGap - kFooterSplit) / 6.0f;   // A B C D | E F
+    constexpr float kFooterLine = kSH - 96.0f;                                       // trait au-dessus des cases
     const Rectangle<float> kOverlay (0.0f, kHeaderH, kSW, kSH - kHeaderH);
 
     Image loadPng (const void* d, int n) { return ImageFileFormat::loadFrom (d, (size_t) n).convertedToFormat (Image::ARGB); }
@@ -223,7 +223,7 @@ public:
         repaintAskedMs = 0.0;
         g.fillAll (Colours::black);
         g.drawImage (bg.get(), getLocalBounds().toFloat());
-        if (logoImg.isValid())             // logo OCTOPUS à sa taille exacte, calé sur la grille des pixels : net
+        if (L::drawLogo && logoImg.isValid())             // logo OCTOPUS à sa taille exacte, calé sur la grille des pixels : net
         {
             const auto lr = r (Rectangle<float> (L::logoRight - L::logoW - L::logoPad, L::logoCy - L::logoH * 0.5f - L::logoPad,
                                                  L::logoW + 2.0f * L::logoPad, L::logoH + 2.0f * L::logoPad));
@@ -265,50 +265,28 @@ public:
     // entre B et C  — ı|ı — (accordeur). Traits, lettre et pictogramme forment une seule LED : gris gravé éteint,
     // couleur de l'effet commandé allumé (vert de CHROMA pour l'accordeur).
     static constexpr float kMarkW = 1.4f;                 // épaisseur des traits (unités)
-    static Point<float> markCentre (int k) { return { (L::fsX[k] + L::fsX[k + 1]) * 0.5f, L::fsY }; }
-    static Rectangle<float> comboRect (int k) { const auto c = markCentre (k); return { c.x - 100.0f, c.y - 30.0f, 200.0f, 60.0f }; }
+    static Point<float> markCentre (int k) { return k == 0 ? Point<float> (338.5f, 868.05f) : k == 2 ? Point<float> (906.4f, 868.05f) : Point<float> (624.35f, 868.3f); }
+    static Rectangle<float> comboRect (int k) { const auto c = markCentre (k); return k == 1 ? Rectangle<float> (c.x - 30.0f, c.y - 26.0f, 60.0f, 52.0f) : Rectangle<float> (c.x - 104.0f, c.y - 31.0f, 208.0f, 62.0f); }
 
-    // contour en unités, relatif au centre entre les deux footswitchs (relevé sur le dessin fourni)
-    static Path markOutline (int k, bool tunerIcon, float wordW)
+    // marquages du plan du 07/11/2026 (design/svg : E.svg, F.svg, Chroma_octo.svg) : contours pleins, repère SVG 1000 x 500
+    // centré en (500, 250), posés à leur place sur la façade (centre et échelle relevés sur le plan)
+    static const Path& markSvg (int k)
     {
-        Path p;
-        auto poly = [&p] (std::initializer_list<Point<float>> pts)
-        {
-            bool first = true;
-            for (auto q : pts) { if (first) p.startNewSubPath (q); else p.lineTo (q); first = false; }
-        };
-        const float T = 27.0f, st = 16.0f, nt = 4.4f, dx = -2.0f;
-        if (k == 0 || k == 2)
-        {
-            poly ({ { -98.0f + dx, -T }, { -15.8f + dx, -T }, { -15.8f + dx, T }, { -98.0f + dx, T } });          // ]
-            if (k == 0)                                                                                               // E [
-                poly ({ { 102.0f + dx, -T }, { 16.8f + dx, -T }, { 16.8f + dx, -st }, { -3.1f + dx, -st }, { -3.1f + dx, -nt },
-                        { 15.3f + dx, -nt }, { 15.3f + dx, nt }, { -3.1f + dx, nt }, { -3.1f + dx, st }, { 16.8f + dx, st },
-                        { 16.8f + dx, T }, { 102.0f + dx, T } });
-            else                                                                                                      // F [
-                poly ({ { 102.0f + dx, -T }, { 16.8f + dx, -T }, { 16.8f + dx, -st }, { -3.1f + dx, -st }, { -3.1f + dx, -nt },
-                        { 15.3f + dx, -nt }, { 15.3f + dx, nt }, { -3.1f + dx, nt }, { -3.1f + dx, T }, { 102.0f + dx, T } });
-            return p;
-        }
-        if (tunerIcon && wordW >= 0.0f)
-        {
-            static constexpr float hRel[5] = { 0.37f, 0.54f, 1.0f, 0.54f, 0.37f };
-            const float H = 39.0f, step = 11.5f;
-            for (int b = 0; b < 5; ++b)
-                poly ({ { (float) (b - 2) * step, -H * hRel[b] * 0.5f }, { (float) (b - 2) * step, H * hRel[b] * 0.5f } });
-            return p;                                     // le pictogramme seul (la LED) ; ses traits sont dessinés à part, jamais allumés
-        }
-        const float h = tunerIcon ? 35.0f : wordW * 0.5f + 10.0f;  // traits de chaque côté du pictogramme ou du mot
-        poly ({ { -88.0f, 0.0f }, { -h, 0.0f } });
-        poly ({ { h, 0.0f }, { 88.0f, 0.0f } });
-        return p;
+        static const Path e = Drawable::parseSVGPath ("M 900 360.99 L 563.34 360.99 L 563.34 318.8 L 483.57 318.8 L 483.57 265.6 L 554.1 265.6 L 554.1 230.71 L 483.57 230.71 L 483.57 181.21 L 563.34 181.21 L 563.34 139.01 L 900 139.01 L 900 144.77 L 569.1 144.77 L 569.1 186.97 L 489.33 186.97 L 489.33 224.94 L 559.86 224.94 L 559.86 271.36 L 489.33 271.36 L 489.33 313.03 L 569.1 313.03 L 569.1 355.23 L 900 355.23 Z M 436.66 360.99 L 100 360.99 L 100 355.22 L 430.9 355.22 L 430.9 144.77 L 100 144.77 L 100 139.01 L 436.66 139.01 Z");
+        static const Path f = Drawable::parseSVGPath ("M 900 360.99 L 483.57 360.99 L 483.57 265.6 L 554.1 265.6 L 554.1 230.71 L 483.57 230.71 L 483.57 181.21 L 563.34 181.21 L 563.34 139.01 L 900 139.01 L 900 144.77 L 569.1 144.77 L 569.1 186.97 L 489.33 186.97 L 489.33 224.94 L 559.86 224.94 L 559.86 271.36 L 489.33 271.36 L 489.33 355.23 L 900 355.23 Z M 436.66 360.99 L 100 360.99 L 100 355.23 L 430.9 355.23 L 430.9 144.77 L 100 144.77 L 100 139.01 L 436.66 139.01 Z");
+        static const Path t = Drawable::parseSVGPath ("M492.35,417.71V82.29c0-3.34,2.23-6.36,5.49-7.09c4.72-1.07,8.91,2.42,8.91,6.87v335.87 c0,4.45-4.19,7.94-8.91,6.87C494.58,424.07,492.35,421.05,492.35,417.71z M391.55,341.25V161.48c0-3.34,2.23-6.36,5.49-7.09c4.72-1.07,8.91,2.42,8.91,6.87v180.22 c0,4.45-4.19,7.94-8.91,6.87C393.78,347.61,391.55,344.59,391.55,341.25z M290.75,315.92v-129.1c0-3.34,2.23-6.36,5.49-7.09c4.72-1.07,8.91,2.42,8.91,6.87v129.55 c0,4.45-4.19,7.94-8.91,6.87C292.98,322.27,290.75,319.25,290.75,315.92z M694.85,315.92v-129.1c0-3.34,2.23-6.36,5.49-7.09c4.72-1.07,8.91,2.42,8.91,6.87v129.55 c0,4.45-4.19,7.94-8.91,6.87C697.08,322.28,694.85,319.26,694.85,315.92z M594.05,341.25V161.48c0-3.34,2.23-6.36,5.49-7.09c4.72-1.07,8.91,2.42,8.91,6.87v180.22 c0,4.45-4.19,7.94-8.91,6.87C596.28,347.61,594.05,344.59,594.05,341.25z");
+        return k == 0 ? e : k == 2 ? f : t;
     }
+    static Point<float> markPos (int k) { return k == 0 ? Point<float> (338.5f, 868.05f) : k == 2 ? Point<float> (906.4f, 868.05f) : Point<float> (624.35f, 868.3f); }
+    static float markScale (int k) { return k == 1 ? 0.1145f : 0.2554f; }
+    // tunerIcon && wordW < 0 : anciens traits de chaque côté du symbole de l'accordeur (plus dessinés)
     Path markPath (int k, bool tunerIcon, float wordW) const
     {
-        Path stroked;
-        PathStrokeType (kMarkW * s, PathStrokeType::mitered, PathStrokeType::square)
-            .createStrokedPath (stroked, markOutline (k, tunerIcon, wordW), AffineTransform::scale (s).translated (r (markCentre (k))));
-        return stroked;
+        if (k == 1 && tunerIcon && wordW < 0.0f) return {};
+        Path p (markSvg (k));
+        const auto c = markPos (k);
+        p.applyTransform (AffineTransform::translation (-500.0f, -250.0f).scaled (markScale (k)).translated (c).scaled (s));
+        return p;
     }
 
     void drawComboMark (Graphics& g)
@@ -804,7 +782,7 @@ private:
         }
 
         // icône
-        FxCat::drawIcon (g, kind, t.reduced (S (13.0f)), (white ? Colour (0xff1a1d23) : on ? col.brighter (0.35f) : kDim.withAlpha (0.55f)).withAlpha (alpha), S (2.6f));
+        FxCat::drawIcon (g, kind, t.reduced (S (13.0f)), (white ? Colour (0xff1a1d23) : on ? col.brighter (0.35f) : kDim.withAlpha (0.55f)).withAlpha (alpha), S (2.6f), FxCat::iconOf (f.original));
 
         // témoin ON (coin haut droit)
         const auto led = Rectangle<float> (S (8.0f), S (8.0f)).withCentre ({ t.getRight() - S (10.0f), t.getY() + S (10.0f) });
@@ -928,7 +906,7 @@ private:
     static String semiValue2 (int v) { return (v > 0 ? "+" : v < 0 ? "-" : "") + String (std::abs (v)).paddedLeft ('0', 2); }
 
     float unitsOf (const Font& f, const String& t) const { return GlyphArrangement::getStringWidth (f, t) / jmax (0.001f, S (1.0f)); }
-    Font semiLabelFont() const { return font (tfBold, 8.8f).withExtraKerningFactor (0.24f); }
+    Font semiLabelFont() const { return font (tfBold, 11.0f).withExtraKerningFactor (0.18f); }
     Rectangle<float> semiRect() const
     {
         const auto& p = semi::get (proc.semitonesPreset());
@@ -1033,10 +1011,10 @@ private:
         const float tx = b.getX() + 5.3f + 26.0f + 7.1f;
         g.setFont (semiLabelFont());
         g.setColour (Colour (0xff9aa3b2));
-        g.drawText ("SEMITONES", S (Rectangle<float> (tx, b.getY() + 6.0f, b.getRight() - tx - 2.0f, 10.0f)), Justification::centredLeft, false);
+        g.drawText ("SEMITONES", S (Rectangle<float> (tx, b.getY() + 4.5f, b.getRight() - tx - 2.0f, 12.0f)), Justification::centredLeft, false);
         g.setFont (font (tfBold, 13.3f));
         g.setColour (Colour (0xfff2f5f9));
-        g.drawText (p.name, S (Rectangle<float> (tx, b.getY() + 15.0f, b.getRight() - tx - 2.0f, 15.0f)), Justification::centredLeft, true);
+        g.drawText (p.name, S (Rectangle<float> (tx, b.getY() + 16.0f, b.getRight() - tx - 2.0f, 15.0f)), Justification::centredLeft, true);
     }
 
     // ---- tambour : presets sur un cylindre vertical, le preset choisi dans la bande du milieu
@@ -1670,7 +1648,7 @@ private:
         g.setColour (col.withAlpha (0.75f));
         g.drawRoundedRectangle (S (box).reduced (S (0.6f)), S (8.0f), S (1.3f));
         g.fillRoundedRectangle (S (box.withWidth (5.0f).reduced (0.0f, 8.0f).translated (8.0f, 0.0f)), S (2.5f));
-        FxCat::drawIcon (g, kind, S (Rectangle<float> (26.0f, 26.0f).withCentre ({ x + 36.0f, y + 24.0f })), col.brighter (0.3f), S (1.9f));
+        FxCat::drawIcon (g, kind, S (Rectangle<float> (26.0f, 26.0f).withCentre ({ x + 36.0f, y + 24.0f })), col.brighter (0.3f), S (1.9f), FxCat::iconOf (f.name));
         g.setFont (font (tfBold, 17.0f));
         g.setColour (kText);
         g.drawText (FxCat::shortName (f.name), S (Rectangle<float> (x + 58.0f, y + 10.0f, w - 70.0f, 24.0f)), Justification::centredLeft, true);
@@ -1726,7 +1704,7 @@ private:
             const int kind = FxCat::classify (f.name);
             g.setColour (FxCat::colour (kind));
             g.fillRoundedRectangle (ir.withWidth (S (5.0f)), S (2.5f));
-            FxCat::drawIcon (g, kind, Rectangle<float> (S (22.0f), S (22.0f)).withCentre ({ ir.getX() + S (24.0f), ir.getCentreY() }), FxCat::colour (kind).brighter (0.3f), S (1.8f));
+            FxCat::drawIcon (g, kind, Rectangle<float> (S (22.0f), S (22.0f)).withCentre ({ ir.getX() + S (24.0f), ir.getCentreY() }), FxCat::colour (kind).brighter (0.3f), S (1.8f), FxCat::iconOf (f.name));
             g.setFont (font (tfMedium, 17.0f));
             g.setColour (kText);
             g.drawText (FxCat::shortName (f.name), ir.withTrimmedLeft (S (44.0f)).withTrimmedRight (S (234.0f)), Justification::centredLeft, true);
@@ -1846,7 +1824,7 @@ private:
         const auto* f = paramFx();
         if (f == nullptr) return;
         const int kind = FxCat::classify (f->original);
-        FxCat::drawIcon (g, kind, S (Rectangle<float> (16.0f, 86.0f, 32.0f, 32.0f)), FxCat::colour (kind).brighter (0.3f), S (2.0f));
+        FxCat::drawIcon (g, kind, S (Rectangle<float> (16.0f, 86.0f, 32.0f, 32.0f)), FxCat::colour (kind).brighter (0.3f), S (2.0f), FxCat::iconOf (f->original));
         g.setFont (font (tfBold, 21.0f));
         g.setColour (kText);
         const auto title = FxCat::shortName (f->name);

@@ -1,5 +1,6 @@
 #include "../../ColourPicker.h"
 #include "../../OctoSettings.h"
+#include "../../FxCategory.h"
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 using namespace juce;
@@ -551,6 +552,18 @@ int main (int argc, char** argv)
         e.addFx ({ "VST3: Stereo Width (NINE HANDS | DSP)", "" }, 1);
         e.setEnabled (e.blocks()[1], false);
         shot ("octopus_utility_on_off");
+        e.remove (e.blocks()[1]);
+        e.remove (e.blocks()[0]);
+    }
+
+    // Anode : famille ampli, icône de lampe (allumé puis éteint)
+    {
+        e.addFx ({ "VST3: Anode (NINE HANDS | DSP)", "" }, 0);
+        e.addFx ({ "VST3: Anode (NINE HANDS | DSP)", "" }, 1);
+        e.setEnabled (e.blocks()[1], false);
+        check (FxCat::classify ("VST3: Anode (NINE HANDS | DSP)") == FxCat::amp && FxCat::iconOf ("VST3: Anode (NINE HANDS | DSP)") == FxCat::iconTube,
+               "Anode : famille ampli, icône de lampe");
+        shot ("octopus_anode");
         e.remove (e.blocks()[1]);
         e.remove (e.blocks()[0]);
     }

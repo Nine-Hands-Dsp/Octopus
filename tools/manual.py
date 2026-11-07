@@ -16,7 +16,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHOTS = sys.argv[1]
 OUT = sys.argv[2]
-VERSION = "1.9.1"
+VERSION = "1.10.0"
 TMP = os.path.join(os.path.dirname(os.path.abspath(OUT)), "manual_tmp")
 os.makedirs(TMP, exist_ok=True)
 
@@ -28,7 +28,7 @@ ACC = colors.HexColor("#1E9BD0"); DARK = colors.HexColor("#1A1C22"); GREY = colo
 # ---------- capture annotée (repère 1249 x 934 du plugin) ----------
 src = Image.open(os.path.join(SHOTS, "octopus_100pc.png")).convert("RGB")
 k = src.height / 934.0
-marks = [(n, x - 9.0, y) for n, x, y in ((1, 142.2, 101), (2, 283.6, 101), (3, 713.8, 101), (4, 911.1, 101), (5, 1055.6, 101), (6, 1143.0, 101), (7, 190.0, 223.9), (8, 634.5, 411.1), (9, 1161.3, 434.5), (10, 209.3, 688.8), (11, 487.5, 861), (12, 452, 800.5), (13, 465.0, 101), (14, 553.0, 101))]   # repère 1267 -> 1249 (9 de moins à gauche)
+marks = [(n, x, y) for n, x, y in ((1, 110.3, 62.5), (2, 258.1, 62.5), (3, 707.7, 62.5), (4, 913.9, 62.5), (5, 1065.0, 62.5), (6, 1156.3, 62.5), (7, 160.2, 187.8), (8, 624.8, 383.5), (9, 1175.5, 407.9), (10, 180.4, 703.0), (11, 482.5, 868.3), (12, 465.0, 808.5), (13, 447.7, 62.5), (14, 539.6, 62.5))]   # repère 1249 x 934 (cadre du 07/11)
 ann = src.copy(); dr = ImageDraw.Draw(ann)
 fnt = ImageFont.truetype(os.path.join(ROOT, "fonts", "Poppins-Bold.ttf"), 26)
 for n, x, y in marks:
@@ -37,11 +37,11 @@ for n, x, y in marks:
     dr.text((cx, cy + 1), str(n), font=fnt, fill=(10, 80, 120), anchor="mm")
 annotated = os.path.join(TMP, "annotated.png"); ann.save(annotated)
 
-# gros plans de l'écran (vitre : 63, 109, 1125 x 660)
+# gros plans de l'écran (vitre : 36, 67, 1177 x 720)
 def screen_crop(name, out):
     im = Image.open(os.path.join(SHOTS, name)).convert("RGB")
     kk = im.height / 934.0
-    im.crop((int(63 * kk), int(109 * kk), int(1188 * kk), int(769 * kk))).save(os.path.join(TMP, out))
+    im.crop((int(36 * kk), int(67 * kk), int(1213 * kk), int(788 * kk))).save(os.path.join(TMP, out))
     return os.path.join(TMP, out)
 scr_stomp = screen_crop ("octopus_stomp.png", "stomp.png")
 scr_add = screen_crop ("octopus_add_effect.png", "add.png")
@@ -365,7 +365,7 @@ class Cover(Flowable):
         # bloc du bas (remonté depuis le bas du cadre)
         y = 2 * mm
         sw = 30 * mm; sh = sw * sw_ratio
-        c.drawImage(os.path.join(ROOT, "design", "logo_studio_wiga_blanc.png"), (aw - sw) / 2, y, sw, sh, mask="auto")
+        c.drawImage(os.path.join(ROOT, "design", "logo_ninehands.png"), (aw - sw) / 2, y, sw, sh, mask="auto")
         y += sh + 9 * mm
         c.setFont("Pop", 10.5); c.setFillColor(colors.HexColor("#B4BCC6"))
         c.drawCentredString(aw / 2, y, self.t["ver"].replace("&nbsp;", " "))
@@ -373,12 +373,12 @@ class Cover(Flowable):
         c.drawCentredString(aw / 2, y, self.t["sub"].replace("&nbsp;", " "))
         y += 8 * mm
         lw = 80 * mm; lh = lw * oct_ratio
-        c.drawImage(os.path.join(ROOT, "design", "logo_octopus_blanc.png"), (aw - lw) / 2, y, lw, lh, mask="auto")
+        c.drawImage(os.path.join(ROOT, "design", "logo_octopus_v003.png"), (aw - lw) / 2, y, lw, lh, mask="auto")
 
 cover_size = Image.open(cover).size
 cover_pedal_cy = pad + ch / 2.0                                          # centre de la pédale dans l'image de couverture (px)
-_sw = Image.open(os.path.join(ROOT, "design", "logo_studio_wiga_blanc.png")); sw_ratio = _sw.height / _sw.width
-_ol = Image.open(os.path.join(ROOT, "design", "logo_octopus_blanc.png")); oct_ratio = _ol.height / _ol.width
+_sw = Image.open(os.path.join(ROOT, "design", "logo_ninehands.png")); sw_ratio = _sw.height / _sw.width
+_ol = Image.open(os.path.join(ROOT, "design", "logo_octopus_v003.png")); oct_ratio = _ol.height / _ol.width
 
 def section(lang):
     t = T[lang]; f = []

@@ -94,7 +94,7 @@ namespace FxCat
         if (has ({ "tuner", "chroma", "polytune" }) || word ({ "tune" }))                                     return tuner;
         if (has ({ "cabinet", "impulse", "reacab", "cab sim" }) || word ({ "cab", "ir", "irs" }))            return cab;
         if (has ({ "genome", "neural", "archetype", "ampli", "preamp", "guitar rig", "s-gear", "tonex",
-                  "bias fx", "amplitube", "mesa", "marshall", "fortin", "nameless", "helix" })
+                  "bias fx", "amplitube", "mesa", "marshall", "fortin", "nameless", "helix", "anode" })
             || word ({ "amp", "nam", "head", "stack" }))                                                     return amp;
         if (has ({ "ring think", "textur", "freeze", "ebow", "fantomine", "theremin", "granular", "synth",
                   "sitar", "jawari", "freakout", "freqout", "feedback", "infinite" }) || word ({ "arc", "ring" })) return special;
@@ -115,10 +115,33 @@ namespace FxCat
         return other;
     }
 
-    // icône vectorielle du bloc (dans le carré r)
-    inline void drawIcon (juce::Graphics& g, int kind, juce::Rectangle<float> r, juce::Colour c, float stroke)
+    // icônes propres à un plugin (sinon celle de sa famille)
+    enum Icon { iconFamily = 0, iconTube };
+    inline int iconOf (const juce::String& fullName)
+    {
+        return shortName (fullName).toLowerCase().contains ("anode") ? iconTube : iconFamily;
+    }
+
+    // icône vectorielle du bloc (dans le carré r) ; icon : iconOf (nom du plugin)
+    inline void drawIcon (juce::Graphics& g, int kind, juce::Rectangle<float> r, juce::Colour c, float stroke, int icon = iconFamily)
     {
         using namespace juce;
+        if (icon == iconTube)           // Anode : lampe (ampoule à dôme, électrodes, culot et broches), dessinée sur une grille 72 x 72
+        {
+            g.setColour (c);
+            const float k = r.getWidth() / 72.0f;
+            auto P = [&] (float x, float y) { return Point<float> (r.getX() + x * k, r.getY() + y * k); };
+            PathStrokeType st (stroke, PathStrokeType::curved, PathStrokeType::rounded);
+            Path p;
+            p.startNewSubPath (P (24, 52)); p.lineTo (P (24, 24));
+            p.addCentredArc (P (36, 24).x, P (36, 24).y, 12 * k, 12 * k, 0.0f, -MathConstants<float>::halfPi, MathConstants<float>::halfPi);
+            p.lineTo (P (48, 52));
+            p.startNewSubPath (P (30, 44)); p.lineTo (P (30, 30)); p.lineTo (P (42, 30)); p.lineTo (P (42, 44));
+            for (float x : { 28.0f, 36.0f, 44.0f }) { p.startNewSubPath (P (x, 61)); p.lineTo (P (x, 67)); }
+            g.strokePath (p, st);
+            g.drawRoundedRectangle (Rectangle<float> (P (20, 52), P (52, 61)), 2.0f * k, stroke);
+            return;
+        }
         g.setColour (c);
         const auto cx = r.getCentreX(), cy = r.getCentreY(), w = r.getWidth(), h = r.getHeight();
         PathStrokeType st (stroke, PathStrokeType::curved, PathStrokeType::rounded);

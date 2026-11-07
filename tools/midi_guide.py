@@ -14,7 +14,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHOTS, OUT = sys.argv[1], sys.argv[2]
-VERSION = "1.9.1"
+VERSION = "1.10.0"
 TMP = os.path.join(os.path.dirname(os.path.abspath(OUT)), "midi_guide_tmp"); os.makedirs(TMP, exist_ok=True)
 for n, f in (("Pop", "Poppins-Regular"), ("PopM", "Poppins-Medium"), ("PopB", "Poppins-Bold")):
     pdfmetrics.registerFont(TTFont(n, os.path.join(ROOT, "fonts", f + ".ttf")))
@@ -42,11 +42,11 @@ def crop_units(name, box, out):
     return os.path.join(TMP, out)
 combos = Image.open(crop_units("octopus_combos.png", (81, 770, 1171, 934), "combos.png")); d = ImageDraw.Draw(combos)
 kk = combos.width / 1090.0
-for n, ux in ((1, 336), (2, 619), (3, 903)):
+for n, ux in ((1, 338.5), (2, 624.4), (3, 906.4)):
     badge(d, int((ux - 81) * kk), int(18 * kk), n, r=int(17 * kk / 1.4))
 combos_path = os.path.join(TMP, "combos_marked.png"); combos.save(combos_path)
 full_path = crop_units("octopus_combos.png", (0, 0, 1249, 934), "full.png")
-tuner_path = crop_units("octopus_tuner_builtin.png", (63, 109, 1188, 769), "tuner.png")
+tuner_path = crop_units("octopus_tuner_builtin.png", (36, 67, 1213, 788), "tuner.png")
 
 def img(path, width):
     im = Image.open(path); return RLImage(path, width=width, height=width * im.height / im.width)
