@@ -141,6 +141,7 @@ public:
     void setPresetColour (int idx, juce::uint32 c) { presets[(size_t) juce::jlimit (0, kPresets - 1, idx)].colour = c; changed(); }
     static constexpr juce::uint32 kDefaultFsColour = 0xff6fc8ff;
 
+    const juce::StringArray& stompKeys (int fs) const { static const juce::StringArray none; return juce::isPositiveAndBelow (fs, kKeys) ? stompGuids[fs] : none; }
     bool isAssigned (int fs, const juce::String& guid) const { return juce::isPositiveAndBelow (fs, kKeys) && stompGuids[fs].contains (guid); }
     void toggleAssign (int fs, const juce::String& guid);
     void clearAssign (int fs);

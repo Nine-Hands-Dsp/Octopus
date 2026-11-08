@@ -5,6 +5,7 @@
 #include "OctoSettings.h"
 #include "ColourPicker.h"
 #include "Routing.h"
+#include "MenuStyle.h"
 #include <BinaryData.h>
 
 using namespace juce;
@@ -117,6 +118,7 @@ public:
         tfBold    = Typeface::createSystemTypefaceFor (BinaryData::PoppinsBold_ttf, BinaryData::PoppinsBold_ttfSize);
         tfRegular = Typeface::createSystemTypefaceFor (BinaryData::PoppinsRegular_ttf, BinaryData::PoppinsRegular_ttfSize);
         tfMono    = Typeface::createSystemTypefaceFor (BinaryData::IBMPlexMonoSemiBold_ttf, BinaryData::IBMPlexMonoSemiBold_ttfSize);
+        menuLnf.f = menuFonts();
         for (auto& l : ledLevel) l = 0.0f;
 
         styleEditor (search, "Search plug-ins...");
@@ -157,7 +159,7 @@ public:
         startTimerHz (30);
     }
 
-    ~PedalView() override { stopTimer(); proc.setMiniTuner (false); OctoSettings::flush(); }
+    ~PedalView() override { PopupMenu::dismissAllActiveMenus(); stopTimer(); proc.setMiniTuner (false); OctoSettings::flush(); }
 
     // ------------------------------------------------------------ public (outil de rendu, éditeur)
     void openBrowser (int blockPos)
@@ -334,7 +336,7 @@ public:
         m.addSeparator();
         m.addItem (310, "Color & Glow");
         SafePointer<PedalView> sp (this);
-        m.showMenuAsync (PopupMenu::Options(), [sp, k] (int r)
+        styled (m).showMenuAsync (PopupMenu::Options(), [sp, k] (int r)
         {
             if (sp == nullptr || r <= 0) return;
             if (r == 310) { sp->tunerColourMenu (sp->r (comboRect (k))); return; }
@@ -351,6 +353,9 @@ private:
     Image glow[4];
     Colour glowColour[4];
     Typeface::Ptr tfMedium, tfBold, tfRegular;
+    MenuStyle::MenuLnf menuLnf;                                    // apparence des menus clic droit
+    MenuStyle::Fonts menuFonts() const { return { tfRegular, tfMedium, tfBold }; }
+    PopupMenu& styled (PopupMenu& m) { m.setLookAndFeel (&menuLnf); return m; }
     float s = 1.0f;
 
     // anti-gel v2
@@ -1505,7 +1510,7 @@ private:
         m.addSeparator();
         m.addItem (2, "Color & Glow");
         SafePointer<PedalView> sp (this);
-        m.showMenuAsync (PopupMenu::Options(), [sp, cur, linked] (int r)
+        styled (m).showMenuAsync (PopupMenu::Options(), [sp, cur, linked] (int r)
         {
             if (sp == nullptr) return;
             if (r == 1)
@@ -1533,7 +1538,7 @@ private:
         m.addSeparator();
         m.addItem (3, "Open the tuner");
         SafePointer<PedalView> sp (this);
-        m.showMenuAsync (PopupMenu::Options(), [sp] (int r)
+        styled (m).showMenuAsync (PopupMenu::Options(), [sp] (int r)
         {
             if (sp == nullptr || r <= 0) return;
             if (r == 3) { sp->eng.toggleTuner(); return; }
@@ -2322,7 +2327,7 @@ private:
         }
         m.addItem (1 + bl.size(), "At the end of the chain", true, insertPos >= bl.size());
         SafePointer<PedalView> sp (this);
-        m.showMenuAsync (PopupMenu::Options().withTargetScreenArea (localAreaToGlobal (S (insertWhereRect()).toNearestInt())), [sp] (int r)
+        styled (m).showMenuAsync (PopupMenu::Options().withTargetScreenArea (localAreaToGlobal (S (insertWhereRect()).toNearestInt())), [sp] (int r)
         {
             if (sp == nullptr || r <= 0) return;
             sp->insertPos = r - 1;
@@ -2764,7 +2769,7 @@ private:
         m.addItem (1, "Replace it with the current settings");
         m.addItem (2, "Cancel");
         SafePointer<PedalView> sp (this);
-        m.showMenuAsync (PopupMenu::Options(), [sp, existing, name] (int r) { if (sp != nullptr && r == 1) sp->storeUserPreset (existing, name); });
+        styled (m).showMenuAsync (PopupMenu::Options(), [sp, existing, name] (int r) { if (sp != nullptr && r == 1) sp->storeUserPreset (existing, name); });
     }
 
     void storeUserPreset (int index, const String& name)      // index -1 : nouveau
@@ -2797,7 +2802,7 @@ private:
         m.addSeparator();
         m.addItem (4, "Delete");
         SafePointer<PedalView> sp (this);
-        m.showMenuAsync (PopupMenu::Options(), [sp, u] (int r)
+        styled (m).showMenuAsync (PopupMenu::Options(), [sp, u] (int r)
         {
             if (sp == nullptr || ! isPositiveAndBelow (u, (int) sp->upresets.size())) return;
             if (r == 1) sp->loadUserPreset (u);
@@ -3067,7 +3072,7 @@ private:
         m.addSectionHeader ("Reference A");
         for (int hz = 430; hz <= 450; ++hz) m.addItem (hz, "A = " + String (hz) + " Hz", true, proc.chroma().ref == hz);
         SafePointer<PedalView> sp (this);
-        m.showMenuAsync (PopupMenu::Options(), [sp] (int r) { if (sp != nullptr && r >= 430) sp->proc.chromaSetReference (r); });
+        styled (m).showMenuAsync (PopupMenu::Options(), [sp] (int r) { if (sp != nullptr && r >= 430) sp->proc.chromaSetReference (r); });
     }
 
     // presets d'accordage : ceux de CHROMA (favoris, usine par catégorie, perso)
@@ -3104,7 +3109,7 @@ private:
         }
         for (int k = 0; k < cats.size(); ++k) m.addSubMenu (cats[k], menus[(size_t) k], true, nullptr, false);
         SafePointer<PedalView> sp (this);
-        m.showMenuAsync (PopupMenu::Options(), [sp] (int r)
+        styled (m).showMenuAsync (PopupMenu::Options(), [sp] (int r)
         {
             if (sp == nullptr || r <= 0) return;
             sp->proc.chromaSelectTuning (r == 1 ? -1 : r - 1000);
@@ -3856,7 +3861,7 @@ private:
         m.addItem (1, "Yes, save the current chain in " + OctopusEngine::label (idx));
         m.addItem (2, "Cancel");
         SafePointer<PedalView> sp (this);
-        m.showMenuAsync (PopupMenu::Options(), [sp, idx] (int r) { if (sp != nullptr && r == 1) sp->eng.save (idx); });
+        styled (m).showMenuAsync (PopupMenu::Options(), [sp, idx] (int r) { if (sp != nullptr && r == 1) sp->eng.save (idx); });
     }
 
     void saveMenu()
@@ -3878,7 +3883,7 @@ private:
         }
         m.addSubMenu ("Save as...", to);
         SafePointer<PedalView> sp (this);
-        m.showMenuAsync (PopupMenu::Options(), [sp, cur] (int r)
+        styled (m).showMenuAsync (PopupMenu::Options(), [sp, cur] (int r)
         {
             if (sp == nullptr || r <= 0) return;
             if (r == 1) sp->eng.save (cur);
@@ -3919,7 +3924,7 @@ private:
         }
         m.addSubMenu ("Switch path A / B with footswitch (STOMP)", swap);
         SafePointer<PedalView> sp (this);
-        m.showMenuAsync (PopupMenu::Options(), [sp, guid] (int r)
+        styled (m).showMenuAsync (PopupMenu::Options(), [sp, guid] (int r)
         {
             if (sp == nullptr || r <= 0) return;
             auto& e = sp->eng;
@@ -4141,7 +4146,7 @@ private:
         m.addItem (7, "Remove " + FxCat::shortName (f.name));
         SafePointer<PedalView> sp (this);
         const String guid = f.guid;
-        m.showMenuAsync (PopupMenu::Options(), [sp, slot, guid] (int r)
+        styled (m).showMenuAsync (PopupMenu::Options(), [sp, slot, guid] (int r)
         {
             if (sp == nullptr || r <= 0) return;
             auto& e = sp->eng;
@@ -4180,7 +4185,7 @@ private:
         m.addItem (3, "Banks...");
         addSizeMenu (m);
         SafePointer<PedalView> sp (this);
-        m.showMenuAsync (PopupMenu::Options(), [sp, blockPos] (int r)
+        styled (m).showMenuAsync (PopupMenu::Options(), [sp, blockPos] (int r)
         {
             if (sp == nullptr) return;
             if (r == 1) sp->openBrowser (blockPos);
@@ -4202,18 +4207,23 @@ private:
     void footswitchMenu (int f)
     {
         PopupMenu m, assign;
-        m.addSectionHeader ("Footswitch " + fsLetter (f) + (f == 4 ? "  (double press A+B)" : f == 5 ? "  (double press C+D)" : ""));
         const int idx = eng.bank() * OctopusEngine::kSlots + f;
+        // en-tête : pastille de la lettre (couleur du footswitch) + mode et bank
+        m.addCustomItem (9001, std::make_unique<MenuStyle::FsHeader> (menuFonts(), fsLetter (f),
+                             "Footswitch " + fsLetter (f) + (f == 4 ? "  (A+B)" : f == 5 ? "  (C+D)" : ""),
+                             String (eng.mode() == OctopusEngine::stompMode ? "STOMP" : "PRESET") + String (CharPointer_UTF8 (" \xc2\xb7 bank ")) + String (eng.bank() + 1).paddedLeft ('0', 2),
+                             f < 4 ? Colour (eng.fsColour (f)) : kAccent), nullptr, "Footswitch " + fsLetter (f));
+        m.addSeparator();
         m.addItem (1, "Save the current chain in " + OctopusEngine::label (idx), eng.isReady());
         m.addItem (2, "Load " + OctopusEngine::label (idx), eng.preset (idx).saved && eng.isReady());
         m.addSeparator();
-        for (int k = 0; k < eng.blocks().size(); ++k)
-        {
-            const auto& fx = eng.chain().getReference (eng.blocks()[k]);
-            assign.addItem (100 + k, FxCat::shortName (fx.name), true, eng.isAssigned (f, fx.guid));
-        }
-        if (eng.blocks().isEmpty()) assign.addItem (99, "(no block in the chain)", false);
-        m.addSubMenu ("STOMP : blocks switched by " + fsLetter (f), assign);
+        // STOMP : grille de tuiles des blocs, on coche / décoche plusieurs blocs sans que le menu se ferme
+        SafePointer<PedalView> spg (this);
+        assign.addCustomItem (9002, std::make_unique<MenuStyle::BlockGrid> (eng, menuFonts(), f, [spg] { if (spg != nullptr) spg->askRepaint (spg->getLocalBounds()); }),
+                              nullptr, "Blocks");
+        int nAssigned = 0;
+        for (auto& g : eng.stompKeys (f)) if (eng.blockOf (g) >= 0) ++nAssigned;
+        m.addSubMenu ("STOMP : blocks switched by " + fsLetter (f) + (nAssigned > 0 ? "  (" + String (nAssigned) + ")" : String()), assign);
         m.addItem (3, "STOMP : clear assignment", true);
         m.addSeparator();
         if (f < 4) addLearnItems (m, f);
@@ -4229,7 +4239,7 @@ private:
         m.addItem (395, "Color & Glow");                // couleur du footswitch et opacité du halo (pas de taille du plugin ici)
         const auto near = fsMenuNear (f);
         SafePointer<PedalView> sp (this);
-        m.showMenuAsync (PopupMenu::Options(), [sp, f, idx, near] (int r)
+        styled (m).showMenuAsync (PopupMenu::Options(), [sp, f, idx, near] (int r)
         {
             if (sp == nullptr || r <= 0) return;
             auto& e = sp->eng;
@@ -4237,9 +4247,54 @@ private:
             if (r == 1) sp->confirmSave (idx);
             else if (r == 2) e.load (idx);
             else if (r == 3) e.clearAssign (f);
-            else if (r >= 100 && r < 100 + e.blocks().size()) e.toggleAssign (f, e.chain().getReference (e.blocks()[r - 100]).guid);
             else sp->handleMidi (r);
         });
+    }
+    // outil de rendu : le menu du footswitch f ouvert sur « STOMP » avec sa grille (dessiné comme le vrai, avec menuLnf)
+    Image menuPreview (int f)
+    {
+        using namespace MenuStyle;
+        const float sc = 2.0f;
+        const int mw = 330, gw = BlockGrid::kW;
+        BlockGrid grid (eng, menuFonts(), f, {});
+        int gwi = 0, ghe = 0; grid.getIdealSize (gwi, ghe);
+        FsHeader head (menuFonts(), fsLetter (f), "Footswitch " + fsLetter (f),
+                       String (eng.mode() == OctopusEngine::stompMode ? "STOMP" : "PRESET") + String (CharPointer_UTF8 (" \xc2\xb7 bank ")) + String (eng.bank() + 1).paddedLeft ('0', 2),
+                       f < 4 ? Colour (eng.fsColour (f)) : MenuStyle::kAccent);
+        struct It { String t; bool sep = false, sub = false, hi = false, tick = false, on = true; };
+        const int idx = eng.bank() * OctopusEngine::kSlots + f;
+        int nA = 0; for (auto& g : eng.stompKeys (f)) if (eng.blockOf (g) >= 0) ++nA;
+        std::vector<It> items { { "", true }, { "Save the current chain in " + OctopusEngine::label (idx) }, { "Load " + OctopusEngine::label (idx), false, false, false, false, eng.preset (idx).saved },
+                                { "", true }, { "STOMP : blocks switched by " + fsLetter (f) + (nA > 0 ? "  (" + String (nA) + ")" : String()), false, true, true },
+                                { "STOMP : clear assignment" }, { "", true }, { "MIDI Learn : " + OctopusEngine::targetName (f) + " (none)" }, { "Clear MIDI", false, false, false, false, false },
+                                { "MIDI footswitch latching (127 / 0 alternately)" }, { "", true }, { "MIDI", false, true }, { "", true }, { "Color & Glow" } };
+        const int bd = menuLnf.getPopupMenuBorderSize();
+        int mh = bd + 52;
+        for (auto& i : items) mh += i.sep ? 11 : 32;
+        mh += bd;
+        int stompY = bd + 52; for (auto& i : items) { if (i.hi) break; stompY += i.sep ? 11 : 32; }
+        const int gx = mw + 6, gy = jmax (0, stompY - bd - 4);
+        const int W = gx + gw + 2 * bd + 20, H = jmax (mh, gy + ghe + 2 * bd) + 20;
+        Image img (Image::ARGB, roundToInt (W * sc), roundToInt (H * sc), true);
+        Graphics g (img);
+        g.fillAll (Colour (0xff08090c));
+        g.addTransform (AffineTransform::scale (sc).translated (10.0f * sc, 10.0f * sc));
+        menuLnf.drawPopupMenuBackground (g, mw, mh);
+        head.setSize (mw - 2 * bd, 52);
+        { Graphics::ScopedSaveState ss (g); g.addTransform (AffineTransform::translation ((float) bd, (float) bd)); head.paintEntireComponent (g, false); }
+        int y = bd + 52;
+        for (auto& i : items)
+        {
+            const int h = i.sep ? 11 : 32;
+            menuLnf.drawPopupMenuItem (g, { bd, y, mw - 2 * bd, h }, i.sep, i.on, i.hi, i.tick, i.sub, i.t, {}, nullptr, nullptr);
+            y += h;
+        }
+        g.addTransform (AffineTransform::translation ((float) gx, (float) gy));
+        menuLnf.drawPopupMenuBackground (g, gw + 2 * bd, ghe + 2 * bd);
+        grid.setSize (gw, ghe);
+        g.addTransform (AffineTransform::translation ((float) bd, (float) bd));
+        grid.paintEntireComponent (g, false);
+        return img;
     }
     // où ouvrir le nuancier d'un footswitch : près de son footswitch (A-D), de son marquage (E / F)
     Rectangle<float> fsMenuNear (int f) const
@@ -4288,7 +4343,7 @@ private:
         midiSubmenu (m);
         addSizeMenu (m);
         SafePointer<PedalView> sp (this);
-        m.showMenuAsync (PopupMenu::Options(), [sp] (int r) { if (sp != nullptr && ! sp->handleMidi (r)) sp->handleSize (r); });
+        styled (m).showMenuAsync (PopupMenu::Options(), [sp] (int r) { if (sp != nullptr && ! sp->handleMidi (r)) sp->handleSize (r); });
     }
 
     void addSizeMenu (PopupMenu& m)
@@ -4581,3 +4636,4 @@ int OctopusEditor::screenUserPreset (int op, const String& arg)
     return (int) v.upresets.size();
 }
 void OctopusEditor::screenTuningMenu() { view->tuningMenu(); }
+juce::Image OctopusEditor::menuPreview (int f) { return view->menuPreview (f); }

@@ -27,6 +27,7 @@ public:
     // presets utilisateur du plugin affiché (0 = saisie du nom, 1 = enregistrer sous ce nom, 2 = charger le n-ième, 3 = tout effacer) ; renvoie leur nombre
     int  screenUserPreset (int op, const juce::String& arg);
     void screenTuningMenu();             // ouvre le menu des accordages de CHROMA
+    juce::Image menuPreview (int footswitch);   // menu clic droit du footswitch, ouvert sur STOMP (grille des blocs)
 
 private:
     friend class PedalView;              // son timer surveille le moteur de rendu (anti-gel v2)

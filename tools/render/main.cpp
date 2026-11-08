@@ -172,6 +172,15 @@ int main (int argc, char** argv)
         e.rename (14, "Stack Amps");
         e.save (14);
         shot ("octopus_split");
+        {   // menu clic droit du footswitch A : grille des blocs (A <-> B du groupe + Holyverb cochés)
+            e.toggleAssign (0, e.swapKeyOf (0));
+            e.toggleAssign (0, e.chain().getReference (idxOf ("Holyverb")).guid);
+            auto img = ed->menuPreview (0);
+            File f (out + "/octopus_menu_footswitch.png"); f.deleteFile();
+            FileOutputStream os (f); PNGImageFormat().writeImageToStream (img, os);
+            e.toggleAssign (0, e.swapKeyOf (0));
+            e.toggleAssign (0, e.chain().getReference (idxOf ("Holyverb")).guid);
+        }
         // footswitch A : passer de la voie A à la voie B (et retour)
         e.toggleAssign (0, e.swapKeyOf (0));
         e.setMode (OctopusEngine::stompMode);
