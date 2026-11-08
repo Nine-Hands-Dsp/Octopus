@@ -1600,7 +1600,8 @@ private:
     {
         std::vector<Btn> v;
         if (overlay == Overlay::none) return v;
-        v.push_back ({ { 1008.0f, 84.0f, 40.0f, 36.0f }, bClose, CharPointer_UTF8 ("\xe2\x9c\x95") });   // (navigateur : 1008, à côté de rescan)
+        v.push_back ({ overlay == Overlay::browser ? Rectangle<float> (1012.0f, kRowY, 36.0f, kRowH) : Rectangle<float> (1008.0f, 84.0f, 40.0f, 36.0f),
+                       bClose, CharPointer_UTF8 ("\xe2\x9c\x95") });
         if (overlay == Overlay::browser)
         {
             // onglets des filtres (texte + nombre, souligné quand actif)
@@ -1613,11 +1614,11 @@ private:
             }
             // ligne du titre : emplacement (menu), tri, sélection, ADD, rescan, fermer
             v.push_back ({ insertWhereRect(), bInsertWhere, insertWhereText() });
-            v.push_back ({ { kSortX, 85.0f, 62.0f, 34.0f }, bSortAZ, "A - Z", ! browserByType });
-            v.push_back ({ { kSortX + 62.0f, 85.0f, 62.0f, 34.0f }, bSortType, "TYPE", browserByType });
+            v.push_back ({ { kSortX, kRowY - 1.0f, 62.0f, kRowH + 2.0f }, bSortAZ, "A - Z", ! browserByType });
+            v.push_back ({ { kSortX + 62.0f, kRowY - 1.0f, 62.0f, kRowH + 2.0f }, bSortType, "TYPE", browserByType });
             if (picked.size() > 0) v.push_back ({ selPillRect(), bClearPicked, String (picked.size()) + " selected", false, true });
-            v.push_back ({ { 852.0f, 84.0f, 102.0f, 36.0f }, bAddPicked, picked.isEmpty() ? String ("ADD") : "ADD " + String (picked.size()), picked.size() > 0, picked.size() > 0 });
-            v.push_back ({ { 962.0f, 84.0f, 40.0f, 36.0f }, bReload, {} });
+            v.push_back ({ { 862.0f, kRowY, 102.0f, kRowH }, bAddPicked, picked.isEmpty() ? String ("ADD") : "ADD " + String (picked.size()), picked.size() > 0, picked.size() > 0 });
+            v.push_back ({ { 970.0f, kRowY, 36.0f, kRowH }, bReload, {} });
         }
         else if (overlay == Overlay::params)
         {
@@ -1929,9 +1930,9 @@ private:
         g.setColour (kText);
         if (overlay == Overlay::browser)
         {
-            g.drawText ("ADD AN EFFECT", S (Rectangle<float> (16.0f, 84.0f, 220.0f, 36.0f)), Justification::centredLeft);
+            g.drawText ("ADD AN EFFECT", S (Rectangle<float> (16.0f, kRowMid - 18.0f, 220.0f, 36.0f)), Justification::centredLeft);
             // tri : interrupteur segmenté (fond commun)
-            const auto seg = Rectangle<float> (kSortX - 3.0f, 82.0f, 130.0f, 40.0f);
+            const auto seg = Rectangle<float> (kSortX - 3.0f, kRowY - 4.0f, 130.0f, kRowH + 8.0f);
             g.setColour (Colour (0xff13171d));
             g.fillRoundedRectangle (S (seg), S (10.0f));
             g.setColour (Colour (0xff262c36));
@@ -2285,9 +2286,11 @@ private:
         return isPositiveAndBelow (r, (int) rows.size()) ? rows[(size_t) r].item : -1;
     }
     // ---- haut du navigateur : titre, emplacement, tri, sélection, ADD ; recherche pleine largeur ; onglets
-    static constexpr float kSortX = 580.0f, kTabsY = 176.0f, kTabsH = 28.0f, kTabGap = 26.0f, kListTopB = 214.0f;
+    // ligne du titre centrée entre le bandeau (62) et la recherche (130)
+    static constexpr float kRowMid = (kHeaderH + 130.0f) * 0.5f, kRowH = 26.0f, kRowY = kRowMid - kRowH * 0.5f;
+    static constexpr float kSortX = 592.0f, kTabsY = 176.0f, kTabsH = 28.0f, kTabGap = 26.0f, kListTopB = 214.0f;
     static inline const Rectangle<float> kSearchR { 16.0f, 130.0f, 1032.0f, 38.0f };
-    Rectangle<float> selPillRect() const { return { 724.0f, 84.0f, 120.0f, 36.0f }; }
+    Rectangle<float> selPillRect() const { return { 736.0f, kRowY, 118.0f, kRowH }; }
     String insertWhereText() const
     {
         const int n = eng.blocks().size();
@@ -2298,7 +2301,8 @@ private:
     {
         const float pre = unitsOf (font (tfRegular, 14.0f), insertPos >= eng.blocks().size() ? String (CharPointer_UTF8 ("\xe2\x86\x92  at")) : String (CharPointer_UTF8 ("\xe2\x86\x92  before")));
         const float w = jmin (330.0f, 14.0f + pre + 6.0f + unitsOf (font (tfMedium, 14.5f), insertWhereText()) + 30.0f);
-        return { 214.0f, 87.0f, w, 30.0f };
+        const float x = 16.0f + unitsOf (font (tfBold, 20.0f), "ADD AN EFFECT") + 16.0f;   // juste après le titre
+        return { x, kRowY, w, kRowH };
     }
     // menu de l'emplacement : au début, avant chaque bloc (un groupe compte pour un), à la fin
     void insertWhereMenu()
