@@ -2210,7 +2210,7 @@ private:
     bool tipShown = false;
     void drawFxTooltip (Graphics& g)
     {
-        if (overlay != Overlay::browser || hoverItem < 0) return;
+        if (overlay != Overlay::browser || hoverItem < 0 || insertOpen) return;
         if (Time::getMillisecondCounterHiRes() - hoverItemMs < kTipDelayMs) return;      // la bulle n'apparaît qu'au bout de 0,8 s
         const auto items = filtered();
         const int i = browserItemAt (hoverItem);
@@ -2336,6 +2336,7 @@ private:
     }
     void openInsertDrum()
     {
+        hoverItem = -1;
         const auto ch = insertChoices();
         insertTarget = (int) ch.size() - 1;
         for (int i = (int) ch.size() - 1; i >= 0; --i) if (ch[(size_t) i].first <= jmin (insertPos, eng.blocks().size())) { insertTarget = i; break; }   // dans un groupe : avant le groupe
@@ -3525,6 +3526,7 @@ private:
         {
             for (int v = 0; v < kListRows * 2; ++v) if (itemRect (v).contains (p)) { hi = v; break; }
             if (hi >= 0 && browserItemAt (hi) < 0) hi = -1;
+            if (insertOpen) hi = -1;                              // tambour de l'emplacement ouvert : pas de survol ni de bulle
         }
         else if (overlay == Overlay::params && presetMode)
         {
