@@ -26,7 +26,7 @@ namespace MenuStyle
         if (s.startsWith ("save")) return icoSave;
         if (s.startsWith ("load")) return icoLoad;
         if (s.contains ("clear") || s.startsWith ("reset") || s.startsWith ("cancel")) return icoClear;
-        if (s.startsWith ("stomp")) return icoStomp;
+        if (s.startsWith ("stomp") || s.startsWith ("assign") || s.startsWith ("footswitch")) return icoStomp;
         if (s.contains ("latching")) return icoLatch;
         if (s.startsWith ("midi") || s.startsWith ("learn") || s.startsWith ("program change")) return icoMidi;
         if (s.contains ("color") || s.contains ("colour") || s.contains ("glow")) return icoColour;
@@ -169,26 +169,68 @@ namespace MenuStyle
         }
     };
 
-    // ------------------------------------------------------------------ en-tête du footswitch : pastille de la lettre + sous-titre
-    struct FsHeader : public PopupMenu::CustomComponent
+    // ------------------------------------------------------------------ en-tête des menus : pastille + titre + sous-titre
+    // pastille : une lettre (footswitch), l'icône d'une famille d'effets, un groupe (voies parallèles) ou une icône de commande
+    struct Badge
     {
-        Fonts f; String letter, title, sub; Colour col;
-        FsHeader (Fonts fo, String l, String t, String s, Colour c) : CustomComponent (false), f (fo), letter (l), title (t), sub (s), col (c) {}
-        void getIdealSize (int& w, int& h) override { w = 260; h = 52; }
+        enum Type { letter, fx, group, ui } type = ui;
+        String text; int kind = -1, icon = FxCat::iconFamily, ico = icoNone; Colour col { kAccent };
+        static Badge ofLetter (String l, Colour c) { Badge b; b.type = letter; b.text = l; b.col = c; return b; }
+        static Badge ofFx (int kind, int icon) { Badge b; b.type = fx; b.kind = kind; b.icon = icon; b.col = kind >= 0 ? FxCat::colour (kind) : kAccent; return b; }
+        static Badge ofGroup (Colour c) { Badge b; b.type = group; b.col = c; return b; }
+        static Badge ofUi (int ico, Colour c = kAccent) { Badge b; b.type = ui; b.ico = ico; b.col = c; return b; }
+    };
+
+    inline void drawGroupIcon (Graphics& g, Rectangle<float> ic, Colour c, float w)
+    {
+        Path p; const float k = ic.getWidth() / 24.0f; auto P = [&] (float x, float y) { return Point<float> (ic.getX() + x * k, ic.getY() + y * k); };
+        p.addEllipse (Rectangle<float> (4.0f * k, 4.0f * k).withCentre (P (5, 12))); p.addEllipse (Rectangle<float> (4.0f * k, 4.0f * k).withCentre (P (19, 12)));
+        p.startNewSubPath (P (7, 12)); p.lineTo (P (10, 12)); p.startNewSubPath (P (14, 12)); p.lineTo (P (17, 12));
+        p.startNewSubPath (P (10, 12)); p.cubicTo (P (10, 7), P (14, 7), P (14, 12)); p.startNewSubPath (P (10, 12)); p.cubicTo (P (10, 17), P (14, 17), P (14, 12));
+        g.setColour (c);
+        g.strokePath (p, PathStrokeType (w, PathStrokeType::curved, PathStrokeType::rounded));
+    }
+
+    struct Header : public PopupMenu::CustomComponent
+    {
+        Fonts f; Badge badge; String title, sub;
+        Header (Fonts fo, Badge b, String t, String s) : CustomComponent (false), f (fo), badge (b), title (t), sub (s) {}
+        void getIdealSize (int& w, int& h) override
+        {
+            w = jmax (240, (int) std::ceil (jmax (GlyphArrangement::getStringWidth (fnt (f.bold, 15.5f), title), GlyphArrangement::getStringWidth (fnt (f.reg, 12.5f), sub))) + 72);
+            h = 52;
+        }
         void paint (Graphics& g) override
         {
-            const auto b = Rectangle<float> (30.0f, 30.0f).withPosition (12.0f, 9.0f);
-            g.setColour (col);
-            g.fillRoundedRectangle (b, 8.0f);
-            g.setColour (col.getPerceivedBrightness() > 0.55f ? Colour (0xff06121a) : Colours::white);
-            g.setFont (fnt (f.bold, 17.0f));
-            g.drawText (letter, b, Justification::centred, false);
+            const auto b = Rectangle<float> (30.0f, 30.0f).withPosition (12.0f, 10.0f);
+            if (badge.type == Badge::letter)                                  // pastille pleine de la couleur
+            {
+                g.setColour (badge.col);
+                g.fillRoundedRectangle (b, 8.0f);
+                g.setColour (badge.col.getPerceivedBrightness() > 0.55f ? Colour (0xff06121a) : Colours::white);
+                g.setFont (fnt (f.bold, 17.0f));
+                g.drawText (badge.text, b, Justification::centred, false);
+            }
+            else                                                               // pastille teintée, icône de la couleur
+            {
+                g.setColour (badge.col.withAlpha (0.16f));
+                g.fillRoundedRectangle (b, 8.0f);
+                g.setColour (badge.col.withAlpha (0.7f));
+                g.drawRoundedRectangle (b.reduced (0.6f), 8.0f, 1.2f);
+                const auto ic = b.reduced (6.0f);
+                if (badge.type == Badge::fx) FxCat::drawIcon (g, jmax (0, badge.kind), ic, badge.col, 1.7f, badge.icon);
+                else if (badge.type == Badge::group) drawGroupIcon (g, ic, badge.col, 1.7f);
+                else drawIco (g, badge.ico, ic.reduced (1.0f), badge.col);
+            }
             g.setColour (kText);
             g.setFont (fnt (f.bold, 15.5f));
-            g.drawText (title, Rectangle<float> (52.0f, 7.0f, (float) getWidth() - 60.0f, 19.0f), Justification::centredLeft, true);
-            g.setColour (kDim);
-            g.setFont (fnt (f.reg, 12.5f));
-            g.drawText (sub, Rectangle<float> (52.0f, 26.0f, (float) getWidth() - 60.0f, 16.0f), Justification::centredLeft, true);
+            g.drawText (title, Rectangle<float> (52.0f, sub.isEmpty() ? 15.0f : 8.0f, (float) getWidth() - 60.0f, 19.0f), Justification::centredLeft, true);
+            if (sub.isNotEmpty())
+            {
+                g.setColour (kDim);
+                g.setFont (fnt (f.reg, 12.5f));
+                g.drawText (sub, Rectangle<float> (52.0f, 27.0f, (float) getWidth() - 60.0f, 16.0f), Justification::centredLeft, true);
+            }
         }
     };
 
@@ -262,12 +304,7 @@ namespace MenuStyle
                 const auto ic = Rectangle<float> (24.0f, 24.0f).withCentre ({ r.getCentreX(), r.getY() + 22.0f });
                 if (t[(size_t) i].group)                                                // groupe : deux voies entre deux points
                 {
-                    Path p; const float k = ic.getWidth() / 24.0f; auto P = [&] (float x, float y) { return Point<float> (ic.getX() + x * k, ic.getY() + y * k); };
-                    p.addEllipse (Rectangle<float> (4.0f * k, 4.0f * k).withCentre (P (5, 12))); p.addEllipse (Rectangle<float> (4.0f * k, 4.0f * k).withCentre (P (19, 12)));
-                    p.startNewSubPath (P (7, 12)); p.lineTo (P (10, 12)); p.startNewSubPath (P (14, 12)); p.lineTo (P (17, 12));
-                    p.startNewSubPath (P (10, 12)); p.cubicTo (P (10, 7), P (14, 7), P (14, 12)); p.startNewSubPath (P (10, 12)); p.cubicTo (P (10, 17), P (14, 17), P (14, 12));
-                    g.setColour (c);
-                    g.strokePath (p, PathStrokeType (2.0f * k, PathStrokeType::curved, PathStrokeType::rounded));
+                    drawGroupIcon (g, ic, c, 2.0f);
                 }
                 else FxCat::drawIcon (g, jmax (0, t[(size_t) i].kind), ic, c, 2.0f, t[(size_t) i].icon);
                 g.setFont (fnt (f.med, 12.5f));
@@ -282,9 +319,7 @@ namespace MenuStyle
                     drawCheck (g, bd.reduced (2.5f), Colour (0xff06121a), 1.8f);
                 }
             }
-            // pied : nombre choisi + CLEAR
-            g.setColour (kSep);
-            g.fillRect (Rectangle<float> (kPad, (float) getHeight() - kFoot + 1.0f, (float) getWidth() - 2.0f * kPad, 1.0f));
+            // pied : nombre choisi + CLEAR (sans filet)
             g.setFont (fnt (f.med, 12.5f));
             g.setColour (kDim);
             g.drawText (String (sel) + " selected", Rectangle<float> (kPad + 2.0f, (float) getHeight() - kFoot + 2.0f, 160.0f, (float) kFoot - 2.0f), Justification::centredLeft, false);

@@ -178,6 +178,9 @@ int main (int argc, char** argv)
             auto img = ed->menuPreview (0);
             File f (out + "/octopus_menu_footswitch.png"); f.deleteFile();
             FileOutputStream os (f); PNGImageFormat().writeImageToStream (img, os);
+            auto img2 = ed->menuPreview (100 + e.blockOf (e.chain().getReference (idxOf ("Holyverb")).guid));   // menu d'un bloc
+            File f2 (out + "/octopus_menu_block.png"); f2.deleteFile();
+            FileOutputStream os2 (f2); PNGImageFormat().writeImageToStream (img2, os2);
             e.toggleAssign (0, e.swapKeyOf (0));
             e.toggleAssign (0, e.chain().getReference (idxOf ("Holyverb")).guid);
         }

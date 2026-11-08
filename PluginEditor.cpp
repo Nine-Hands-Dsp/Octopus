@@ -120,6 +120,7 @@ public:
         tfRegular = Typeface::createSystemTypefaceFor (BinaryData::PoppinsRegular_ttf, BinaryData::PoppinsRegular_ttfSize);
         tfMono    = Typeface::createSystemTypefaceFor (BinaryData::IBMPlexMonoSemiBold_ttf, BinaryData::IBMPlexMonoSemiBold_ttfSize);
         menuLnf.f = menuFonts();
+        setLookAndFeel (&menuLnf);                                  // menus des champs de texte (copier / coller) aussi
         for (auto& l : ledLevel) l = 0.0f;
 
         styleEditor (search, "Search plug-ins...");
@@ -160,7 +161,7 @@ public:
         startTimerHz (30);
     }
 
-    ~PedalView() override { PopupMenu::dismissAllActiveMenus(); stopTimer(); proc.setMiniTuner (false); OctoSettings::flush(); }
+    ~PedalView() override { PopupMenu::dismissAllActiveMenus(); setLookAndFeel (nullptr); stopTimer(); proc.setMiniTuner (false); OctoSettings::flush(); }
 
     // ------------------------------------------------------------ public (outil de rendu, éditeur)
     void openBrowser (int blockPos)
@@ -332,7 +333,7 @@ public:
         if (OctopusEngine::keyOfCombo (k) >= 0) { footswitchMenu (OctopusEngine::keyOfCombo (k)); return; }   // E / F : menu de A-D
         // symbole de l'accordeur : plus de double appui B+C, l'accordeur se commande par MIDI learn (ou un clic)
         PopupMenu m;
-        m.addSectionHeader ("Tuner");
+        menuHeader (m, MenuStyle::Badge::ofFx (FxCat::tuner, FxCat::iconFamily), "Tuner", "CHROMA");
         addLearnItems (m, OctopusEngine::tunerToggle);
         m.addSeparator();
         m.addItem (310, "Color & Glow");
@@ -357,6 +358,17 @@ private:
     MenuStyle::MenuLnf menuLnf;                                    // apparence des menus clic droit
     MenuStyle::Fonts menuFonts() const { return { tfRegular, tfMedium, tfBold }; }
     PopupMenu& styled (PopupMenu& m) { m.setLookAndFeel (&menuLnf); return m; }
+    // en-tête de menu : pastille + titre + sous-titre, puis un filet
+    void menuHeader (PopupMenu& m, MenuStyle::Badge b, const String& title, const String& sub = {})
+    {
+        m.addCustomItem (9001, std::make_unique<MenuStyle::Header> (menuFonts(), b, title, sub), nullptr, title);
+        m.addSeparator();
+    }
+    MenuStyle::Badge fxBadge (int chainIndex) const
+    {
+        const auto& f = eng.chain().getReference (chainIndex);
+        return MenuStyle::Badge::ofFx (eng.blockKind (chainIndex), FxCat::iconOf (f.name));
+    }
     float s = 1.0f;
 
     // anti-gel v2
@@ -503,7 +515,7 @@ private:
     }
 
     // ---- nom du preset chargé : clic sur le nom en haut de l'écran pour le changer
-    Rectangle<float> headerNameRect() const { return { kNameX, kHeaderH * 0.5f - 28.0f, jmax (120.0f, chromaLeft() - kHG - kNameX), 34.0f }; }
+    Rectangle<float> headerNameRect() const { return { kNameX, kHeaderH * 0.5f - 26.0f, jmax (120.0f, chromaLeft() - kHG - kNameX), 34.0f }; }
     static Rectangle<float> badgeRect() { return { kHdrGap, (kHeaderH - kBadge) * 0.5f, kBadge, kBadge }; }
     void startHeaderRename()
     {
@@ -1492,7 +1504,7 @@ private:
     {
         const int cur = eng.current();
         PopupMenu m;
-        m.addSectionHeader ("SEMITONES");
+        menuHeader (m, MenuStyle::Badge::ofFx (FxCat::pitch, FxCat::iconFamily), "Semitones", semi::get (proc.semitonesPreset()).name);
         const bool can = cur >= 0 && eng.preset (cur).saved;
         const bool linked = can && eng.presetSemi (cur) >= 0;
         m.addItem (1, can ? "Save with preset " + OctopusEngine::label (cur) + " (" + eng.displayName (cur) + ")" : String ("Save with a preset (load or save a preset first)"),
@@ -1522,7 +1534,7 @@ private:
     void chromaMenu()
     {
         PopupMenu m;
-        m.addSectionHeader ("CHROMA");
+        menuHeader (m, MenuStyle::Badge::ofFx (FxCat::tuner, FxCat::iconFamily), "Mini CHROMA", "Colours and glow");
         m.addItem (1, "Color & Glow : in tune");
         m.addItem (2, "Color & Glow : out of tune");
         m.addSeparator();
@@ -1765,7 +1777,7 @@ private:
         if (msg.isNotEmpty()) sub = msg;
         g.setFont (font (tfRegular, 15.0f));
         g.setColour (msg.isNotEmpty() ? kAccent : kDim);
-        g.drawText (sub, S (Rectangle<float> (kNameX, kHeaderH * 0.5f + 4.0f, headerNameRect().getWidth(), 20.0f)), Justification::centredLeft, true);
+        g.drawText (sub, S (Rectangle<float> (kNameX, kHeaderH * 0.5f + 1.0f, headerNameRect().getWidth(), 20.0f)), Justification::centredLeft, true);
 
         // séparateurs fins
         for (float x : { kSep1X, kSep2X, kSep3X })
@@ -2288,7 +2300,7 @@ private:
     void insertWhereMenu()
     {
         PopupMenu m;
-        m.addSectionHeader ("Insert the effects");
+        menuHeader (m, MenuStyle::Badge::ofUi (MenuStyle::icoAdd), "Insert the effects", "Position in the chain");
         const auto& bl = eng.blocks();
         for (int k = 0; k < bl.size(); ++k)
         {
@@ -2737,7 +2749,7 @@ private:
         const int existing = UserFxPresets::indexOf (upresets, name);
         if (existing < 0) { storeUserPreset (-1, name); return; }
         PopupMenu m;                                               // jamais d'écrasement sans confirmation
-        m.addSectionHeader ("\"" + name + "\" already exists");
+        menuHeader (m, MenuStyle::Badge::ofUi (MenuStyle::icoSave), "\"" + name + "\" already exists", "User preset");
         m.addItem (1, "Replace it with the current settings");
         m.addItem (2, "Cancel");
         SafePointer<PedalView> sp (this);
@@ -2767,7 +2779,7 @@ private:
     {
         if (! isPositiveAndBelow (u, (int) upresets.size())) return;
         PopupMenu m;
-        m.addSectionHeader (upresets[(size_t) u].name);
+        menuHeader (m, MenuStyle::Badge::ofUi (MenuStyle::icoPreset), upresets[(size_t) u].name, "User preset");
         m.addItem (1, "Load");
         m.addItem (2, "Replace with the current settings");
         m.addItem (3, "Rename");
@@ -3041,7 +3053,7 @@ private:
     void referenceMenu()
     {
         PopupMenu m;
-        m.addSectionHeader ("Reference A");
+        menuHeader (m, MenuStyle::Badge::ofFx (FxCat::tuner, FxCat::iconFamily), "Reference A", "CHROMA");
         for (int hz = 430; hz <= 450; ++hz) m.addItem (hz, "A = " + String (hz) + " Hz", true, proc.chroma().ref == hz);
         SafePointer<PedalView> sp (this);
         styled (m).showMenuAsync (PopupMenu::Options(), [sp] (int r) { if (sp != nullptr && r >= 430) sp->proc.chromaSetReference (r); });
@@ -3054,7 +3066,7 @@ private:
         lib.reload();
         const auto cur = proc.chroma().tuningKey;
         PopupMenu m;
-        m.addSectionHeader ("TUNINGS (CHROMA)");
+        menuHeader (m, MenuStyle::Badge::ofFx (FxCat::tuner, FxCat::iconFamily), "Tunings", "CHROMA");
         m.addItem (1, proc.chroma().internal ? "Default tuning (E standard)" : "Use the tuning set in CHROMA", proc.tuningOverridden(), ! proc.tuningOverridden());
         m.addSeparator();
         auto label = [&lib] (int i)
@@ -3829,7 +3841,7 @@ private:
     {
         if (! eng.preset (idx).saved) { eng.save (idx); return; }
         PopupMenu m;
-        m.addSectionHeader ("Replace " + OctopusEngine::label (idx) + " (" + eng.displayName (idx) + ") ?");
+        menuHeader (m, MenuStyle::Badge::ofUi (MenuStyle::icoSave), "Replace " + OctopusEngine::label (idx) + " ?", eng.displayName (idx));
         m.addItem (1, "Yes, save the current chain in " + OctopusEngine::label (idx));
         m.addItem (2, "Cancel");
         SafePointer<PedalView> sp (this);
@@ -3840,7 +3852,7 @@ private:
     {
         PopupMenu m;
         const int cur = eng.current();
-        m.addSectionHeader ("Save the current chain");
+        menuHeader (m, MenuStyle::Badge::ofUi (MenuStyle::icoSave), "Save the current chain", "Bank " + String (eng.bank() + 1).paddedLeft ('0', 2));
         if (cur >= 0) m.addItem (1, "Save " + OctopusEngine::label (cur) + "  " + eng.displayName (cur));
         PopupMenu to;
         for (int b = 0; b < OctopusEngine::kBanks; ++b)
@@ -3871,7 +3883,7 @@ private:
         const auto& G = eng.groups()[(size_t) g];
         const String guid = G.guid;
         PopupMenu m, assign;
-        m.addSectionHeader ("Parallel paths : " + eng.blockName (G.split));
+        menuHeader (m, MenuStyle::Badge::ofGroup (Colour (0xffffb547)), "Parallel paths", eng.blockName (G.split).replace (" || ", String (CharPointer_UTF8 (" \xe2\x80\x96 "))));
         m.addItem (1, "Mix the paths (level, pan, phase)...");
         m.addItem (2, G.on ? "Bypass the group (dry signal)" : "Enable the group");
         m.addItem (3, eng.isFolded (g) ? "Unfold" : "Fold into one block");
@@ -4078,7 +4090,7 @@ private:
         const int i = eng.blocks()[slot];
         const auto f = eng.chain().getReference (i);
         PopupMenu m, assign, moveM;
-        m.addSectionHeader (FxCat::shortName (f.name));
+        menuHeader (m, fxBadge (i), FxCat::shortName (f.name), String (FxCat::label (eng.blockKind (i))) + String (CharPointer_UTF8 (" \xc2\xb7 ")) + (f.enabled ? "ON" : "OFF"));
         m.addItem (1, f.enabled ? "Bypass (OFF)" : "Enable (ON)");
         m.addItem (2, "Parameters on screen");
         m.addItem (3, f.open ? "Close plug-in window" : "Open plug-in window");
@@ -4118,6 +4130,7 @@ private:
         m.addItem (7, "Remove " + FxCat::shortName (f.name));
         SafePointer<PedalView> sp (this);
         const String guid = f.guid;
+        if (captureOnly) { captured = m; return; }
         styled (m).showMenuAsync (PopupMenu::Options(), [sp, slot, guid] (int r)
         {
             if (sp == nullptr || r <= 0) return;
@@ -4181,11 +4194,9 @@ private:
         PopupMenu m, assign;
         const int idx = eng.bank() * OctopusEngine::kSlots + f;
         // en-tête : pastille de la lettre (couleur du footswitch) + mode et bank
-        m.addCustomItem (9001, std::make_unique<MenuStyle::FsHeader> (menuFonts(), fsLetter (f),
-                             "Footswitch " + fsLetter (f) + (f == 4 ? "  (A+B)" : f == 5 ? "  (C+D)" : ""),
-                             String (eng.mode() == OctopusEngine::stompMode ? "STOMP" : "PRESET") + String (CharPointer_UTF8 (" \xc2\xb7 bank ")) + String (eng.bank() + 1).paddedLeft ('0', 2),
-                             f < 4 ? Colour (eng.fsColour (f)) : kAccent), nullptr, "Footswitch " + fsLetter (f));
-        m.addSeparator();
+        menuHeader (m, MenuStyle::Badge::ofLetter (fsLetter (f), f < 4 ? Colour (eng.fsColour (f)) : MenuStyle::kAccent),
+                    "Footswitch " + fsLetter (f) + (f == 4 ? "  (A+B)" : f == 5 ? "  (C+D)" : ""),
+                    String (eng.mode() == OctopusEngine::stompMode ? "STOMP" : "PRESET") + String (CharPointer_UTF8 (" \xc2\xb7 bank ")) + String (eng.bank() + 1).paddedLeft ('0', 2));
         m.addItem (1, "Save the current chain in " + OctopusEngine::label (idx), eng.isReady());
         m.addItem (2, "Load " + OctopusEngine::label (idx), eng.preset (idx).saved && eng.isReady());
         m.addSeparator();
@@ -4211,6 +4222,7 @@ private:
         m.addItem (395, "Color & Glow");                // couleur du footswitch et opacité du halo (pas de taille du plugin ici)
         const auto near = fsMenuNear (f);
         SafePointer<PedalView> sp (this);
+        if (captureOnly) { captured = m; return; }
         styled (m).showMenuAsync (PopupMenu::Options(), [sp, f, idx, near] (int r)
         {
             if (sp == nullptr || r <= 0) return;
@@ -4222,50 +4234,79 @@ private:
             else sp->handleMidi (r);
         });
     }
-    // outil de rendu : le menu du footswitch f ouvert sur « STOMP » avec sa grille (dessiné comme le vrai, avec menuLnf)
-    Image menuPreview (int f)
+    // outil de rendu : un vrai menu clic droit (0-5 = footswitch A-F ouvert sur STOMP, 100 + n = bloc n ouvert sur « Assign »)
+    bool captureOnly = false;
+    PopupMenu captured;
+    Image menuPreview (int which)
     {
-        using namespace MenuStyle;
-        const float sc = 2.0f;
-        const int mw = 330, gw = BlockGrid::kW;
-        BlockGrid grid (eng, menuFonts(), f, {});
-        int gwi = 0, ghe = 0; grid.getIdealSize (gwi, ghe);
-        FsHeader head (menuFonts(), fsLetter (f), "Footswitch " + fsLetter (f),
-                       String (eng.mode() == OctopusEngine::stompMode ? "STOMP" : "PRESET") + String (CharPointer_UTF8 (" \xc2\xb7 bank ")) + String (eng.bank() + 1).paddedLeft ('0', 2),
-                       f < 4 ? Colour (eng.fsColour (f)) : MenuStyle::kAccent);
-        struct It { String t; bool sep = false, sub = false, hi = false, tick = false, on = true; };
-        const int idx = eng.bank() * OctopusEngine::kSlots + f;
-        int nA = 0; for (auto& g : eng.stompKeys (f)) if (eng.blockOf (g) >= 0) ++nA;
-        std::vector<It> items { { "", true }, { "Save the current chain in " + OctopusEngine::label (idx) }, { "Load " + OctopusEngine::label (idx), false, false, false, false, eng.preset (idx).saved },
-                                { "", true }, { "STOMP : blocks switched by " + fsLetter (f) + (nA > 0 ? "  (" + String (nA) + ")" : String()), false, true, true },
-                                { "STOMP : clear assignment" }, { "", true }, { "MIDI Learn : " + OctopusEngine::targetName (f) + " (none)" }, { "Clear MIDI", false, false, false, false, false },
-                                { "MIDI footswitch latching (127 / 0 alternately)" }, { "", true }, { "MIDI", false, true }, { "", true }, { "Color & Glow" } };
+        captureOnly = true; captured = {};
+        if (which < 100) footswitchMenu (which); else blockMenu (which - 100);
+        captureOnly = false;
+        PopupMenu main = captured; captured = {};
+        const String openPrefix = which < 100 ? "STOMP : blocks" : "Assign";
+
+        struct Row { const PopupMenu::Item* it; int h; };
         const int bd = menuLnf.getPopupMenuBorderSize();
-        int mh = bd + 52;
-        for (auto& i : items) mh += i.sep ? 11 : 32;
-        mh += bd;
-        int stompY = bd + 52; for (auto& i : items) { if (i.hi) break; stompY += i.sep ? 11 : 32; }
-        const int gx = mw + 6, gy = jmax (0, stompY - bd - 4);
-        const int W = gx + gw + 2 * bd + 20, H = jmax (mh, gy + ghe + 2 * bd) + 20;
+        auto layout = [&] (const PopupMenu& m, int& w, int& h)
+        {
+            std::vector<Row> rows; w = 0; h = 0;
+            PopupMenu::MenuItemIterator iter (m);
+            while (iter.next())
+            {
+                const auto& it = iter.getItem();
+                int iw = 0, ih = 0;
+                if (it.customComponent != nullptr) it.customComponent->getIdealSize (iw, ih);
+                else if (it.isSectionHeader) { iw = 200; ih = 32; }
+                else menuLnf.getIdealPopupMenuItemSize (it.text, it.isSeparator, 32, iw, ih);
+                rows.push_back ({ &it, ih }); w = jmax (w, iw); h += ih;
+            }
+            w += 2 * bd; h += 2 * bd;
+            return rows;
+        };
+        auto draw = [&] (Graphics& g, const std::vector<Row>& rows, int w, int h, int& openY) -> const PopupMenu*
+        {
+            menuLnf.drawPopupMenuBackground (g, w, h);
+            int y = bd; const PopupMenu* open = nullptr;
+            for (auto& r : rows)
+            {
+                const auto& it = *r.it;
+                const Rectangle<int> a (bd, y, w - 2 * bd, r.h);
+                if (it.customComponent != nullptr)
+                {
+                    it.customComponent->setSize (a.getWidth(), a.getHeight());
+                    Graphics::ScopedSaveState ss (g);
+                    g.addTransform (AffineTransform::translation ((float) a.getX(), (float) a.getY()));
+                    it.customComponent->paintEntireComponent (g, false);
+                }
+                else if (it.isSectionHeader) menuLnf.drawPopupMenuSectionHeader (g, a, it.text);
+                else
+                {
+                    const bool hi = it.subMenu != nullptr && open == nullptr && it.text.startsWith (openPrefix);
+                    if (hi) { open = it.subMenu.get(); openY = y; }
+                    menuLnf.drawPopupMenuItem (g, a, it.isSeparator, it.isEnabled, hi, it.isTicked, it.subMenu != nullptr, it.text, {}, nullptr, nullptr);
+                }
+                y += r.h;
+            }
+            return open;
+        };
+        int mw, mh; const auto rows = layout (main, mw, mh);
+        // sous-menu ouvert (mesuré d'avance pour la taille de l'image)
+        int sw = 0, sh = 0, openY = 0; std::vector<Row> srows; const PopupMenu* sub = nullptr;
+        {
+            int y = bd;
+            for (auto& r : rows) { if (r.it->subMenu != nullptr && r.it->text.startsWith (openPrefix)) { sub = r.it->subMenu.get(); openY = y; break; } y += r.h; }
+            if (sub != nullptr) srows = layout (*sub, sw, sh);
+        }
+        const float sc = 2.0f;
+        const int gx = mw + 4, gy = jmax (0, openY - bd);
+        const int W = mw + (sub != nullptr ? sw + 4 : 0) + 20, H = jmax (mh, gy + sh) + 20;
         Image img (Image::ARGB, roundToInt (W * sc), roundToInt (H * sc), true);
         Graphics g (img);
         g.fillAll (Colour (0xff08090c));
         g.addTransform (AffineTransform::scale (sc).translated (10.0f * sc, 10.0f * sc));
-        menuLnf.drawPopupMenuBackground (g, mw, mh);
-        head.setSize (mw - 2 * bd, 52);
-        { Graphics::ScopedSaveState ss (g); g.addTransform (AffineTransform::translation ((float) bd, (float) bd)); head.paintEntireComponent (g, false); }
-        int y = bd + 52;
-        for (auto& i : items)
-        {
-            const int h = i.sep ? 11 : 32;
-            menuLnf.drawPopupMenuItem (g, { bd, y, mw - 2 * bd, h }, i.sep, i.on, i.hi, i.tick, i.sub, i.t, {}, nullptr, nullptr);
-            y += h;
-        }
-        g.addTransform (AffineTransform::translation ((float) gx, (float) gy));
-        menuLnf.drawPopupMenuBackground (g, gw + 2 * bd, ghe + 2 * bd);
-        grid.setSize (gw, ghe);
-        g.addTransform (AffineTransform::translation ((float) bd, (float) bd));
-        grid.paintEntireComponent (g, false);
+        int dummy = 0;
+        draw (g, rows, mw, mh, dummy);
+        if (sub != nullptr) { g.addTransform (AffineTransform::translation ((float) gx, (float) gy)); draw (g, srows, sw, sh, dummy); }
         return img;
     }
     // où ouvrir le nuancier d'un footswitch : près de son footswitch (A-D), de son marquage (E / F)
