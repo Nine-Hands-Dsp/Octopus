@@ -157,12 +157,12 @@ int main (int argc, char** argv)
     // voies parallèles (split / merge)
     {
         e.load (14);                                                       // preset vide
-        for (auto* n : { "VST3: NGATE (NINE HANDS | DSP)", "VST3: Doorn (NINE HANDS | DSP)", "VST3: Genome (Two notes Audio Engineering)",
+        for (auto* n : { "VST3: NGATE (NINE HANDS | DSP)", "VST3: Doorn (NINE HANDS | DSP)", "VST3: Ampire (NINE HANDS | DSP)",
                          "VST3: Impulse (NINE HANDS | DSP)", "VST3: Holyverb (NINE HANDS | DSP)", "VST3: ECHOFLEX (NINE HANDS | DSP)",
                          "VST3: Small Tone (NINE HANDS | DSP)", "VST3: ReaEQ (Cockos)", "VST3: Wharry (NINE HANDS | DSP)", "VST3: Crycat (NINE HANDS | DSP)" })
             e.addFx ({ n, n }, e.blocks().size());
         auto idxOf = [&] (const String& s, int nth = 0) { for (int i = 0; i < e.chain().size(); ++i) if (e.chain().getReference (i).name.contains (s) && nth-- == 0) return i; return -1; };
-        e.split (idxOf ("Genome"));
+        e.split (idxOf ("Ampire"));
         check (e.groups().size() == 1 && e.groups()[0].lanes[1].isEmpty(), "split : groupe créé, voie B vide");
         shot ("octopus_split_empty");
         e.moveBlock (idxOf ("Impulse"), e.laneEndBlock (0, 0));            // IR dans la voie A, derrière l'ampli

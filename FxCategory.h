@@ -93,7 +93,7 @@ namespace FxCat
         // l'ordre compte : du plus spécifique au plus général
         if (has ({ "tuner", "chroma", "polytune" }) || word ({ "tune" }))                                     return tuner;
         if (has ({ "cabinet", "impulse", "reacab", "cab sim" }) || word ({ "cab", "ir", "irs" }))            return cab;
-        if (has ({ "genome", "neural", "archetype", "ampli", "preamp", "guitar rig", "s-gear", "tonex",
+        if (has ({ "ampire", "neural", "archetype", "ampli", "preamp", "guitar rig", "s-gear", "tonex",
                   "bias fx", "amplitube", "mesa", "marshall", "fortin", "nameless", "helix", "anode" })
             || word ({ "amp", "nam", "head", "stack" }))                                                     return amp;
         if (has ({ "ring think", "textur", "freeze", "ebow", "fantomine", "theremin", "granular", "synth",

@@ -76,7 +76,7 @@ public:
     int groupAt (int chainIndex) const;           // groupe dont cet effet (ou repère) fait partie, -1 sinon
     int laneAt (int chainIndex) const;            // voie (0 = A) d'un effet d'un groupe, -1 sinon
     int laneEndBlock (int g, int lane) const;     // position de bloc où insérer pour être à la fin de cette voie
-    juce::String blockName (int chainIndex) const;   // nom court (un groupe : « Genome || Anode »)
+    juce::String blockName (int chainIndex) const;   // nom court (un groupe : « Ampire || Anode »)
     int blockKind (int chainIndex) const;            // famille (un groupe : celle du premier bloc de la voie A)
     bool split (int chainIndex, int moving = -1);    // crée un groupe : ce bloc en voie A, voie B vide (ou le bloc 'moving')
     bool addPath (int g, int moving = -1);           // voie C (vide ou avec le bloc 'moving')
