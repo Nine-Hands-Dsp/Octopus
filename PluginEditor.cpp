@@ -1559,6 +1559,13 @@ private:
     void tickHeaderWidgets()
     {
         if (semiOpen && (tunerShown() || ! eng.isReady())) closeSemiDrum();
+        if (modeOpen && ! tunerShown()) closeModeDrum();
+        if (modeOpen && std::abs (modePos - (float) modeTarget) > 0.001f)
+        {
+            modePos += ((float) modeTarget - modePos) * 0.35f;
+            if (std::abs (modePos - (float) modeTarget) < 0.01f) modePos = (float) modeTarget;
+            askRepaint (screenPx());
+        }
         if (semiOpen && std::abs (semiPos - (float) semiTarget) > 0.001f)
         {
             semiPos += ((float) semiTarget - semiPos) * 0.35f;
@@ -3021,31 +3028,42 @@ private:
     // ---- écran de l'accordeur (07/11/2026) : ligne d'infos centrée, note, mètre fin qui s'efface aux bouts,
     // écart en cents, boutons en mots sur 4 colonnes. Repère de l'écran (1064 x 651), centre en x = kSW / 2.
     static constexpr float kTx0 = 170.4f, kTw = 723.2f;             // mètre : -50 .. +50 cents, centré sur l'écran
+    // ligne du haut (v1.17.1) : MODE · ACCORDAGE · A 440 · MUTE, centrée, et une croix en haut à droite pour quitter
     std::vector<Btn> tunerButtons() const
     {
-        const auto& c = proc.chroma();
-        static const char* names[3] = { "MONO", "POLY", "STROBE" };
+        const auto t = tunerTop();
         std::vector<Btn> v;
-        const float cw = 135.6f, x0 = kSW * 0.5f - cw * 2.0f;
-        v.push_back ({ { x0,            580.0f, cw, 40.0f }, bTunerTunings, "TUNINGS" });
-        v.push_back ({ { x0 + cw,       580.0f, cw, 40.0f }, bTunerMute, c.muted ? "MUTED" : "MUTE", c.muted });
-        v.push_back ({ { x0 + cw * 2.0f, 580.0f, cw, 40.0f }, bTunerMode, names[jlimit (0, 2, c.mode)] });
-        v.push_back ({ { x0 + cw * 3.0f, 580.0f, cw, 40.0f }, bTunerExit, "EXIT" });
+        v.push_back ({ t.mute, bTunerMute, "MUTE", proc.chroma().muted });
+        v.push_back ({ tunerCloseRect(), bTunerExit, {} });
         return v;
     }
+    static Rectangle<float> tunerCloseRect() { return { kSW - 50.0f, 37.0f, 28.0f, 28.0f }; }
     Font monoS (float units) const { return Font (FontOptions (tfMono).withHeight (units * L::kG * s)); }
-    // ligne d'infos : zones cliquables (mode, accordage, La de référence)
-    struct TunerTop { Rectangle<float> mode, name, ref; };
+    Font tunerTopFont() const { return monoS (21.0f).withExtraKerningFactor (0.22f); }
+    String tunerModeText() const
+    {
+        static const char* names[3] = { "MONO", "POLY", "STROBE" };
+        const auto& c = proc.chroma();
+        const auto sn = proc.tunerSnapshot();
+        const bool autoMono = c.mode == 1 && sn.monoOffTuning && ! sn.anyStringActive;
+        return autoMono ? String ("POLY>MONO") : String (names[jlimit (0, 2, c.mode)]);
+    }
+    // ligne d'infos : zones cliquables (mode, accordage, La de référence, mute) ; dots : centres des points séparateurs
+    struct TunerTop { Rectangle<float> mode, name, ref, mute; float dots[3]; };
     TunerTop tunerTop() const
     {
         const auto& c = proc.chroma();
-        const auto f = monoS (21.0f).withExtraKerningFactor (0.22f);
-        const float nameW = unitsOf (f, c.tuningName.toUpperCase());
-        const float cx = kSW * 0.5f, y = 38.0f, h = 26.0f;
+        const auto f = tunerTopFont();
+        const float trail = 21.0f * 0.22f * 0.6f;                         // espace d'approche ajouté après la dernière lettre
+        auto vis = [&] (const String& t) { return unitsOf (f, t) - trail; };
+        const float wm = vis ("STROBE"), wn = vis (c.tuningName.toUpperCase()), wr = vis ("A " + String (c.ref)), wu = vis ("MUTE");
+        const float gap = 60.0f, y = 38.0f, h = 26.0f;                    // point au milieu de chaque écart
+        float x = kSW * 0.5f - (wm + wn + wr + wu + 3.0f * gap) * 0.5f;
         TunerTop t;
-        t.name = { cx - nameW * 0.5f, y, nameW, h };
-        t.mode = { t.name.getX() - 10.0f - 240.0f, y, 240.0f, h };      // même écart visible des deux côtés du nom
-        t.ref  = { t.name.getRight() + 19.0f, y, 240.0f, h };
+        t.mode = { x, y, wm, h };            x += wm + gap; t.dots[0] = x - gap * 0.5f;
+        t.name = { x, y, wn, h };            x += wn + gap; t.dots[1] = x - gap * 0.5f;
+        t.ref  = { x, y, wr, h };            x += wr + gap; t.dots[2] = x - gap * 0.5f;
+        t.mute = { x, y, wu, h };
         return t;
     }
     Rectangle<float> tuningBox() const { return { 414.0f - 165.0f, 16.0f, 330.0f, 66.0f }; }   // repère de CHROMA
@@ -3069,30 +3087,41 @@ private:
         menuHeader (m, MenuStyle::Badge::ofFx (FxCat::tuner, FxCat::iconFamily), "Tunings", "CHROMA");
         m.addItem (1, proc.chroma().internal ? "Default tuning (E standard)" : "Use the tuning set in CHROMA", proc.tuningOverridden(), ! proc.tuningOverridden());
         m.addSeparator();
-        auto label = [&lib] (int i)
+        // chaque sous-menu : nom de l'accordage | notes, les notes alignées en colonne sur la première
+        const auto fonts = menuFonts();
+        auto fill = [&] (PopupMenu& sub, const std::vector<int>& idx)
         {
-            const auto& t = lib.get (i);
-            return String::fromUTF8 (tuna::displayName (t, false).c_str()) + "    " + String (tuna::notesToString (t.notes));
+            float col = 0.0f;
+            for (int i : idx) col = jmax (col, MenuStyle::TwoColItem::leftWidth (fonts, String::fromUTF8 (tuna::displayName (lib.get (i), false).c_str())));
+            col += 26.0f;
+            for (int i : idx)
+            {
+                const auto& t = lib.get (i);
+                const auto nm = String::fromUTF8 (tuna::displayName (t, false).c_str());
+                sub.addCustomItem (1000 + i, std::make_unique<MenuStyle::TwoColItem> (fonts, nm, String (tuna::notesToString (t.notes)), col, lib.keyAt (i) == cur), nullptr, nm);
+            }
         };
         const auto fav = lib.favouriteIndices();
         if (! fav.empty())
         {
             PopupMenu f;
-            for (int i : fav) f.addItem (1000 + i, label (i), true, lib.keyAt (i) == cur);
-            m.addSubMenu (CharPointer_UTF8 ("\xe2\x98\x85 FAVORITES"), f);
+            fill (f, std::vector<int> (fav.begin(), fav.end()));
+            m.addSubMenu (CharPointer_UTF8 ("\xe2\x98\x85 Favorites"), f);
         }
         StringArray cats;
-        std::vector<PopupMenu> menus;
+        std::vector<std::vector<int>> byCat;
         for (int i = 0; i < lib.size(); ++i)
         {
-            const auto& t = lib.get (i);
-            const auto cat = String::fromUTF8 (tuna::displayCategory (t.category, false).c_str());
+            const auto cat = String::fromUTF8 (tuna::displayCategory (lib.get (i).category, false).c_str());
             int k = cats.indexOf (cat);
-            if (k < 0) { cats.add (cat); menus.emplace_back(); k = cats.size() - 1; }
-            menus[(size_t) k].addItem (1000 + i, label (i), true, lib.keyAt (i) == cur);
+            if (k < 0) { cats.add (cat); byCat.emplace_back(); k = cats.size() - 1; }
+            byCat[(size_t) k].push_back (i);
         }
+        std::vector<PopupMenu> menus (byCat.size());
+        for (size_t k = 0; k < byCat.size(); ++k) fill (menus[k], byCat[k]);
         for (int k = 0; k < cats.size(); ++k) m.addSubMenu (cats[k], menus[(size_t) k], true, nullptr, false);
         SafePointer<PedalView> sp (this);
+        if (captureOnly) { captured = m; return; }
         styled (m).showMenuAsync (PopupMenu::Options(), [sp] (int r)
         {
             if (sp == nullptr || r <= 0) return;
@@ -3137,23 +3166,32 @@ private:
         g.setColour (Colour (0xff08090c));
         g.fillRect (S (Rectangle<float> (0.0f, 0.0f, kSW, kSH)));
         const bool autoMono = c.mode == 1 && sn.monoOffTuning && ! sn.anyStringActive;
-        // ligne d'infos : MODE · ACCORDAGE · A 440, le nom de l'accordage centré sur l'écran
+        // ligne d'infos : MODE · ACCORDAGE · A 440 · MUTE, centrée (mode : tambour ; accordage, La : menus ; MUTE : coupe le son)
         {
-            static const char* names[3] = { "MONO", "POLY", "STROBE" };
             const auto t = tunerTop();
-            const auto f = monoS (21.0f).withExtraKerningFactor (0.22f);
+            const auto f = tunerTopFont();
             const bool green = c.mode == 1 && ! autoMono && sn.allInTune;
+            const auto grey = Colour (0xff9aa3b2);
             g.setFont (f);
-            g.setColour (Colour (0xff9aa3b2));
-            // points séparateurs à égale distance du nom, mode et La à égale distance des points
-            const float trail = 21.0f * 0.22f * 0.6f;                     // espace d'approche ajouté après la dernière lettre
-            const float dl = t.name.getX() - 30.0f, dr = t.name.getRight() - trail + 30.0f;
-            g.drawText (String (CharPointer_UTF8 ("\xc2\xb7")), S (Rectangle<float> (dl - 10.0f, t.name.getY(), 20.0f, t.name.getHeight())), Justification::centred);
-            g.drawText (String (CharPointer_UTF8 ("\xc2\xb7")), S (Rectangle<float> (dr - 10.0f, t.name.getY(), 20.0f, t.name.getHeight())), Justification::centred);
-            g.drawText (autoMono ? String ("POLY>MONO") : String (names[jlimit (0, 2, c.mode)]), S (t.mode.withRightX (dl - 30.0f + trail)), Justification::centredRight);
-            g.drawText ("A " + String (c.ref), S (t.ref.withX (dr + 30.0f)), Justification::centredLeft);
-            g.setColour (green ? TC::green() : TC::amber());
-            g.drawText (c.tuningName.toUpperCase(), S (t.name.expanded (4.0f, 0.0f)), Justification::centred);
+            g.setColour (grey);
+            for (float d : t.dots) g.drawText (String (CharPointer_UTF8 ("\xc2\xb7")), S (Rectangle<float> (d - 10.0f, t.name.getY(), 20.0f, t.name.getHeight())), Justification::centred);
+            const bool hm = hoverTunerTop == 1 || modeOpen, hr = hoverTunerTop == 3;
+            g.setColour (hm ? Colours::white : grey);
+            g.drawText (tunerModeText(), S (t.mode.withWidth (t.mode.getWidth() + 12.0f).withX (t.mode.getCentreX() - (t.mode.getWidth() + 12.0f) * 0.5f)), Justification::centred);
+            g.setColour (hr ? Colours::white : grey);
+            g.drawText ("A " + String (c.ref), S (t.ref.expanded (6.0f, 0.0f)), Justification::centred);
+            const bool hu = hoverBtn == bTunerMute;
+            g.setColour (c.muted ? Colour (0xffff4d4d) : (hu ? Colours::white : grey));
+            g.drawText ("MUTE", S (t.mute.expanded (6.0f, 0.0f)), Justification::centred);
+            g.setColour (green ? TC::green() : (hoverTunerTop == 2 ? TC::amber().brighter (0.3f) : TC::amber()));
+            g.drawText (c.tuningName.toUpperCase(), S (t.name.expanded (6.0f, 0.0f)), Justification::centred);
+            // croix : quitter l'accordeur
+            const auto xr = tunerCloseRect().reduced (8.0f);
+            Path x;
+            x.startNewSubPath (S (xr.getTopLeft())); x.lineTo (S (xr.getBottomRight()));
+            x.startNewSubPath (S (xr.getTopRight())); x.lineTo (S (xr.getBottomLeft()));
+            g.setColour (hoverBtn == bTunerExit ? Colours::white : grey);
+            g.strokePath (x, PathStrokeType (S (2.0f), PathStrokeType::curved, PathStrokeType::rounded));
         }
         if (c.mode == 0 || autoMono) tunerMono (g, sn);
         else if (c.mode == 1)        tunerPoly (g, sn);
@@ -3165,24 +3203,77 @@ private:
             g.addTransform (AffineTransform::scale (sc * L::kG * s).translated (o.x, o.y));
             tunerStrobe (g, sn);
         }
-        // boutons en mots, 4 colonnes centrées : celui du mode en couleur et souligné, MUTE en rouge quand il coupe
-        for (auto& b : tunerButtons())
+        if (modeOpen) drawModeDrum (g);
+    }
+
+    // ---- tambour du mode de CHROMA (MONO / POLY / STROBE), comme celui de Semitones, sous le mode
+    bool modeOpen = false; int modeTarget = 0, hoverMode = -1, hoverTunerTop = 0; float modePos = 0.0f;
+    static constexpr float kModeMidY = 170.0f, kModeR = 92.0f, kModeStep = 30.0f;
+    float modeY (float d) const { return kModeMidY + kModeR * std::sin (jlimit (-2.8f, 2.8f, d) * kModeStep * MathConstants<float>::pi / 180.0f); }
+    Rectangle<float> modeBand() const { const float cx = tunerTop().mode.getCentreX(); return { cx - 95.0f, kModeMidY - 16.0f, 190.0f, 32.0f }; }
+    void openModeDrum() { modeTarget = jlimit (0, 2, proc.chroma().mode); modePos = (float) modeTarget; hoverMode = -1; modeOpen = true; askRepaint (screenPx()); }
+    void closeModeDrum() { if (! modeOpen) return; modeOpen = false; hoverMode = -1; askRepaint (screenPx()); }
+    void chooseMode (int m)
+    {
+        for (int i = 0; i < 3 && proc.chroma().mode != m; ++i) proc.chromaNextMode();
+        modeTarget = m;
+        askRepaint (screenPx());
+    }
+    int modeItemAt (Point<float> p) const
+    {
+        const auto band = modeBand();
+        if (p.x < band.getX() || p.x > band.getRight()) return -1;
+        for (int i = 0; i < 3; ++i)
         {
-            const bool hov = hoverBtn == b.id;
-            const bool red = b.id == bTunerMute && b.active;
-            const bool acc = b.id == bTunerMode;
-            const auto col = red ? Colour (0xffff4d4d) : acc ? TC::amber() : Colour (0xffc7cdd6).withAlpha (hov ? 1.0f : 0.85f);
-            const auto f = monoS (18.8f).withExtraKerningFactor (0.19f);
-            g.setFont (f);
-            g.setColour (hov && ! red && ! acc ? Colours::white : col);
-            g.drawText (b.text, S (b.r), Justification::centred);
-            if (acc || red || hov)
-            {
-                const float tw = unitsOf (f, b.text) - 3.0f;
-                g.setColour ((hov && ! red && ! acc ? Colours::white : col).withAlpha (acc || red ? 1.0f : 0.5f));
-                g.fillRect (S (Rectangle<float> (b.r.getCentreX() - tw * 0.5f, b.r.getCentreY() + 13.5f, tw, 1.8f)));
-            }
+            const float d = (float) i - modePos;
+            const float h = 15.0f * std::cos (d * kModeStep * MathConstants<float>::pi / 180.0f);
+            if (std::abs (p.y - modeY (d)) <= h) return i;
         }
+        return -1;
+    }
+    void drawModeDrum (Graphics& g)
+    {
+        static const char* names[3] = { "MONO", "POLY", "STROBE" };
+        const auto col = TC::amber();
+        g.setColour (Colour (0xff05070b).withAlpha (0.82f));
+        g.fillRect (S (Rectangle<float> (0.0f, 72.0f, kSW, kSH - 72.0f)));
+        const auto band = S (modeBand());
+        for (int l = 3; l >= 1; --l)
+        {
+            g.setColour (col.withAlpha (0.05f));
+            g.fillRoundedRectangle (band.expanded (S (3.0f * (float) l)), S (6.0f + 3.0f * (float) l));
+        }
+        g.setColour (col.withAlpha (0.10f));
+        g.fillRoundedRectangle (band, S (6.0f));
+        g.setColour (col.withAlpha (0.55f));
+        g.drawRoundedRectangle (band, S (6.0f), S (0.9f));
+        const float cx = modeBand().getCentreX();
+        for (int i = 0; i < 3; ++i)
+        {
+            const float d = (float) i - modePos, ad = std::abs (d);
+            const float a = d * kModeStep * MathConstants<float>::pi / 180.0f;
+            float op = jmax (0.08f, 1.0f - ad * 0.32f);
+            if (i == hoverMode && ad > 0.5f) op = jmin (1.0f, op + 0.3f);
+            const bool sel = ad < 0.5f;
+            const auto cy = S (Point<float> (cx, modeY (d)));
+            Graphics::ScopedSaveState ss (g);
+            g.addTransform (AffineTransform::scale (1.0f - ad * 0.08f, (1.0f - ad * 0.08f) * std::cos (a), cy.x, cy.y));
+            g.setFont (monoS (sel ? 21.0f : 19.0f).withExtraKerningFactor (0.22f));
+            g.setColour ((sel ? col : Colour (0xffc7cdd6)).withAlpha (op));
+            g.drawText (names[i], Rectangle<float> (cy.x - S (95.0f), cy.y - S (14.0f), S (190.0f), S (28.0f)), Justification::centred);
+        }
+        // aide : souris + texte, comme le tambour de Semitones
+        const auto hintF = font (tfBold, 11.6f).withExtraKerningFactor (0.14f);
+        const String hintT = CharPointer_UTF8 ("SCROLL  \xc2\xb7  CLICK TO CHOOSE");
+        const float hx = cx - (13.0f + 6.0f + unitsOf (hintF, hintT)) * 0.5f, hy = kModeMidY + kModeR + 26.0f;
+        const auto mr = S (Rectangle<float> (hx, hy, 13.0f, 19.0f));
+        g.setColour (Colour (0xff9aa4b4));
+        g.drawRoundedRectangle (mr, mr.getWidth() * 0.5f, S (1.2f));
+        g.setColour (col);
+        g.fillRoundedRectangle (S (Rectangle<float> (hx + 5.3f, hy + 3.6f, 2.4f, 5.4f)), S (1.2f));
+        g.setFont (hintF);
+        g.setColour (Colour (0xff9aa4b4));
+        g.drawText (hintT, S (Rectangle<float> (hx + 19.0f, hy, 220.0f, 19.0f)), Justification::centredLeft);
     }
 
     // mètre fin : traits blancs (un par cent, moyens tous les 5, grands tous les 10) qui s'effacent vers les bouts,
@@ -3399,6 +3490,18 @@ private:
             const int hd = drumItemAt (toLocal (e.position));
             if (hd != hoverDrum) { hoverDrum = hd; askRepaint (screenPx()); }
         }
+        if (modeOpen)
+        {
+            const int hm = modeItemAt (toLocal (e.position));
+            if (hm != hoverMode) { hoverMode = hm; askRepaint (screenPx()); }
+        }
+        if (tunerShown())                                    // survol du mode, de l'accordage et du La
+        {
+            const auto lp = toLocal (e.position);
+            const auto t = tunerTop();
+            const int ht = t.mode.expanded (8.0f, 6.0f).contains (lp) ? 1 : t.name.expanded (8.0f, 6.0f).contains (lp) ? 2 : t.ref.expanded (8.0f, 6.0f).contains (lp) ? 3 : 0;
+            if (ht != hoverTunerTop) { hoverTunerTop = ht; askRepaint (screenPx()); }
+        }
         updateHover (toLocal (e.position));
         const int hc = comboAt (e.position / s);
         if (hc != hoverCombo && hc >= 0) eng.say (eng.comboTitle (hc) + "   (click : run, right-click : set)", 3000.0);
@@ -3446,6 +3549,14 @@ private:
 
         if (! L::glass.contains (unit)) { closeSemiDrum(); if (e.mods.isPopupMenu()) pedalMenu(); return; }
 
+        // tambour du mode de CHROMA ouvert : clic sur un mode = le choisir, ailleurs = fermer
+        if (modeOpen)
+        {
+            const int it = modeItemAt (p);
+            if (it >= 0 && ! e.mods.isPopupMenu()) chooseMode (it);
+            closeModeDrum();
+            return;
+        }
         // tambour de Semitones ouvert : clic sur un preset = le choisir, ailleurs = fermer
         if (semiOpen && ! tunerShown())
         {
@@ -3466,8 +3577,8 @@ private:
             if (e.mods.isPopupMenu()) { pedalMenu(); return; }
             const auto t = tunerTop();
             if (t.name.expanded (8.0f, 6.0f).contains (p)) tuningMenu();          // clic sur le nom de l'accordage
-            else if (t.ref.expanded (0.0f, 6.0f).contains (p)) referenceMenu();     // clic sur « A 440 » : La de référence
-            else if (t.mode.expanded (0.0f, 6.0f).contains (p)) proc.chromaNextMode();
+            else if (t.ref.expanded (8.0f, 6.0f).contains (p)) referenceMenu();     // clic sur « A 440 » : La de référence
+            else if (t.mode.expanded (8.0f, 6.0f).contains (p)) openModeDrum();     // clic sur le mode : tambour
             return;
         }
         if (headerNameRect().contains (p) && ! e.mods.isPopupMenu() && eng.isReady()) { startHeaderRename(); return; }
@@ -3688,6 +3799,13 @@ private:
         const auto p = toLocal (e.position);
         const int dir = w.deltaY < 0 ? 1 : (w.deltaY > 0 ? -1 : 0);
         if (dir == 0 || ! Rectangle<float> (0, 0, kSW, kSH).contains (p)) return;
+        if (modeOpen)
+        {
+            modeTarget = jlimit (0, 2, modeTarget + dir);
+            hoverMode = -1;
+            askRepaint (screenPx());
+            return;
+        }
         if (semiOpen)
         {
             semiTarget = jlimit (0, semi::kCount - 1, semiTarget + dir);
@@ -3717,6 +3835,8 @@ private:
 
     bool keyPressed (const KeyPress& k) override
     {
+        if (k == KeyPress::escapeKey && modeOpen) { closeModeDrum(); return true; }
+        if (k == KeyPress::returnKey && modeOpen) { chooseMode (modeTarget); closeModeDrum(); return true; }
         if (k == KeyPress::escapeKey && semiOpen) { closeSemiDrum(); return true; }
         if (k == KeyPress::returnKey && semiOpen) { chooseSemi (semiTarget); closeSemiDrum(); return true; }
         if (k == KeyPress::escapeKey && overlay != Overlay::none) { closeOverlay(); return true; }
@@ -4240,10 +4360,10 @@ private:
     Image menuPreview (int which)
     {
         captureOnly = true; captured = {};
-        if (which < 100) footswitchMenu (which); else blockMenu (which - 100);
+        if (which == 200) tuningMenu(); else if (which < 100) footswitchMenu (which); else blockMenu (which - 100);
         captureOnly = false;
         PopupMenu main = captured; captured = {};
-        const String openPrefix = which < 100 ? "STOMP : blocks" : "Assign";
+        const String openPrefix = which == 200 ? "" : which < 100 ? "STOMP : blocks" : "Assign";
 
         struct Row { const PopupMenu::Item* it; int h; };
         const int bd = menuLnf.getPopupMenuBorderSize();
@@ -4598,6 +4718,7 @@ void OctopusEditor::showScreen (int which, int arg)
         case 15: view->openMixer (arg); break;   // rendus : mixeur d'un groupe (-1 : fermé)
         case 13: view->recGlowPc = arg; view->askRepaint (view->screenPx()); break;   // rendus : glow de l'effet record
         case 14: view->recColourMenu(); break;
+        case 19: if (arg != 0) view->openModeDrum(); else view->closeModeDrum(); break;   // rendus : tambour du mode de CHROMA
         case 12: view->recPreview = arg == 0 ? -1 : (arg == 1 ? 1 : 2); view->recBlinkOn = arg != 2; view->askRepaint (view->screenPx()); break;   // rendus : 1 = armée (REC fixe), 2 = enregistrement (REC éteint), 3 = enregistrement (REC allumé)
         case 11: view->openPicker ("Semitones colour", view->semiColour(), view->S (view->semiRect()), true, [] (Colour) {}); break;
         default: view->closeSemiDrum(); view->closeOverlay(); break;

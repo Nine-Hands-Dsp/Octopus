@@ -377,6 +377,14 @@ int main (int argc, char** argv)
         pump (10);
         play (73.42, 2.0);
         shot ("octopus_tuner_poly");
+        ed->showScreen (19, 1); pump (6);
+        shot ("octopus_tuner_mode_drum");
+        ed->showScreen (19, 0); pump (2);
+        {
+            auto img = ed->menuPreview (200);                                // menu des accordages
+            File f (out + "/octopus_menu_tunings.png"); f.deleteFile();
+            FileOutputStream os (f); PNGImageFormat().writeImageToStream (img, os);
+        }
         check (proc.chroma().on && proc.chroma().notes.size() == 7, "accordeur : CHROMA allumé, accordage lu dans CHROMA (" + proc.chroma().tuningName + ")");
         {
             auto& lib = proc.tuningLibrary();

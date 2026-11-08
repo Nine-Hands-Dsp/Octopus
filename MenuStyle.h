@@ -353,4 +353,34 @@ namespace MenuStyle
             if (changed) changed();
         }
     };
+
+    // ------------------------------------------------------------------ ligne à deux colonnes (accordages : nom | notes alignées)
+    struct TwoColItem : public PopupMenu::CustomComponent
+    {
+        Fonts f; String left, right; float colX; bool ticked;
+        TwoColItem (Fonts fo, String l, String r, float cx, bool t) : CustomComponent (true), f (fo), left (l), right (r), colX (cx), ticked (t) {}
+        static float leftWidth (const Fonts& fo, const String& t) { return GlyphArrangement::getStringWidth (fnt (fo.med, 15.0f), t); }
+        void getIdealSize (int& w, int& h) override
+        {
+            w = (int) std::ceil (38.0f + colX + GlyphArrangement::getStringWidth (fnt (f.reg, 14.0f), right) + 22.0f);
+            h = 32;
+        }
+        void paint (Graphics& g) override
+        {
+            const auto a = getLocalBounds().toFloat();
+            const bool hi = isItemHighlighted();
+            if (hi)
+            {
+                g.setColour (kHover);
+                g.fillRoundedRectangle (a.reduced (5.0f, 1.0f), 7.0f);
+            }
+            if (ticked) drawCheck (g, Rectangle<float> (17.0f, 17.0f).withCentre ({ 22.0f, a.getCentreY() }), kAccent, 2.0f);
+            g.setFont (fnt (f.med, 15.0f));
+            g.setColour (hi ? Colours::white : kText);
+            g.drawText (left, Rectangle<float> (38.0f, 0.0f, colX, a.getHeight()), Justification::centredLeft, true);
+            g.setFont (fnt (f.reg, 14.0f));
+            g.setColour (hi ? kText : kDim);
+            g.drawText (right, Rectangle<float> (38.0f + colX, 0.0f, a.getWidth() - 38.0f - colX - 8.0f, a.getHeight()), Justification::centredLeft, true);
+        }
+    };
 }
