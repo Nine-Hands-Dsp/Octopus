@@ -16,7 +16,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHOTS = sys.argv[1]
 OUT = sys.argv[2]
-VERSION = "1.12.2"
+VERSION = "1.13.0"
 TMP = os.path.join(os.path.dirname(os.path.abspath(OUT)), "manual_tmp")
 os.makedirs(TMP, exist_ok=True)
 
@@ -28,7 +28,7 @@ ACC = colors.HexColor("#1E9BD0"); DARK = colors.HexColor("#1A1C22"); GREY = colo
 # ---------- capture annotée (repère 1249 x 934 du plugin) ----------
 src = Image.open(os.path.join(SHOTS, "octopus_100pc.png")).convert("RGB")
 k = src.height / 934.0
-marks = [(n, x, y) for n, x, y in ((1, 110.3, 62.5), (2, 258.1, 62.5), (3, 707.7, 62.5), (4, 913.9, 62.5), (5, 1065.0, 62.5), (6, 1156.3, 62.5), (7, 160.2, 187.8), (8, 624.8, 383.5), (9, 1175.5, 407.9), (10, 180.4, 703.0), (11, 482.5, 868.3), (12, 465.0, 808.5), (13, 447.7, 62.5), (14, 539.6, 62.5))]   # repère 1249 x 934 (cadre du 07/11)
+marks = [(n, x, y) for n, x, y in ((1, 75.7, 62.5), (2, 201.8, 62.5), (3, 700.6, 62.5), (4, 891.9, 62.5), (5, 1050.1, 62.5), (6, 1151.8, 62.5), (7, 160.2, 187.8), (8, 624.8, 383.5), (9, 1175.5, 407.9), (10, 180.4, 703.0), (11, 482.5, 868.3), (12, 465.0, 808.5), (13, 425.2, 62.5), (14, 534.7, 62.5))]   # repère 1249 x 934 (cadre du 07/11)
 ann = src.copy(); dr = ImageDraw.Draw(ann)
 fnt = ImageFont.truetype(os.path.join(ROOT, "fonts", "Poppins-Bold.ttf"), 26)
 for n, x, y in marks:
@@ -184,7 +184,7 @@ T = {
  par_t="Parallel paths (split / merge)",
  par=["Run <b>two or three paths side by side</b> and mix them, to stack two amps, an amp and a clean DI, or two amp + IR pairs. On the screen a group starts at a <b>Y</b> point and ends at an <b>M</b> point; its paths A, B, C are drawn one under the other, with blocks of the same size, and its row grows to make room.",
       "<b>Create a split</b>: right-click a block &gt; <b>Split here</b> (the block stays on path A, path B is empty with its <b>+</b> box), or <b>drag a block just under another one</b> (an orange SPLIT box shows where it lands, on path B). Dragging a block under the last path of a group (NEW PATH box) adds path C. Click the <b>+</b> of an empty path to add effects to it; inside a group, blocks are moved from one path to another, or out of the group, by drag and drop.",
-      "<b>Click M</b>: the mixer of the group - level (-60 to +12 dB, click the value: 0 dB), pan, <b>phase</b> (stacked amps with their IRs can cancel each other: flip one) and mute of each path. <b>Click Y</b>: the group folds into one block (|| 2 PATHS), a click unfolds it. <b>Right-click Y or M</b>: mix, bypass the group (dry signal), fold, add / remove a path, merge the paths in series, assign the group to a footswitch (STOMP). A group never splits across two rows; a long chain scrolls.",
+      "<b>Click M</b>: the mixer of the group - level (-60 to +12 dB, click the value: 0 dB), pan, <b>phase</b> (stacked amps with their IRs can cancel each other: flip one) and mute of each path. <b>Click Y</b>: the group folds into one block (|| 2 PATHS), a click unfolds it. <b>Right-click Y or M</b>: mix, bypass the group (dry signal), fold, add / remove a path, merge the paths in series, assign the group to a footswitch (STOMP), or <b>switch path A / B with a footswitch</b>: each press lets only one path play (A, then B, then C...), the others are muted in the mixer with a 10 ms fade, no click; the footswitch is lit on B. A group never splits across two rows; a long chain scrolls.",
       "How it works in REAPER: Octopus places four small JS effects of its own around the paths (Nine Hands Split, Path B, Path C, Merge, installed in REAPER's Effects folder, NINE HANDS/Routing) and gives the track 8 channels; every plug-in stays on channels 1/2. Presets keep the groups and their mix. REAPER does not realign the paths when a plug-in of one path adds latency: prefer zero-latency amps and IRs in parallel paths."],
  par_cap="Two paths (amp + IR on each) between Y and M; right, the mixer opened by a click on M.",
  pre_t="5. Banks and presets",
@@ -310,7 +310,7 @@ T = {
  par_t="Voies parallèles (split / merge)",
  par=["Faites passer le son par <b>deux ou trois voies côte à côte</b> et mélangez-les, pour empiler deux amplis, un ampli et un son clair (DI), ou deux paires ampli + IR. À l'écran, un groupe commence à un point <b>Y</b> et finit à un point <b>M</b> ; ses voies A, B, C sont dessinées l'une sous l'autre, avec des blocs de même taille, et sa rangée s'agrandit pour leur faire de la place.",
       "<b>Créer un split</b> : clic droit sur un bloc &gt; <b>Split here</b> (le bloc reste en voie A, la voie B est vide avec sa case <b>+</b>), ou <b>glissez un bloc juste sous un autre</b> (une case orange SPLIT montre où il se pose, en voie B). Glisser un bloc sous la dernière voie d'un groupe (case NEW PATH) ajoute la voie C. Cliquez sur le <b>+</b> d'une voie vide pour y ajouter des effets ; dans un groupe, les blocs se déplacent d'une voie à l'autre, ou hors du groupe, par glisser-déposer.",
-      "<b>Clic sur M</b> : le mixeur du groupe - niveau (-60 à +12 dB, clic sur la valeur : 0 dB), pan, <b>phase</b> (deux amplis empilés avec leurs IR peuvent s'annuler : inversez-en un) et mute de chaque voie. <b>Clic sur Y</b> : le groupe se replie en un seul bloc (|| 2 PATHS), un clic le déplie. <b>Clic droit sur Y ou M</b> : mixer, couper le groupe (signal sec), replier, ajouter / retirer une voie, remettre les voies en série, assigner le groupe à un footswitch (STOMP). Un groupe ne se coupe jamais entre deux rangées ; une chaîne longue défile.",
+      "<b>Clic sur M</b> : le mixeur du groupe - niveau (-60 à +12 dB, clic sur la valeur : 0 dB), pan, <b>phase</b> (deux amplis empilés avec leurs IR peuvent s'annuler : inversez-en un) et mute de chaque voie. <b>Clic sur Y</b> : le groupe se replie en un seul bloc (|| 2 PATHS), un clic le déplie. <b>Clic droit sur Y ou M</b> : mixer, couper le groupe (signal sec), replier, ajouter / retirer une voie, remettre les voies en série, assigner le groupe à un footswitch (STOMP), ou <b>passer de la voie A à la voie B au footswitch</b> : chaque appui ne laisse sonner qu'une voie (A, puis B, puis C...), les autres sont coupées dans le mixeur avec un fondu de 10 ms, sans clic ; le footswitch est allumé sur B. Un groupe ne se coupe jamais entre deux rangées ; une chaîne longue défile.",
       "Dans REAPER : Octopus place autour des voies quatre petits effets JS à lui (Nine Hands Split, Path B, Path C, Merge, installés dans le dossier Effects de REAPER, NINE HANDS/Routing) et passe la piste à 8 canaux ; tous les plugins restent sur les canaux 1/2. Les presets gardent les groupes et leur mixage. REAPER ne recale pas les voies quand un plugin d'une voie ajoute de la latence : préférez des amplis et des IR sans latence dans les voies parallèles."],
  par_cap="Deux voies (ampli + IR sur chacune) entre Y et M ; à droite, le mixeur ouvert par un clic sur M.",
  pre_t="5. Banks et presets",

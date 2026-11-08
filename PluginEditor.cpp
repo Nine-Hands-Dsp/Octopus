@@ -492,7 +492,8 @@ private:
     }
 
     // ---- nom du preset chargé : clic sur le nom en haut de l'écran pour le changer
-    Rectangle<float> headerNameRect() const { return { 132.0f, 8.0f, jmax (120.0f, chromaLeft() - kHdrGap - 132.0f), 36.0f }; }
+    Rectangle<float> headerNameRect() const { return { kNameX, 9.0f, jmax (120.0f, chromaLeft() - kHG - kNameX), 34.0f }; }
+    static Rectangle<float> badgeRect() { return { kHdrGap, (kHeaderH - kBadge) * 0.5f, kBadge, kBadge }; }
     void startHeaderRename()
     {
         const int cur = eng.current();
@@ -1232,13 +1233,13 @@ private:
     Rectangle<float> semiRect() const
     {
         const auto& p = semi::get (proc.semitonesPreset());
-        const float tw = jmax (unitsOf (font (tfBold, 13.3f), p.name), unitsOf (semiLabelFont(), "SEMITONES"));
-        const float w = jlimit (96.0f, 170.0f, 5.3f + 26.0f + 7.1f + tw + 9.5f);
-        return { kBankPrevX - kHdrGap - w, 19.0f, w, 36.0f };
+        const float tw = jmax (unitsOf (font (tfBold, 16.0f), p.name), unitsOf (semiLabelFont(), "SEMITONES"));
+        const float w = jlimit (80.0f, 160.0f, 26.0f + 8.0f + tw + 2.0f);
+        return { kSep1X - kHG - w, 19.0f, w, 36.0f };
     }
     // mini CHROMA : anneau à gauche de la case, chevrons rouges à droite (trop bas : vers le bas, trop haut : vers le haut ;
     // deux chevrons à partir de 10 cents d'écart) pendant que la note sonne
-    Rectangle<float> chromaRect() const { return { semiRect().getX() - kHdrGap - 54.0f, 19.0f, 54.0f, 36.0f }; }
+    Rectangle<float> chromaRect() const { return { semiRect().getX() - kHG - 42.0f, 19.0f, 42.0f, 36.0f }; }
     float chromaLeft() const { return chromaRect().getX(); }
 
     // anneau lumineux : halo (opacité glowPc %) puis trait net
@@ -1288,9 +1289,9 @@ private:
     void drawMiniChroma (Graphics& g)
     {
         const auto b = chromaRect();
-        drawHeaderBox (g, b, hoverBtn == bChroma);
         const auto n = miniNote();
-        const auto c = S (Point<float> (b.getX() + 18.0f, b.getCentreY()));
+        const auto c = S (Point<float> (b.getX() + 12.0f, b.getCentreY()));
+        if (hoverBtn == bChroma) { g.setColour (Colours::white.withAlpha (0.06f)); g.fillEllipse (Rectangle<float> (S (34.0f), S (34.0f)).withCentre (c)); }
         const float rad = S (11.6f), w = S (2.1f);
         g.setColour (Colours::black.withAlpha (0.4f));
         g.fillEllipse (Rectangle<float> (rad * 2.0f, rad * 2.0f).withCentre (c));
@@ -1324,7 +1325,7 @@ private:
         const bool up = n.cents > 0.0f;
         const auto col = chromaOffColour();
         const float k = (float) chromaGlowPc / 100.0f;
-        const float x = b.getX() + 43.0f, cy = b.getCentreY(), d = up ? -1.0f : 1.0f;
+        const float x = b.getX() + 35.0f, cy = b.getCentreY(), d = up ? -1.0f : 1.0f;
         auto chevron = [&] (float y)
         {
             const float wdt = 10.0f, hgt = 6.0f;
@@ -1349,8 +1350,9 @@ private:
         const auto b = semiRect();
         const int idx = proc.semitonesPreset();
         const auto& p = semi::get (idx);
-        drawHeaderBox (g, b, hoverBtn == bSemi || semiOpen);
-        const auto c = S (Point<float> (b.getX() + 5.3f + 13.0f, b.getCentreY()));
+        const bool hovS = hoverBtn == bSemi || semiOpen;
+        const auto c = S (Point<float> (b.getX() + 13.0f, b.getCentreY()));
+        if (hovS) { g.setColour (Colours::white.withAlpha (0.06f)); g.fillEllipse (Rectangle<float> (S (32.0f), S (32.0f)).withCentre (c)); }
         const float rad = S (11.0f), w = S (2.26f);
         g.setColour (Colours::black.withAlpha (0.4f));
         g.fillEllipse (Rectangle<float> (rad * 2.0f, rad * 2.0f).withCentre (c));
@@ -1364,13 +1366,13 @@ private:
         g.setFont (font (tfBold, 14.1f));
         g.setColour (Colours::white);
         g.drawText (semiValue (p.semis), Rectangle<float> (rad * 2.2f, rad * 2.0f).withCentre (c), Justification::centred);
-        const float tx = b.getX() + 5.3f + 26.0f + 7.1f;
+        const float tx = b.getX() + 26.0f + 8.0f;
         g.setFont (semiLabelFont());
         g.setColour (Colour (0xff9aa3b2));
         g.drawText ("SEMITONES", S (Rectangle<float> (tx, b.getY() + 4.5f, b.getRight() - tx - 2.0f, 12.0f)), Justification::centredLeft, false);
-        g.setFont (font (tfBold, 13.3f));
+        g.setFont (font (tfBold, 16.0f));
         g.setColour (Colour (0xfff2f5f9));
-        g.drawText (p.name, S (Rectangle<float> (tx, b.getY() + 16.0f, b.getRight() - tx - 2.0f, 15.0f)), Justification::centredLeft, true);
+        g.drawText (p.name, S (Rectangle<float> (tx, b.getY() + 15.0f, b.getRight() - tx - 2.0f, 18.0f)), Justification::centredLeft, true);
     }
 
     // ---- tambour : presets sur un cylindre vertical, le preset choisi dans la bande du milieu
@@ -1564,19 +1566,23 @@ private:
     // ------------------------------------------------------------ boutons
     // en-tête : marge de 14 avec les bords de l'écran (badge du preset à gauche, BANKS à droite) et 14 entre tous les éléments
     static constexpr float kHdrGap = 14.0f;
-    static constexpr float kBanksX = kSW - kHdrGap - 78.0f, kSaveX = kBanksX - kHdrGap - 72.0f, kStompX = kSaveX - kHdrGap - 84.0f,
-                           kPresetX = kStompX - kHdrGap - 84.0f, kBankNextX = kPresetX - kHdrGap - 34.0f,
-                           kBankTextX = kBankNextX - 106.0f, kBankPrevX = kBankTextX - 34.0f;
+    // en-tête épuré (v1.13) : sans cadres ; à droite, séparateurs fins entre BANK, PRESET / STOMP et SAVE / BANKS
+    static constexpr float kHG = 16.0f;                                               // écart entre les éléments
+    static constexpr float kBanksX = kSW - kHdrGap - 82.0f, kSaveX = kBanksX - kHG - 70.0f, kSep3X = kSaveX - kHG,
+                           kStompX = kSep3X - kHG - 64.0f, kPresetX = kStompX - kHG - 72.0f, kSep2X = kPresetX - kHG,
+                           kBankNextX = kSep2X - kHG - 24.0f, kBankTextX = kBankNextX - 82.0f, kBankPrevX = kBankTextX - 24.0f,
+                           kSep1X = kBankPrevX - kHG;
+    static constexpr float kBadge = 44.0f, kNameX = kHdrGap + kBadge + 16.0f;
     std::vector<Btn> headerButtons() const
     {
         std::vector<Btn> v;
         // de droite à gauche, même écart (kHdrGap = marge du bord de l'écran) entre tous les éléments de l'en-tête
-        v.push_back ({ { kBankPrevX, 19.0f, 34.0f, 36.0f }, bBankPrev, CharPointer_UTF8 ("\xe2\x97\x80") });
-        v.push_back ({ { kBankNextX, 19.0f, 34.0f, 36.0f }, bBankNext, CharPointer_UTF8 ("\xe2\x96\xb6") });
-        v.push_back ({ { kPresetX, 19.0f, 84.0f, 36.0f }, bModePreset, "PRESET", eng.mode() == OctopusEngine::presetMode });
-        v.push_back ({ { kStompX, 19.0f, 84.0f, 36.0f }, bModeStomp, "STOMP", eng.mode() == OctopusEngine::stompMode });
-        v.push_back ({ { kSaveX, 19.0f, 72.0f, 36.0f }, bSave, "SAVE", false, eng.isReady() });
-        v.push_back ({ { kBanksX, 19.0f, 78.0f, 36.0f }, bBanks, "BANKS", overlay == Overlay::banks });
+        v.push_back ({ { kBankPrevX, 19.0f, 24.0f, 36.0f }, bBankPrev, "<" });
+        v.push_back ({ { kBankNextX, 19.0f, 24.0f, 36.0f }, bBankNext, ">" });
+        v.push_back ({ { kPresetX, 19.0f, 72.0f, 36.0f }, bModePreset, "PRESET", eng.mode() == OctopusEngine::presetMode });
+        v.push_back ({ { kStompX, 19.0f, 64.0f, 36.0f }, bModeStomp, "STOMP", eng.mode() == OctopusEngine::stompMode });
+        v.push_back ({ { kSaveX, 19.0f, 70.0f, 36.0f }, bSave, "SAVE", false, eng.isReady() });
+        v.push_back ({ { kBanksX, 19.0f, 82.0f, 36.0f }, bBanks, "BANKS", overlay == Overlay::banks });
         return v;
     }
 
@@ -1734,26 +1740,26 @@ private:
         g.setColour (kFaint.withAlpha (0.6f));
         g.fillRect (S (Rectangle<float> (0.0f, kHeaderH - 1.0f, kSW, 1.0f)));
 
-        // preset chargé
+        // preset chargé : badge carré, de la couleur du footswitch de ce preset (BANKS > FOOTSWITCH COLOURS)
         const int cur = eng.current();
-        const auto badge = S (Rectangle<float> (14.0f, 13.0f, 104.0f, 48.0f));
-        // même couleur que le footswitch de ce preset (choisie dans BANKS > FOOTSWITCH COLOURS)
+        const auto badge = S (badgeRect());
         const auto badgeCol = cur >= 0 ? Colour (eng.presetColour (cur)) : kScrPanel2;
         g.setColour (badgeCol);
-        g.fillRoundedRectangle (badge, S (8.0f));
-        g.setFont (font (tfBold, 32.0f));
+        g.fillRoundedRectangle (badge, S (10.0f));
+        g.setFont (font (tfBold, 25.0f));
         g.setColour (cur < 0 ? kDim : badgeCol.getPerceivedBrightness() > 0.55f ? kScrBg : Colours::white);
-        g.drawText (cur >= 0 ? OctopusEngine::label (cur) : String ("--"), badge.translated (0.0f, S (1.5f)), Justification::centred);
+        g.drawText (cur >= 0 ? OctopusEngine::label (cur) : String ("--"), badge.translated (0.0f, S (1.0f)), Justification::centred);
 
         const String name = cur >= 0 ? eng.displayName (cur) : String (eng.isReady() ? "Live chain" : "OCTOPUS");
         const auto nameR = S (headerNameRect());
-        g.setFont (font (tfMedium, 26.0f));
+        const auto nameFont = font (tfBold, 24.0f);
+        g.setFont (nameFont);
         g.setColour (kText);
         if (! headerRenaming) g.drawText (name, nameR, Justification::centredLeft, true);
         if (eng.modified() && ! headerRenaming)
         {
-            const float tw = jmin (nameR.getWidth() - S (60.0f), GlyphArrangement::getStringWidth (font (tfMedium, 26.0f), name));
-            g.setFont (font (tfBold, 14.0f));
+            const float tw = jmin (nameR.getWidth() - S (60.0f), GlyphArrangement::getStringWidth (nameFont, name));
+            g.setFont (font (tfBold, 13.0f));
             g.setColour (kAmber);
             g.drawText ("EDITED", Rectangle<float> (nameR.getX() + tw + S (10.0f), nameR.getY() + S (9.0f), S (60.0f), S (18.0f)), Justification::centredLeft);
         }
@@ -1761,17 +1767,86 @@ private:
         const auto msg = eng.message();
         String sub = eng.trackName().isNotEmpty() ? eng.trackName() : eng.statusText();
         if (msg.isNotEmpty()) sub = msg;
-        g.setFont (font (tfRegular, 17.0f));
+        g.setFont (font (tfRegular, 15.0f));
         g.setColour (msg.isNotEmpty() ? kAccent : kDim);
-        g.drawText (sub, S (Rectangle<float> (132.0f, 44.0f, headerNameRect().getWidth(), 22.0f)), Justification::centredLeft, true);
+        g.drawText (sub, S (Rectangle<float> (kNameX, 41.0f, headerNameRect().getWidth(), 20.0f)), Justification::centredLeft, true);
 
-        // bank affichée
-        g.setFont (font (tfBold, 17.0f));
+        // séparateurs fins
+        for (float x : { kSep1X, kSep2X, kSep3X })
+        {
+            g.setColour (Colour (0xff232933));
+            g.fillRect (S (Rectangle<float> (x, 20.0f, 1.0f, 34.0f)));
+        }
+
+        // bank affichée : ‹ BANK 01 ›
+        g.setFont (font (tfBold, 18.2f).withExtraKerningFactor (0.08f));
         g.setColour (kText);
-        g.drawText ("BANK " + String (eng.bank() + 1).paddedLeft ('0', 2), S (Rectangle<float> (kBankTextX, 19.0f, 106.0f, 36.0f)), Justification::centred);
-        for (auto& b : headerButtons()) drawButton (g, b);
+        g.drawText ("BANK " + String (eng.bank() + 1).paddedLeft ('0', 2), S (Rectangle<float> (kBankTextX, 19.0f, 82.0f, 36.0f)), Justification::centred);
+        for (auto& b : headerButtons()) drawHeaderItem (g, b);
         drawMiniChroma (g);
         drawSemiButton (g);
+    }
+
+    // éléments de l'en-tête, sans cadre : flèches, onglets PRESET / STOMP (soulignés), SAVE / BANKS (icône + texte)
+    void drawHeaderItem (Graphics& g, const Btn& b)
+    {
+        const bool hov = hoverBtn == b.id && b.enabled;
+        const auto r0 = b.r;
+        if (b.id == bBankPrev || b.id == bBankNext)
+        {
+            const auto cc = r0.getCentre();
+            const float dx = b.id == bBankPrev ? 1.0f : -1.0f;
+            Path p;
+            p.startNewSubPath (S (Point<float> (cc.x + 2.5f * dx, cc.y - 5.0f)));
+            p.lineTo (S (Point<float> (cc.x - 2.5f * dx, cc.y)));
+            p.lineTo (S (Point<float> (cc.x + 2.5f * dx, cc.y + 5.0f)));
+            g.setColour (hov ? kText : kDim);
+            g.strokePath (p, PathStrokeType (S (1.9f), PathStrokeType::curved, PathStrokeType::rounded));
+            return;
+        }
+        if (b.id == bModePreset || b.id == bModeStomp)
+        {
+            const auto acc = b.id == bModeStomp ? kStompOrange : kAccent;
+            const auto f = font (tfBold, 15.4f).withExtraKerningFactor (0.14f);
+            g.setFont (f);
+            g.setColour (b.active ? kText : (hov ? kText.withAlpha (0.85f) : kDim));
+            g.drawText (b.text, S (r0), Justification::centred, false);
+            if (b.active)
+            {
+                const float tw = unitsOf (f, b.text) + 4.0f;
+                const auto line = Rectangle<float> (tw, 2.2f).withCentre ({ r0.getCentreX(), r0.getBottom() - 4.0f });
+                g.setColour (acc.withAlpha (0.35f));
+                g.fillRoundedRectangle (S (line.expanded (1.5f, 1.5f)), S (2.5f));
+                g.setColour (acc);
+                g.fillRoundedRectangle (S (line), S (1.1f));
+            }
+            return;
+        }
+        // SAVE / BANKS : petite icône + texte
+        const auto col = ! b.enabled ? kFaint : (b.active ? kAccent : (hov ? kText : kDim));
+        const auto f = font (tfBold, 15.4f).withExtraKerningFactor (0.1f);
+        const float tw = unitsOf (f, b.text), iw = 15.0f, gap = 7.0f;
+        const float x0 = r0.getCentreX() - (iw + gap + tw) * 0.5f, cy = r0.getCentreY();
+        g.setColour (col);
+        const auto ib = Rectangle<float> (x0, cy - iw * 0.5f, iw, iw);
+        if (b.id == bSave)
+        {
+            Path p;
+            p.startNewSubPath (S (Point<float> (ib.getX() + 2.0f, ib.getY() + 2.0f)));
+            p.lineTo (S (Point<float> (ib.getX() + 10.5f, ib.getY() + 2.0f)));
+            p.lineTo (S (Point<float> (ib.getRight() - 2.0f, ib.getY() + 4.5f)));
+            p.lineTo (S (Point<float> (ib.getRight() - 2.0f, ib.getBottom() - 2.0f)));
+            p.lineTo (S (Point<float> (ib.getX() + 2.0f, ib.getBottom() - 2.0f)));
+            p.closeSubPath();
+            p.addRectangle (S (Rectangle<float> (ib.getX() + 4.5f, ib.getY() + 2.0f, 5.0f, 3.5f)));
+            p.addRectangle (S (Rectangle<float> (ib.getX() + 4.5f, ib.getY() + 8.5f, 6.0f, 4.5f)));
+            g.strokePath (p, PathStrokeType (S (1.4f), PathStrokeType::mitered, PathStrokeType::rounded));
+        }
+        else
+            for (int k = 0; k < 4; ++k)
+                g.drawRoundedRectangle (S (Rectangle<float> (ib.getX() + 1.5f + (float) (k % 2) * 7.0f, ib.getY() + 1.5f + (float) (k / 2) * 7.0f, 5.0f, 5.0f)), S (1.2f), S (1.4f));
+        g.setFont (f);
+        g.drawText (b.text, S (Rectangle<float> (x0 + iw + gap, r0.getY(), tw + 6.0f, r0.getHeight())), Justification::centredLeft, false);
     }
 
     void drawNotReady (Graphics& g)
@@ -3084,7 +3159,7 @@ private:
             return;
         }
         if (headerNameRect().contains (p) && ! e.mods.isPopupMenu() && eng.isReady()) { startHeaderRename(); return; }
-        if (Rectangle<float> (14.0f, 13.0f, 104.0f, 48.0f).contains (p) && eng.current() >= 0) { presetColourMenu (eng.current()); return; }
+        if (badgeRect().contains (p) && eng.current() >= 0) { presetColourMenu (eng.current()); return; }
         if (overlay == Overlay::none && e.mods.isPopupMenu() && eng.isReady() && recMarkAt (p)) { recColourMenu(); return; }   // effet record : couleur & glow
 
         if (overlay == Overlay::browser)
@@ -3420,7 +3495,7 @@ private:
     void presetColourMenu (int idx)
     {
         openPicker ("Preset " + OctopusEngine::label (idx) + " colour", Colour (eng.presetColour (idx)),
-                    S (Rectangle<float> (14.0f, 13.0f, 104.0f, 48.0f)), true,
+                    S (badgeRect()), true,
                     [this, idx] (Colour c) { eng.setPresetColour (idx, c.getARGB()); },
                     [this, idx] { eng.setPresetColour (idx, 0); });
     }
