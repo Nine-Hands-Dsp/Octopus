@@ -1230,9 +1230,10 @@ private:
         const float w = jlimit (96.0f, 170.0f, 5.3f + 26.0f + 7.1f + tw + 9.5f);
         return { kBankPrevX - kHdrGap - w, 19.0f, w, 36.0f };
     }
-    // mini CHROMA ; à sa gauche, un chevron rouge (trop bas : vers le bas, trop haut : vers le haut) pendant que la note sonne
-    Rectangle<float> chromaRect() const { return { semiRect().getX() - kHdrGap - 36.0f, 19.0f, 36.0f, 36.0f }; }
-    float chromaLeft() const { return chromaRect().getX() - 16.0f; }
+    // mini CHROMA : anneau à gauche de la case, chevrons rouges à droite (trop bas : vers le bas, trop haut : vers le haut ;
+    // deux chevrons à partir de 10 cents d'écart) pendant que la note sonne
+    Rectangle<float> chromaRect() const { return { semiRect().getX() - kHdrGap - 54.0f, 19.0f, 54.0f, 36.0f }; }
+    float chromaLeft() const { return chromaRect().getX(); }
 
     // anneau lumineux : halo (opacité glowPc %) puis trait net
     void glowArc (Graphics& g, Point<float> c, float rad, float w, float from, float to, Colour col, int glowPc)
@@ -1283,7 +1284,7 @@ private:
         const auto b = chromaRect();
         drawHeaderBox (g, b, hoverBtn == bChroma);
         const auto n = miniNote();
-        const auto c = S (b.getCentre());
+        const auto c = S (Point<float> (b.getX() + 18.0f, b.getCentreY()));
         const float rad = S (11.6f), w = S (2.1f);
         g.setColour (Colours::black.withAlpha (0.4f));
         g.fillEllipse (Rectangle<float> (rad * 2.0f, rad * 2.0f).withCentre (c));
@@ -1309,26 +1310,32 @@ private:
         }
     }
 
-    // chevron à gauche de la case : sous la note affichée -> vers le bas, au-dessus -> vers le haut ; rien si juste ou sans son
+    // chevrons à droite de l'anneau : sous la note affichée -> vers le bas, au-dessus -> vers le haut ; un chevron quand on est
+    // un peu faux, deux à partir de 10 cents ; rien si la note est juste ou sans son
     void drawMiniArrow (Graphics& g, const MiniNote& n, Rectangle<float> b)
     {
         if (! n.has || ! n.sounding || n.inTune) return;
         const bool up = n.cents > 0.0f;
         const auto col = chromaOffColour();
         const float k = (float) chromaGlowPc / 100.0f;
-        const Point<float> cc { b.getX() - 9.0f, b.getCentreY() };
-        const float wdt = 10.0f, hgt = 6.5f, sgn = up ? -1.0f : 1.0f;
-        Path p;
-        p.startNewSubPath (S (Point<float> (cc.x - wdt * 0.5f, cc.y - sgn * hgt * 0.5f)));
-        p.lineTo (S (Point<float> (cc.x, cc.y + sgn * hgt * 0.5f)));
-        p.lineTo (S (Point<float> (cc.x + wdt * 0.5f, cc.y - sgn * hgt * 0.5f)));
-        for (auto l : { 3.2f, 2.0f })
+        const float x = b.getX() + 43.0f, cy = b.getCentreY(), d = up ? -1.0f : 1.0f;
+        auto chevron = [&] (float y)
         {
-            g.setColour (col.withAlpha (jmin (1.0f, 0.14f * k)));
-            g.strokePath (p, PathStrokeType (S (2.0f * l), PathStrokeType::curved, PathStrokeType::rounded));
-        }
-        g.setColour (col);
-        g.strokePath (p, PathStrokeType (S (2.0f), PathStrokeType::curved, PathStrokeType::rounded));
+            const float wdt = 10.0f, hgt = 6.0f;
+            Path p;
+            p.startNewSubPath (S (Point<float> (x - wdt * 0.5f, y - d * hgt * 0.5f)));
+            p.lineTo (S (Point<float> (x, y + d * hgt * 0.5f)));
+            p.lineTo (S (Point<float> (x + wdt * 0.5f, y - d * hgt * 0.5f)));
+            for (auto l : { 3.2f, 2.0f })
+            {
+                g.setColour (col.withAlpha (jmin (1.0f, 0.14f * k)));
+                g.strokePath (p, PathStrokeType (S (2.0f * l), PathStrokeType::curved, PathStrokeType::rounded));
+            }
+            g.setColour (col);
+            g.strokePath (p, PathStrokeType (S (2.0f), PathStrokeType::curved, PathStrokeType::rounded));
+        };
+        if (std::abs (n.cents) >= 10.0f) { chevron (cy - 3.6f * d); chevron (cy + 3.6f * d); }
+        else chevron (cy);
     }
 
     void drawSemiButton (Graphics& g)
