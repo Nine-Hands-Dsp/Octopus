@@ -1600,7 +1600,7 @@ private:
     {
         std::vector<Btn> v;
         if (overlay == Overlay::none) return v;
-        v.push_back ({ overlay == Overlay::browser ? Rectangle<float> (1012.0f, kRowY, 36.0f, kRowH) : Rectangle<float> (1008.0f, 84.0f, 40.0f, 36.0f),
+        v.push_back ({ overlay == Overlay::browser ? Rectangle<float> (kCloseX, kRowY, 36.0f, kRowH) : Rectangle<float> (1008.0f, 84.0f, 40.0f, 36.0f),
                        bClose, CharPointer_UTF8 ("\xe2\x9c\x95") });
         if (overlay == Overlay::browser)
         {
@@ -1614,11 +1614,11 @@ private:
             }
             // ligne du titre : emplacement (menu), tri, sélection, ADD, rescan, fermer
             v.push_back ({ insertWhereRect(), bInsertWhere, insertWhereText() });
-            v.push_back ({ { kSortX, kRowY - 1.0f, 62.0f, kRowH + 2.0f }, bSortAZ, "A - Z", ! browserByType });
-            v.push_back ({ { kSortX + 62.0f, kRowY - 1.0f, 62.0f, kRowH + 2.0f }, bSortType, "TYPE", browserByType });
+            v.push_back ({ { kSortX + 3.0f, kRowY + 3.0f, 60.0f, kRowH - 6.0f }, bSortAZ, "A - Z", ! browserByType });     // dans l'interrupteur
+            v.push_back ({ { kSortX + 63.0f, kRowY + 3.0f, 60.0f, kRowH - 6.0f }, bSortType, "TYPE", browserByType });
             if (picked.size() > 0) v.push_back ({ selPillRect(), bClearPicked, String (picked.size()) + " selected", false, true });
-            v.push_back ({ { 862.0f, kRowY, 102.0f, kRowH }, bAddPicked, picked.isEmpty() ? String ("ADD") : "ADD " + String (picked.size()), picked.size() > 0, picked.size() > 0 });
-            v.push_back ({ { 970.0f, kRowY, 36.0f, kRowH }, bReload, {} });
+            v.push_back ({ { kAddX, kRowY, kAddW, kRowH }, bAddPicked, picked.isEmpty() ? String ("ADD") : "ADD " + String (picked.size()), picked.size() > 0, picked.size() > 0 });
+            v.push_back ({ { kReloadX, kRowY, 36.0f, kRowH }, bReload, {} });
         }
         else if (overlay == Overlay::params)
         {
@@ -1932,11 +1932,11 @@ private:
         {
             g.drawText ("ADD AN EFFECT", S (Rectangle<float> (16.0f, kRowMid - 18.0f, 220.0f, 36.0f)), Justification::centredLeft);
             // tri : interrupteur segmenté (fond commun)
-            const auto seg = Rectangle<float> (kSortX - 3.0f, kRowY - 4.0f, 130.0f, kRowH + 8.0f);
+            const auto seg = Rectangle<float> (kSortX, kRowY, kSortW, kRowH);
             g.setColour (Colour (0xff13171d));
-            g.fillRoundedRectangle (S (seg), S (10.0f));
+            g.fillRoundedRectangle (S (seg), S (7.0f));
             g.setColour (Colour (0xff262c36));
-            g.drawRoundedRectangle (S (seg).reduced (S (0.5f)), S (10.0f), S (1.0f));
+            g.drawRoundedRectangle (S (seg).reduced (S (0.6f)), S (7.0f), S (1.2f));
             // champ de recherche : fond, cadre arrondi (bleu quand on tape), loupe
             const bool foc = search.hasKeyboardFocus (true);
             g.setColour (Colour (0xff13171d));
@@ -1964,9 +1964,9 @@ private:
             const bool colourBtn = b.id >= bFsColour && b.id <= bFsColour + OctopusEngine::kFs;
             if (b.id == bSortAZ || b.id == bSortType)                // tri : moitié de l'interrupteur segmenté
             {
-                const auto rr = S (b.r.reduced (1.0f, 1.0f));
-                if (b.active) { g.setColour (kAccent); g.fillRoundedRectangle (rr, S (8.0f)); }
-                else if (hoverBtn == b.id) { g.setColour (Colours::white.withAlpha (0.06f)); g.fillRoundedRectangle (rr, S (8.0f)); }
+                const auto rr = S (b.r);
+                if (b.active) { g.setColour (kAccent); g.fillRoundedRectangle (rr, S (6.0f)); }
+                else if (hoverBtn == b.id) { g.setColour (Colours::white.withAlpha (0.06f)); g.fillRoundedRectangle (rr, S (6.0f)); }
                 g.setFont (font (tfBold, 12.5f).withExtraKerningFactor (0.12f));
                 g.setColour (b.active ? kScrBg : kDim);
                 g.drawText (b.text, rr, Justification::centred, false);
@@ -2025,9 +2025,9 @@ private:
                 const auto rr = S (b.r);
                 const bool hov = hoverBtn == b.id;
                 g.setColour (hov ? Colour (0xff1a1f27) : Colour (0xff13171d));
-                g.fillRoundedRectangle (rr, S (10.0f));
+                g.fillRoundedRectangle (rr, S (7.0f));
                 g.setColour (hov ? kDim : Colour (0xff262c36));
-                g.drawRoundedRectangle (rr.reduced (S (0.6f)), S (10.0f), S (1.0f));
+                g.drawRoundedRectangle (rr.reduced (S (0.6f)), S (7.0f), S (1.0f));
                 g.setFont (font (tfMedium, 15.0f));
                 g.setColour (kText);
                 g.drawText (b.text, S (b.r.withTrimmedLeft (14.0f).withTrimmedRight (30.0f)), Justification::centredLeft, false);
@@ -2043,12 +2043,12 @@ private:
                 if (b.enabled)
                 {
                     g.setColour (hov ? kAccent.brighter (0.15f) : kAccent);
-                    g.fillRoundedRectangle (rr, S (9.0f));
+                    g.fillRoundedRectangle (rr, S (7.0f));
                 }
                 else
                 {
                     g.setColour (kAccent.withAlpha (0.16f));
-                    g.fillRoundedRectangle (rr, S (9.0f));
+                    g.fillRoundedRectangle (rr, S (7.0f));
                 }
                 g.setFont (font (tfBold, 14.5f).withExtraKerningFactor (0.08f));
                 g.setColour (b.enabled ? kScrBg : kAccent.withAlpha (0.45f));
@@ -2288,9 +2288,12 @@ private:
     // ---- haut du navigateur : titre, emplacement, tri, sélection, ADD ; recherche pleine largeur ; onglets
     // ligne du titre centrée entre le bandeau (62) et la recherche (130)
     static constexpr float kRowMid = (kHeaderH + 130.0f) * 0.5f, kRowH = 26.0f, kRowY = kRowMid - kRowH * 0.5f;
-    static constexpr float kSortX = 592.0f, kTabsY = 176.0f, kTabsH = 28.0f, kTabGap = 26.0f, kListTopB = 214.0f;
+    // cases de droite, même hauteur et même écart (kRowGap), calées sur le bord droit de la recherche
+    static constexpr float kRowGap = 8.0f, kCloseX = 1048.0f - 36.0f, kReloadX = kCloseX - kRowGap - 36.0f, kAddW = 102.0f, kAddX = kReloadX - kRowGap - kAddW,
+                           kSelW = 118.0f, kSelX = kAddX - kRowGap - kSelW, kSortW = 126.0f;
+    static constexpr float kSortX = kSelX - kRowGap - kSortW, kTabsY = 176.0f, kTabsH = 28.0f, kTabGap = 26.0f, kListTopB = 214.0f;
     static inline const Rectangle<float> kSearchR { 16.0f, 130.0f, 1032.0f, 38.0f };
-    Rectangle<float> selPillRect() const { return { 736.0f, kRowY, 118.0f, kRowH }; }
+    Rectangle<float> selPillRect() const { return { kSelX, kRowY, kSelW, kRowH }; }
     String insertWhereText() const
     {
         const int n = eng.blocks().size();
