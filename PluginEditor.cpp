@@ -18,15 +18,16 @@ namespace
 
     // ---- couleurs de l'écran
     const Colour kScrBg (0xff0a0c10), kScrPanel (0xff13161c), kScrPanel2 (0xff1a1e26), kLine (0xff59616e),
-                 kText (0xffeef1f5), kDim (0xff8d96a4), kFaint (0xff3a414d), kAccent (0xff4fc3f7), kAmber (0xffffb547), kStompOrange (0xffff8c3a),
+                 kScreenBlack (0xff08090b), kText (0xffeef1f5), kDim (0xff8d96a4), kFaint (0xff3a414d), kAccent (0xff4fc3f7), kAmber (0xffffb547), kStompOrange (0xffff8c3a),
                  kPresetLed (0xff6fc8ff);
 
     // ---- écran : repère local (unités), origine = coin haut gauche de la vitre (1064 x 624)
     constexpr float kSW = 1064.0f, kSH = L::kScreenH;
-    constexpr float kHeaderH = 62.0f;                      // en-tête (v1.13.1 : 12 plus bas -> 62)
+    constexpr float kHeaderH = 57.0f;                      // en-tête (v1.13.1 : 62 ; v1.17.0 : 5 de moins -> 57)
+    constexpr float kHdrY = (kHeaderH - 36.0f) * 0.5f;     // éléments de l'en-tête (36 de haut) centrés
     // 3 rangées visibles ; même espace entre les carrés horizontalement et verticalement (pas de 140 = carré 70 + 70)
     constexpr int kRows = 3, kCols = 7;
-    constexpr float kGridTop = 94.0f, kRowPitch = 140.0f, kColPitch = 140.0f, kColX0 = (kSW - kColPitch * (float) (kCols - 1)) * 0.5f;   // grille centrée
+    constexpr float kGridTop = 89.0f, kRowPitch = 140.0f, kColPitch = 140.0f, kColX0 = (kSW - kColPitch * (float) (kCols - 1)) * 0.5f;   // grille centrée
     constexpr float kTile = 70.0f, kTileDy = 40.0f;              // carré du bloc, centre à rowTop + kTileDy
     // cases des footswitchs : même écart entre elles et avec les bords de l'écran, décollées du bas
     constexpr float kFooterGap = 14.0f, kFooterH = 58.0f, kFooterY = kSH - kFooterH - kFooterGap, kFooterSplit = 0.0f, kFooterW = (kSW - 7.0f * kFooterGap - kFooterSplit) / 6.0f;   // A-F : même écart entre les cases et avec les bords de l'écran (côtés et bas)
@@ -502,7 +503,7 @@ private:
     }
 
     // ---- nom du preset chargé : clic sur le nom en haut de l'écran pour le changer
-    Rectangle<float> headerNameRect() const { return { kNameX, 3.0f, jmax (120.0f, chromaLeft() - kHG - kNameX), 34.0f }; }
+    Rectangle<float> headerNameRect() const { return { kNameX, kHeaderH * 0.5f - 28.0f, jmax (120.0f, chromaLeft() - kHG - kNameX), 34.0f }; }
     static Rectangle<float> badgeRect() { return { kHdrGap, (kHeaderH - kBadge) * 0.5f, kBadge, kBadge }; }
     void startHeaderRename()
     {
@@ -961,7 +962,7 @@ private:
         // ils clignotent tant que la piste est seulement armée, fixes pendant l'enregistrement
         const int rs = recShown();
         drawnRec = rs;
-        const bool red = rs == 2 || (rs == 1 && recBlinkOn);
+        const bool recOn = rs == 1 || (rs == 2 && recBlinkOn);        // REC : fixe si armée, clignote pendant l'enregistrement
         const Colour rec = recColour();
         const float gk = (float) recGlowPc / 100.0f;                   // glow : 0-200 %, 100 = normal
         auto glowText = [&] (const String& txt, Rectangle<float> r)
@@ -977,26 +978,15 @@ private:
             g.setColour (rec);
             g.drawText (txt, S (r), Justification::centred);
         };
+        // IN / OUT et leurs points restent gris ; seul REC (sous IN) passe en rouge
         auto mark = [&] (const String& txt, Point<float> dot, bool withRec)
         {
             g.setFont (font (tfBold, 15.0f));
             const Rectangle<float> tr (dot.x - 22.0f, dot.y - 24.0f, 44.0f, 18.0f);
-            if (! red)
-            {
-                g.setColour (kDim);
-                g.drawText (txt, S (tr), Justification::centred);
-                g.fillEllipse (Rectangle<float> (S (7.0f), S (7.0f)).withCentre (S (dot)));
-                return;
-            }
-            glowText (txt, tr);
-            for (int l = 3; l >= 1; --l)                                // halo du point
-            {
-                g.setColour (rec.withAlpha (jmin (1.0f, 0.11f * gk)));
-                g.fillEllipse (Rectangle<float> (S (7.0f + 5.0f * (float) l), S (7.0f + 5.0f * (float) l)).withCentre (S (dot)));
-            }
-            g.setColour (rec);
+            g.setColour (kDim);
+            g.drawText (txt, S (tr), Justification::centred);
             g.fillEllipse (Rectangle<float> (S (7.0f), S (7.0f)).withCentre (S (dot)));
-            if (withRec) glowText ("REC", { dot.x - 22.0f, dot.y + 6.0f, 44.0f, 18.0f });   // même taille que IN / OUT
+            if (withRec && rs > 0 && recOn) glowText ("REC", { dot.x - 22.0f, dot.y + 6.0f, 44.0f, 18.0f });   // même taille que IN / OUT
         };
         if (inVisible()) mark ("IN", inDot(), true);
         if (outVisible()) mark ("OUT", outDot(), false);
@@ -1245,11 +1235,11 @@ private:
         const auto& p = semi::get (proc.semitonesPreset());
         const float tw = jmax (unitsOf (font (tfBold, 16.0f), p.name), unitsOf (semiLabelFont(), "SEMITONES"));
         const float w = jlimit (80.0f, 160.0f, 26.0f + 8.0f + tw + 2.0f);
-        return { kSep1X - kHG - w, 13.0f, w, 36.0f };
+        return { kSep1X - kHG - w, kHdrY, w, 36.0f };
     }
     // mini CHROMA : anneau à gauche de la case, chevrons rouges à droite (trop bas : vers le bas, trop haut : vers le haut ;
     // deux chevrons à partir de 10 cents d'écart) pendant que la note sonne
-    Rectangle<float> chromaRect() const { return { semiRect().getX() - kHG - 42.0f, 13.0f, 42.0f, 36.0f }; }
+    Rectangle<float> chromaRect() const { return { semiRect().getX() - kHG - 42.0f, kHdrY, 42.0f, 36.0f }; }
     float chromaLeft() const { return chromaRect().getX(); }
 
     // anneau lumineux : halo (opacité glowPc %) puis trait net
@@ -1582,17 +1572,17 @@ private:
                            kStompX = kSep3X - kHG - 64.0f, kPresetX = kStompX - kHG - 72.0f, kSep2X = kPresetX - kHG,
                            kBankNextX = kSep2X - kHG - 24.0f, kBankTextX = kBankNextX - 82.0f, kBankPrevX = kBankTextX - 24.0f,
                            kSep1X = kBankPrevX - kHG;
-    static constexpr float kBadge = 44.0f, kNameX = kHdrGap + kBadge + 16.0f;
+    static constexpr float kBadge = 41.0f, kNameX = kHdrGap + kBadge + 16.0f;
     std::vector<Btn> headerButtons() const
     {
         std::vector<Btn> v;
         // de droite à gauche, même écart (kHdrGap = marge du bord de l'écran) entre tous les éléments de l'en-tête
-        v.push_back ({ { kBankPrevX, 13.0f, 24.0f, 36.0f }, bBankPrev, "<" });
-        v.push_back ({ { kBankNextX, 13.0f, 24.0f, 36.0f }, bBankNext, ">" });
-        v.push_back ({ { kPresetX, 13.0f, 72.0f, 36.0f }, bModePreset, "PRESET", eng.mode() == OctopusEngine::presetMode });
-        v.push_back ({ { kStompX, 13.0f, 64.0f, 36.0f }, bModeStomp, "STOMP", eng.mode() == OctopusEngine::stompMode });
-        v.push_back ({ { kSaveX, 13.0f, 70.0f, 36.0f }, bSave, "SAVE", false, eng.isReady() });
-        v.push_back ({ { kBanksX, 13.0f, 82.0f, 36.0f }, bBanks, "BANKS", overlay == Overlay::banks });
+        v.push_back ({ { kBankPrevX, kHdrY, 24.0f, 36.0f }, bBankPrev, "<" });
+        v.push_back ({ { kBankNextX, kHdrY, 24.0f, 36.0f }, bBankNext, ">" });
+        v.push_back ({ { kPresetX, kHdrY, 72.0f, 36.0f }, bModePreset, "PRESET", eng.mode() == OctopusEngine::presetMode });
+        v.push_back ({ { kStompX, kHdrY, 64.0f, 36.0f }, bModeStomp, "STOMP", eng.mode() == OctopusEngine::stompMode });
+        v.push_back ({ { kSaveX, kHdrY, 70.0f, 36.0f }, bSave, "SAVE", false, eng.isReady() });
+        v.push_back ({ { kBanksX, kHdrY, 82.0f, 36.0f }, bBanks, "BANKS", overlay == Overlay::banks });
         return v;
     }
 
@@ -1716,7 +1706,7 @@ private:
         Graphics::ScopedSaveState ss (g);
         Path clip; clip.addRoundedRectangle (glass, L::glassRadius * s);
         g.reduceClipRegion (clip);
-        g.setGradientFill (ColourGradient (Colour (0xff0d1015), glass.getX(), glass.getY(), Colour (0xff07080b), glass.getX(), glass.getBottom(), false));
+        g.setColour (kScreenBlack);                                                 // fond noir uni (v1.17.0 : plus de dégradé)
         g.fillRect (glass);
 
         if (tunerShown()) drawTuner (g);
@@ -1734,16 +1724,7 @@ private:
             if (semiOpen) drawSemiDrum (g);
         }
 
-        // vitre : léger reflet en biais (lumière en haut à gauche) + assombrissement des bords
-        Path gloss;
-        gloss.startNewSubPath (glass.getX(), glass.getY());
-        gloss.lineTo (glass.getX() + glass.getWidth() * 0.46f, glass.getY());
-        gloss.lineTo (glass.getX() + glass.getWidth() * 0.30f, glass.getBottom());
-        gloss.lineTo (glass.getX(), glass.getBottom());
-        gloss.closeSubPath();
-        g.setGradientFill (ColourGradient (Colours::white.withAlpha (0.035f), glass.getX(), glass.getY(), Colours::white.withAlpha (0.0f),
-                                           glass.getX() + glass.getWidth() * 0.35f, glass.getY() + glass.getHeight() * 0.6f, false));
-        g.fillPath (gloss);
+        // bord de la vitre (plus de reflet en biais : fond uni)
         g.setColour (Colours::white.withAlpha (0.05f));
         g.drawRoundedRectangle (glass.reduced (0.5f), L::glassRadius * s, 1.0f);
     }
@@ -1784,19 +1765,19 @@ private:
         if (msg.isNotEmpty()) sub = msg;
         g.setFont (font (tfRegular, 15.0f));
         g.setColour (msg.isNotEmpty() ? kAccent : kDim);
-        g.drawText (sub, S (Rectangle<float> (kNameX, 35.0f, headerNameRect().getWidth(), 20.0f)), Justification::centredLeft, true);
+        g.drawText (sub, S (Rectangle<float> (kNameX, kHeaderH * 0.5f + 4.0f, headerNameRect().getWidth(), 20.0f)), Justification::centredLeft, true);
 
         // séparateurs fins
         for (float x : { kSep1X, kSep2X, kSep3X })
         {
             g.setColour (Colour (0xff232933));
-            g.fillRect (S (Rectangle<float> (x, 14.0f, 1.0f, 34.0f)));
+            g.fillRect (S (Rectangle<float> (x, (kHeaderH - 34.0f) * 0.5f, 1.0f, 34.0f)));
         }
 
         // bank affichée : ‹ BANK 01 ›
-        g.setFont (font (tfBold, 18.2f).withExtraKerningFactor (0.08f));
+        g.setFont (font (tfBold, 15.4f).withExtraKerningFactor (0.14f));            // même taille que PRESET / STOMP / SAVE / BANKS
         g.setColour (kText);
-        g.drawText ("BANK " + String (eng.bank() + 1).paddedLeft ('0', 2), S (Rectangle<float> (kBankTextX, 13.0f, 82.0f, 36.0f)), Justification::centred);
+        g.drawText ("BANK " + String (eng.bank() + 1).paddedLeft ('0', 2), S (Rectangle<float> (kBankTextX, kHdrY, 82.0f, 36.0f)), Justification::centred);
         for (auto& b : headerButtons()) drawHeaderItem (g, b);
         drawMiniChroma (g);
         drawSemiButton (g);
@@ -1812,29 +1793,20 @@ private:
             const auto cc = r0.getCentre();
             const float dx = b.id == bBankPrev ? 1.0f : -1.0f;
             Path p;
-            p.startNewSubPath (S (Point<float> (cc.x + 2.5f * dx, cc.y - 5.0f)));
-            p.lineTo (S (Point<float> (cc.x - 2.5f * dx, cc.y)));
-            p.lineTo (S (Point<float> (cc.x + 2.5f * dx, cc.y + 5.0f)));
+            p.startNewSubPath (S (Point<float> (cc.x + 2.0f * dx, cc.y - 4.0f)));     // hauteur des capitales du texte
+            p.lineTo (S (Point<float> (cc.x - 2.0f * dx, cc.y)));
+            p.lineTo (S (Point<float> (cc.x + 2.0f * dx, cc.y + 4.0f)));
             g.setColour (hov ? kText : kDim);
-            g.strokePath (p, PathStrokeType (S (1.9f), PathStrokeType::curved, PathStrokeType::rounded));
+            g.strokePath (p, PathStrokeType (S (1.7f), PathStrokeType::curved, PathStrokeType::rounded));
             return;
         }
         if (b.id == bModePreset || b.id == bModeStomp)
         {
             const auto acc = b.id == bModeStomp ? kStompOrange : kAccent;
             const auto f = font (tfBold, 15.4f).withExtraKerningFactor (0.14f);
-            g.setFont (f);
-            g.setColour (b.active ? kText : (hov ? kText.withAlpha (0.85f) : kDim));
+            g.setFont (f);                                                          // actif : écrit en bleu (PRESET) ou en orange (STOMP)
+            g.setColour (b.active ? acc : (hov ? kText.withAlpha (0.85f) : kDim));
             g.drawText (b.text, S (r0), Justification::centred, false);
-            if (b.active)
-            {
-                const float tw = unitsOf (f, b.text) + 4.0f;
-                const auto line = Rectangle<float> (tw, 2.2f).withCentre ({ r0.getCentreX(), r0.getBottom() - 4.0f });
-                g.setColour (acc.withAlpha (0.35f));
-                g.fillRoundedRectangle (S (line.expanded (1.5f, 1.5f)), S (2.5f));
-                g.setColour (acc);
-                g.fillRoundedRectangle (S (line), S (1.1f));
-            }
             return;
         }
         // SAVE / BANKS : petite icône + texte
@@ -1927,7 +1899,7 @@ private:
     // ------------------------------------------------------------ fenêtres sur l'écran
     void drawOverlay (Graphics& g)
     {
-        g.setGradientFill (ColourGradient (Colour (0xff0b0d11), 0.0f, S (kOverlay).getY(), Colour (0xff08090c), 0.0f, S (kOverlay).getBottom(), false));
+        g.setColour (kScreenBlack);
         g.fillRect (S (kOverlay));
         g.setColour (kFaint.withAlpha (0.6f));
         g.fillRect (S (Rectangle<float> (0.0f, kOverlay.getY(), kSW, 1.0f)));
@@ -4425,7 +4397,7 @@ private:
         // piste armée : IN / OUT / REC clignotent (0,5 s allumés, 0,5 s éteints)
         if (recPreview < 0)
         {
-            const bool on = eng.recState() != 1 || std::fmod (now, 1000.0) < 500.0;
+            const bool on = eng.recState() != 2 || std::fmod (now, 1000.0) < 500.0;     // clignote pendant l'enregistrement
             if (on != recBlinkOn) { recBlinkOn = on; askRepaint (screenPx()); }
             if (drawnRec >= 0 && recShown() != drawnRec) askRepaint (screenPx());   // fin de l'aperçu du réglage
         }
@@ -4585,7 +4557,7 @@ void OctopusEditor::showScreen (int which, int arg)
         case 15: view->openMixer (arg); break;   // rendus : mixeur d'un groupe (-1 : fermé)
         case 13: view->recGlowPc = arg; view->askRepaint (view->screenPx()); break;   // rendus : glow de l'effet record
         case 14: view->recColourMenu(); break;
-        case 12: view->recPreview = arg == 0 ? -1 : (arg == 3 ? 2 : 1); view->recBlinkOn = arg != 2; view->askRepaint (view->screenPx()); break;   // rendus : 1 = armée (allumé), 2 = armée (éteint), 3 = enregistrement
+        case 12: view->recPreview = arg == 0 ? -1 : (arg == 1 ? 1 : 2); view->recBlinkOn = arg != 2; view->askRepaint (view->screenPx()); break;   // rendus : 1 = armée (REC fixe), 2 = enregistrement (REC éteint), 3 = enregistrement (REC allumé)
         case 11: view->openPicker ("Semitones colour", view->semiColour(), view->S (view->semiRect()), true, [] (Colour) {}); break;
         default: view->closeSemiDrum(); view->closeOverlay(); break;
     }
