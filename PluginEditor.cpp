@@ -1943,9 +1943,9 @@ private:
             g.drawText ("ADD AN EFFECT", S (Rectangle<float> (16.0f, kRowMid - 18.0f, 220.0f, 36.0f)), Justification::centredLeft);
             // tri : interrupteur segmenté (fond commun)
             const auto seg = Rectangle<float> (kSortX, kRowY, kSortW, kRowH);
-            g.setColour (Colour (0xff13171d));
+            g.setColour (kScrPanel2);
             g.fillRoundedRectangle (S (seg), S (7.0f));
-            g.setColour (Colour (0xff262c36));
+            g.setColour (kFaint);
             g.drawRoundedRectangle (S (seg).reduced (S (0.6f)), S (7.0f), S (1.2f));
             // champ de recherche : fond, cadre arrondi (bleu quand on tape), loupe
             const bool foc = search.hasKeyboardFocus (true);
@@ -2006,7 +2006,7 @@ private:
             {
                 const auto rr = S (b.r);
                 const bool hov = hoverBtn == b.id || insertOpen;               // même forme que ADD, sans remplissage
-                g.setColour (insertOpen ? kAccent.withAlpha (0.8f) : hov ? kDim : Colour (0xff2c333e));
+                g.setColour (insertOpen ? kAccent.withAlpha (0.8f) : hov ? kDim : kFaint);
                 g.drawRoundedRectangle (rr.reduced (S (0.6f)), S (7.0f), S (1.2f));
                 const auto fd = font (tfRegular, 14.0f), fn = font (tfMedium, 14.5f);
                 const String pre = insertPos >= eng.blocks().size() ? String (CharPointer_UTF8 ("\xe2\x86\x92  at")) : String (CharPointer_UTF8 ("\xe2\x86\x92  before"));
@@ -2028,10 +2028,10 @@ private:
             {
                 const auto rr = S (b.r);
                 const bool hov = hoverBtn == b.id;
-                g.setColour (hov ? Colour (0xff1a1f27) : Colour (0xff13171d));
+                g.setColour (hov ? kScrPanel2.brighter (0.15f) : kScrPanel2);
                 g.fillRoundedRectangle (rr, S (7.0f));
-                g.setColour (hov ? kDim : Colour (0xff262c36));
-                g.drawRoundedRectangle (rr.reduced (S (0.6f)), S (7.0f), S (1.0f));
+                g.setColour (hov ? kDim : kFaint);
+                g.drawRoundedRectangle (rr.reduced (S (0.6f)), S (7.0f), S (1.2f));
                 g.setFont (font (tfMedium, 15.0f));
                 g.setColour (kText);
                 g.drawText (b.text, S (b.r.withTrimmedLeft (14.0f).withTrimmedRight (30.0f)), Justification::centredLeft, false);
