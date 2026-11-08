@@ -251,6 +251,10 @@ int main (int argc, char** argv)
     shot ("octopus_add_all_bytype");
     ed->showScreen (17, 0); pump (3);
     shot ("octopus_add_all_az");
+    ed->screenSearch ({}, 0);
+    ed->showScreen (18, 2); pump (3);                                       // A-Z : la liste descend ligne à ligne
+    shot ("octopus_add_az_scrolled");
+    ed->showScreen (18, 0); pump (3);
 
     // clic / double-clic sur un bloc (temps simulés, en ms : appui, relâchement, ...)
     {

@@ -1959,19 +1959,18 @@ private:
                 drawButton (g, bb);
                 const int cnt = chipCount (b.id - bChip);
                 const auto f = font (tfBold, 15.0f);
-                const float tw = unitsOf (f, b.text), pw = cnt > 0 ? 12.0f + 7.6f * (float) String (cnt).length() : 0.0f;
-                const float x0 = b.r.getCentreX() - (tw + (cnt > 0 ? 7.0f + pw : 0.0f)) * 0.5f;
+                const auto fc = font (tfBold, 13.5f);
+                const float tw = unitsOf (f, b.text), pw = cnt > 0 ? unitsOf (fc, String (cnt)) : 0.0f;
+                const float x0 = b.r.getCentreX() - (tw + (cnt > 0 ? 8.0f + pw : 0.0f)) * 0.5f;
                 g.setFont (f);
                 g.setColour (kText.withAlpha (b.active ? 1.0f : 0.85f));
                 g.drawText (b.text, S (Rectangle<float> (x0, b.r.getY(), tw + 4.0f, b.r.getHeight())), Justification::centredLeft, false);
                 if (cnt > 0)
                 {
-                    const auto pr = Rectangle<float> (x0 + tw + 7.0f, b.r.getCentreY() - 9.0f, pw, 18.0f);
-                    g.setColour (b.active ? Colour (0xff0b1c26) : Colour (0xff0b0e12));
-                    g.fillRoundedRectangle (S (pr), S (9.0f));
-                    g.setFont (font (tfBold, 12.5f));
+                    const auto pr = Rectangle<float> (x0 + tw + 8.0f, b.r.getY(), pw + 4.0f, b.r.getHeight());   // nombre seul, sans pastille
+                    g.setFont (fc);
                     g.setColour (b.active ? kAccent : kDim);
-                    g.drawText (String (cnt), S (pr), Justification::centred, false);
+                    g.drawText (String (cnt), S (pr), Justification::centredLeft, false);
                 }
                 continue;
             }
@@ -2046,7 +2045,7 @@ private:
         if (favs.contains (f.name)) { favs.removeString (f.name); eng.say (FxCat::shortName (f.name) + " removed from favorites"); }
         else { favs.add (f.name); eng.say (FxCat::shortName (f.name) + " added to favorites"); }
         OctoSettings::setFavourites (favs);
-        if (chip == kChipFavourites) listScroll = jlimit (0, jmax (0, browserCols() - 2), listScroll);
+        if (chip == kChipFavourites) listScroll = jlimit (0, browserMaxScroll(), listScroll);
         layoutEditors();                                   // le nombre de favoris a changé : largeur des filtres
         askRepaint (screenPx());
     }
@@ -2094,6 +2093,11 @@ private:
             { "freakout",     "Controlled feedback in the spirit of the DigiTech FreqOut: natural guitar feedback at any volume." },
             { "fantomine",    "Theremin voice played from your guitar: gliding, ghostly melodies." },
             { "jawari",       "Sitar sound for guitar: the buzzing, resonant voice of the Indian sitar." },
+            { "ampire",       "Neural Amp Modeler loader for guitar and bass: plays NAM captures of real amps and pedals (A1 and A2)." },
+            { "anode",        "Tube power amp stage for guitar and bass: 6L6, EL34, EL84 or KT88, single-ended or push-pull." },
+            { "darkbass",     "Bass preamp and overdrive in the spirit of the Darkglass Microtubes B7K Ultra: grit, blend and EQ." },
+            { "impulse",      "Dual cabinet IR loader for guitar and bass: two impulse responses A and B with a MIX knob." },
+            { "screamer",     "Overdrive in the spirit of the Ibanez TS9 Tube Screamer: smooth mid-hump drive and boost." },
             { "stereo width", "Stereo width: from mono to wide stereo." } };
         const auto n = shortName.toLowerCase();
         for (auto& x : d) if (n.contains (x.first)) return x.second;
@@ -2169,13 +2173,20 @@ private:
         }
         return rows;
     }
+    // A-Z : grille de 2 colonnes remplie ligne par ligne, qui défile vers le bas ligne à ligne ;
+    // TYPE : colonnes remplies de haut en bas (titres de type), qui défilent colonne par colonne
+    bool browserRowMajor() const { return ! browserByType; }
+    int browserFirstRow() const { return browserRowMajor() ? listScroll * 2 : listScroll * kListRows; }
+    int browserRowAt (int v) const { return browserRowMajor() ? (listScroll + v % kListRows) * 2 + v / kListRows : listScroll * kListRows + v; }
+    int browserVisible() const { return browserRowMajor() ? kListRows : 2; }
+    int browserUnits (int nRows) const { return browserRowMajor() ? (nRows + 1) / 2 : (nRows + kListRows - 1) / kListRows; }
+    int browserMaxScroll() { return jmax (0, browserUnits ((int) browserRows (filtered()).size()) - browserVisible()); }
     int browserItemAt (int v)                                        // plugin sous la case visible v (indice dans filtered()), -1 sinon
     {
         const auto rows = browserRows (filtered());
-        const int r = listScroll * kListRows + v;
+        const int r = browserRowAt (v);
         return isPositiveAndBelow (r, (int) rows.size()) ? rows[(size_t) r].item : -1;
     }
-    int browserCols() { return ((int) browserRows (filtered()).size() + kListRows - 1) / kListRows; }
     int chipCount (int c)
     {
         int n = 0;
@@ -2202,7 +2213,7 @@ private:
     {
         const int cnt = const_cast<PedalView*> (this)->chipCount (c);
         const float tw = unitsOf (font (tfBold, 15.0f), kChips[c]);
-        return 16.0f + tw + (cnt > 0 ? 7.0f + 12.0f + 7.6f * (float) String (cnt).length() : 0.0f) + 16.0f;   // texte + pastille du nombre
+        return 16.0f + tw + (cnt > 0 ? 8.0f + unitsOf (font (tfBold, 13.5f), String (cnt)) : 0.0f) + 16.0f;   // texte + nombre
     }
     float chipsStartX() const
     {
@@ -2213,20 +2224,21 @@ private:
 
     // indices de défilement d'une liste à 2 colonnes : fondu, pastille « ▼ MORE », barre à droite, « 1 - 24 of 27 »
     Rectangle<float> morePill;
-    void drawListCues (Graphics& g, int cols, int scroll, int shownFrom, int shownTo, int total, const String& noun, const String& moreText)
+    // units : colonnes (ou lignes) en tout, visible : combien on en voit, scroll : la première visible
+    void drawListCues (Graphics& g, int units, int visible, int scroll, int shownFrom, int shownTo, int total, const String& noun, const String& moreText)
     {
         morePill = {};
         const float top = itemRect (0).getY(), bottom = itemRect (kListRows - 1).getBottom();
-        if (cols > 2)
+        if (units > visible)
         {
             const float tx = kSW - 9.0f, th = bottom - top;
             g.setColour (Colour (0xff161a21));
             g.fillRoundedRectangle (S (Rectangle<float> (tx, top, 4.0f, th)), S (2.0f));
-            const float thumb = jmax (24.0f, th * 2.0f / (float) cols), y = top + (th - thumb) * (float) scroll / (float) jmax (1, cols - 2);
+            const float thumb = jmax (24.0f, th * (float) visible / (float) units), y = top + (th - thumb) * (float) scroll / (float) jmax (1, units - visible);
             g.setColour (Colour (0xff4a5363));
             g.fillRoundedRectangle (S (Rectangle<float> (tx, y, 4.0f, thumb)), S (2.0f));
         }
-        if (cols > scroll + 2)
+        if (units > scroll + visible)
         {
             const float fy = itemRect (kListRows - 2).getY();
             g.setGradientFill (ColourGradient (Colour (0x000a0c10), 0.0f, S (fy), Colour (0xf20a0c10), 0.0f, S (bottom), false));
@@ -2238,7 +2250,7 @@ private:
             g.setColour (kAccent);
             g.drawText (String (CharPointer_UTF8 ("\xe2\x96\xbc  ")) + moreText, S (morePill), Justification::centred, false);
         }
-        if (total > 0 && cols > 2)
+        if (total > 0 && units > visible)
         {
             g.setFont (font (tfRegular, 14.0f));
             g.setColour (kDim);
@@ -2265,8 +2277,8 @@ private:
         int firstShown = -1, lastShown = -1;
         for (int v = 0; v < perPage; ++v)
         {
-            const int r = listScroll * kListRows + v;
-            if (r >= (int) rows.size()) break;
+            const int r = browserRowAt (v);
+            if (r >= (int) rows.size()) continue;
             const auto& row = rows[(size_t) r];
             if (row.item < 0)
             {
@@ -2331,8 +2343,8 @@ private:
             }
         }
         // ce qui reste plus bas : nombre de plugins (A-Z) ou types (TYPE)
-        const int cols = ((int) rows.size() + kListRows - 1) / kListRows;
-        const int lastRow = (listScroll + 2) * kListRows;
+        const int units = browserUnits ((int) rows.size()), firstRow = browserFirstRow();
+        const int lastRow = firstRow + kListRows * 2;
         int remaining = 0;
         StringArray kinds;
         for (int r = lastRow; r < (int) rows.size(); ++r)
@@ -2345,10 +2357,10 @@ private:
             kinds.removeString (String (FxCat::label (rows[(size_t) lastRow - 1].kind)).toUpperCase());
         const String more = browserByType && kinds.size() > 0 ? "MORE : " + kinds.joinIntoString (", ") : String (remaining) + " MORE";
         int shownCount = 0;
-        for (int r = listScroll * kListRows; r < jmin ((int) rows.size(), lastRow); ++r) if (rows[(size_t) r].item >= 0) ++shownCount;
+        for (int r = firstRow; r < jmin ((int) rows.size(), lastRow); ++r) if (rows[(size_t) r].item >= 0) ++shownCount;
         int before = 0;
-        for (int r = 0; r < listScroll * kListRows && r < (int) rows.size(); ++r) if (rows[(size_t) r].item >= 0) ++before;
-        drawListCues (g, cols, listScroll, before + 1, before + shownCount, items.size(), "plug-ins", more);
+        for (int r = 0; r < firstRow && r < (int) rows.size(); ++r) if (rows[(size_t) r].item >= 0) ++before;
+        drawListCues (g, units, browserVisible(), listScroll, before + 1, before + shownCount, items.size(), "plug-ins", more);
         juce::ignoreUnused (firstShown, lastShown);
     }
 
@@ -2738,7 +2750,7 @@ private:
         }
         const int rows = (presetTotal() + kListRows - 1) / kListRows;
         const int shownTo = jmin (presetTotal(), (presetScroll + 2) * kListRows);
-        drawListCues (g, rows, presetScroll, presetScroll * kListRows + 1, shownTo, presetTotal(), "presets", String (presetTotal() - shownTo) + " MORE");
+        drawListCues (g, rows, 2, presetScroll, presetScroll * kListRows + 1, shownTo, presetTotal(), "presets", String (presetTotal() - shownTo) + " MORE");
     }
 
     void setParamFromX (int k, float x)
@@ -3341,7 +3353,7 @@ private:
         {
             // clic : choisir / retirer (numérotés dans l'ordre) ; double-clic : ajouter tout de suite ; clic droit : rien
             if (e.mods.isPopupMenu()) return;
-            if (morePill.contains (p)) { listScroll = jlimit (0, jmax (0, browserCols() - 2), listScroll + 2); askRepaint (screenPx()); return; }
+            if (morePill.contains (p)) { listScroll = jlimit (0, browserMaxScroll(), listScroll + (browserRowMajor() ? kListRows - 2 : 2)); askRepaint (screenPx()); return; }
             for (int v = 0; v < kListRows * 2; ++v)
                 if (itemRect (v).contains (p))
                 {
@@ -3560,7 +3572,7 @@ private:
         }
         if (overlay == Overlay::browser)
         {
-            listScroll = jlimit (0, jmax (0, browserCols() - 2), listScroll + dir);
+            listScroll = jlimit (0, browserMaxScroll(), listScroll + dir);
         }
         else if (overlay == Overlay::params && presetMode)
         {
@@ -4377,6 +4389,7 @@ void OctopusEditor::showScreen (int which, int arg)
         case 9: view->openSemiDrum(); break;                                      // tambour de Semitones
         case 10: view->semiTarget = jlimit (0, semi::kCount - 1, view->semiTarget + arg); break;   // molette
         case 17: view->browserByType = arg != 0; view->listScroll = 0; view->askRepaint (view->screenPx()); break;   // rendus : tri du navigateur
+        case 18: view->listScroll = jlimit (0, view->browserMaxScroll(), arg); view->askRepaint (view->screenPx()); break;   // rendus : défilement du navigateur
         case 15: view->openMixer (arg); break;   // rendus : mixeur d'un groupe (-1 : fermé)
         case 13: view->recGlowPc = arg; view->askRepaint (view->screenPx()); break;   // rendus : glow de l'effet record
         case 14: view->recColourMenu(); break;
