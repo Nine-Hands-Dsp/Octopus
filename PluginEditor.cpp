@@ -492,7 +492,7 @@ private:
     }
 
     // ---- nom du preset chargé : clic sur le nom en haut de l'écran pour le changer
-    Rectangle<float> headerNameRect() const { return { 132.0f, 8.0f, jmax (120.0f, chromaRect().getX() - kHdrGap - 132.0f), 36.0f }; }
+    Rectangle<float> headerNameRect() const { return { 132.0f, 8.0f, jmax (120.0f, chromaLeft() - kHdrGap - 132.0f), 36.0f }; }
     void startHeaderRename()
     {
         const int cur = eng.current();
@@ -1230,7 +1230,9 @@ private:
         const float w = jlimit (96.0f, 170.0f, 5.3f + 26.0f + 7.1f + tw + 9.5f);
         return { kBankPrevX - kHdrGap - w, 19.0f, w, 36.0f };
     }
+    // mini CHROMA ; à sa gauche, un chevron rouge (trop bas : vers le bas, trop haut : vers le haut) pendant que la note sonne
     Rectangle<float> chromaRect() const { return { semiRect().getX() - kHdrGap - 36.0f, 19.0f, 36.0f, 36.0f }; }
+    float chromaLeft() const { return chromaRect().getX() - 16.0f; }
 
     // anneau lumineux : halo (opacité glowPc %) puis trait net
     void glowArc (Graphics& g, Point<float> c, float rad, float w, float from, float to, Colour col, int glowPc)
@@ -1259,7 +1261,7 @@ private:
         g.drawRoundedRectangle (rr.reduced (S (0.6f)), S (7.0f), S (1.2f));
     }
 
-    struct MiniNote { bool has = false; bool inTune = false; float alpha = 0.3f; String letter, acc; };
+    struct MiniNote { bool has = false; bool inTune = false, sounding = false; float alpha = 0.3f, cents = 0.0f; String letter, acc; };
     MiniNote miniNote() const
     {
         MiniNote n;
@@ -1268,6 +1270,8 @@ private:
         if (! n.has) return n;
         n.alpha = sn.monoActive ? 1.0f : jmap (jlimit (0.25f, 2.0f, sn.monoAge), 0.25f, 2.0f, 1.0f, 0.35f);
         n.inTune = sn.monoPrecise && std::abs (sn.monoCents) <= (float) tuna::TunerEngine::kMonoInTune;   // comme CHROMA
+        n.sounding = sn.monoActive;                     // la flèche n'apparaît que pendant que la note sonne
+        n.cents = sn.monoCents;
         // note qui sort d'Octopus : celle jouée, décalée par Semitones (le grand accordeur garde la note jouée, pour accorder)
         const String pc (tuna::pitchClassName (sn.monoMidi + semi::get (proc.semitonesPreset()).semis));
         n.letter = pc.substring (0, 1); n.acc = pc.substring (1);
@@ -1290,6 +1294,7 @@ private:
         }
         else glowArc (g, c, rad, w, 0.0f, MathConstants<float>::twoPi,
                       (n.inTune ? chromaOkColour() : chromaOffColour()).withMultipliedAlpha (n.alpha), (int) (chromaGlowPc * n.alpha));
+        drawMiniArrow (g, n, b);
         const auto big = font (tfBold, 16.7f), small = font (tfBold, 9.8f);
         g.setColour (n.has ? Colours::white.withAlpha (jmax (0.5f, n.alpha)) : kDim);
         if (! n.has) { g.setFont (big); g.drawText (CharPointer_UTF8 ("\xe2\x80\x93"), Rectangle<float> (rad * 2.0f, rad * 2.0f).withCentre (c), Justification::centred); return; }
@@ -1302,6 +1307,28 @@ private:
             g.setFont (small);
             g.drawText (n.acc, Rectangle<float> (x + wl + S (0.4f), c.y - S (9.5f), wa + S (1.0f), S (11.0f)), Justification::centredLeft);
         }
+    }
+
+    // chevron à gauche de la case : sous la note affichée -> vers le bas, au-dessus -> vers le haut ; rien si juste ou sans son
+    void drawMiniArrow (Graphics& g, const MiniNote& n, Rectangle<float> b)
+    {
+        if (! n.has || ! n.sounding || n.inTune) return;
+        const bool up = n.cents > 0.0f;
+        const auto col = chromaOffColour();
+        const float k = (float) chromaGlowPc / 100.0f;
+        const Point<float> cc { b.getX() - 9.0f, b.getCentreY() };
+        const float wdt = 10.0f, hgt = 6.5f, sgn = up ? -1.0f : 1.0f;
+        Path p;
+        p.startNewSubPath (S (Point<float> (cc.x - wdt * 0.5f, cc.y - sgn * hgt * 0.5f)));
+        p.lineTo (S (Point<float> (cc.x, cc.y + sgn * hgt * 0.5f)));
+        p.lineTo (S (Point<float> (cc.x + wdt * 0.5f, cc.y - sgn * hgt * 0.5f)));
+        for (auto l : { 3.2f, 2.0f })
+        {
+            g.setColour (col.withAlpha (jmin (1.0f, 0.14f * k)));
+            g.strokePath (p, PathStrokeType (S (2.0f * l), PathStrokeType::curved, PathStrokeType::rounded));
+        }
+        g.setColour (col);
+        g.strokePath (p, PathStrokeType (S (2.0f), PathStrokeType::curved, PathStrokeType::rounded));
     }
 
     void drawSemiButton (Graphics& g)
@@ -1515,8 +1542,9 @@ private:
         if (! tunerShown())
         {
             const auto n = miniNote();
-            const String sig = n.has ? n.letter + n.acc + (n.inTune ? "1" : "0") + String (roundToInt (n.alpha * 20.0f)) : String ("-");
-            if (sig != drawnChroma) { drawnChroma = sig; askRepaint (S (chromaRect()).expanded (S (8.0f)).toNearestInt()); }
+            const String sig = n.has ? n.letter + n.acc + (n.inTune ? "1" : "0") + String (roundToInt (n.alpha * 20.0f))
+                                         + (n.sounding ? (n.cents > 0.0f ? "u" : "d") + String (roundToInt (n.cents)) : String()) : String ("-");
+            if (sig != drawnChroma) { drawnChroma = sig; askRepaint (S (chromaRect().withLeft (chromaLeft())).expanded (S (8.0f)).toNearestInt()); }
         }
     }
 

@@ -487,6 +487,11 @@ int main (int argc, char** argv)
             shot ("octopus_header_offtune");
             const auto sm = proc.tunerSnapshot();
             check (sm.monoMidi == 42, "mini CHROMA : F#2 lu fenêtre ouverte, sans bloc CHROMA (" + String (sm.monoMidi) + ")");
+            // chevron du mini CHROMA : G joué 12 cents trop bas, puis 25 cents trop haut
+            proc.setSemitonesPreset (0);
+            play (98.0 * std::pow (2.0, -12.0 / 1200.0), 1.5); shot ("octopus_header_flat");
+            play (98.0 * std::pow (2.0, 25.0 / 1200.0), 1.5); shot ("octopus_header_sharp");
+            proc.setSemitonesPreset (2);
             play (0.0, 2.6); pump (8);                               // silence : la note s'efface
             shot ("octopus_header_idle");
             ed->showScreen (9);
