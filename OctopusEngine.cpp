@@ -123,7 +123,8 @@ juce::String OctopusEngine::signature() const
 
 int OctopusEngine::blockOf (const juce::String& guid) const
 {
-    for (int k = 0; k < blk.size(); ++k) if (fx.getReference (blk[k]).guid == guid) return k;
+    const auto gd = guid.startsWith ("ab:") ? guid.substring (3) : guid;     // footswitch A <-> B : le Split du groupe
+    for (int k = 0; k < blk.size(); ++k) if (fx.getReference (blk[k]).guid == gd) return k;
     return -1;
 }
 
@@ -526,7 +527,7 @@ bool OctopusEngine::unsplit (int g)
     host.beginUndo();
     for (int k = idx.size(); --k >= 0;) host.remove (idx[k]);
     host.endUndo ("merge paths in series");
-    for (auto& s : stompGuids) s.removeString (G.guid);
+    for (auto& s : stompGuids) { s.removeString (G.guid); s.removeString (swapKey (G.guid)); }
     folded.removeString (G.guid);
     refreshNow();
     say ("Paths merged in series");
@@ -551,7 +552,7 @@ bool OctopusEngine::removePath (int g, int lane)
         host.beginUndo();
         for (int k = idx.size(); --k >= 0;) host.remove (idx[k]);
         host.endUndo ("remove path");
-        for (auto& s : stompGuids) { s.removeString (G.guid); for (auto& gd : gone) s.removeString (gd); }
+        for (auto& s : stompGuids) { s.removeString (G.guid); s.removeString (swapKey (G.guid)); for (auto& gd : gone) s.removeString (gd); }
         folded.removeString (G.guid);
     }
     else
@@ -587,6 +588,39 @@ void OctopusEngine::setMix (int g, int lane, int what, double v)
     if (! ready || ! juce::isPositiveAndBelow (g, (int) grp.size())) return;
     host.setParam (grp[(size_t) g].merge, Routing::laneParam (lane, what), Routing::toNorm (what, v));
     ++gen;
+}
+
+juce::String OctopusEngine::swapKeyOf (int g) const
+{
+    return juce::isPositiveAndBelow (g, (int) grp.size()) ? swapKey (grp[(size_t) g].guid) : juce::String();
+}
+
+int OctopusEngine::soloLane (int g) const
+{
+    if (! ready || ! juce::isPositiveAndBelow (g, (int) grp.size())) return -1;
+    const auto& G = grp[(size_t) g];
+    int one = -1, n = 0;
+    for (int l = 0; l < (int) G.lanes.size(); ++l)
+        if (! G.lanes[(size_t) l].isEmpty() && host.getParam (G.merge, Routing::laneParam (l, Routing::mixMute)) < 0.5) { one = l; ++n; }
+    return n == 1 ? one : -1;
+}
+
+void OctopusEngine::nextLane (int g)
+{
+    if (! ready || ! juce::isPositiveAndBelow (g, (int) grp.size())) return;
+    const auto G = grp[(size_t) g];
+    juce::Array<int> playable;
+    for (int l = 0; l < (int) G.lanes.size(); ++l) if (! G.lanes[(size_t) l].isEmpty()) playable.add (l);
+    if (playable.isEmpty()) return;
+    const int cur = soloLane (g);
+    const int next = cur < 0 ? playable[0] : playable[(playable.indexOf (cur) + 1) % playable.size()];   // plusieurs voies : d'abord A
+    for (int l = 0; l < (int) G.lanes.size(); ++l)
+        host.setParam (G.merge, Routing::laneParam (l, Routing::mixMute), l == next ? 0.0 : 1.0);
+    if (! G.on) host.setParam (G.merge, Routing::pGroupOn, 1.0);
+    ++gen;
+    say ("Path " + juce::String::charToString ((juce::juce_wchar) ('A' + next)) + " : "
+         + FxCat::shortName (fx.getReference (G.lanes[(size_t) next][0]).name));
+    refreshNow();
 }
 
 bool OctopusEngine::isFolded (int g) const { return juce::isPositiveAndBelow (g, (int) grp.size()) && folded.contains (grp[(size_t) g].guid); }
@@ -801,11 +835,23 @@ void OctopusEngine::press (int f)
 void OctopusEngine::switchGroup (int f)
 {
     if (! juce::isPositiveAndBelow (f, kKeys)) return;
-    juce::Array<int> idx;
+    juce::Array<int> idx, swaps;
     bool anyOn = false;
     for (auto& g : stompGuids[f])
+    {
+        if (g.startsWith ("ab:"))
+        {
+            for (int k = 0; k < (int) grp.size(); ++k) if (grp[(size_t) k].guid == g.substring (3)) swaps.add (k);
+            continue;
+        }
         for (int i = 0; i < fx.size(); ++i)
             if (fx.getReference (i).guid == g) { idx.add (i); anyOn = anyOn || fx.getReference (i).enabled; }
+    }
+    if (! swaps.isEmpty())
+    {
+        for (auto k : swaps) nextLane (k);
+        if (idx.isEmpty()) return;
+    }
     if (idx.isEmpty()) { say ("Footswitch " + juce::String::charToString ((juce::juce_wchar) ('A' + f)) + " : no effect assigned (right-click its box on the screen)"); return; }
     host.beginUndo();
     for (auto i : idx) setOn (i, ! anyOn);
@@ -828,7 +874,17 @@ juce::String OctopusEngine::fsText (int f) const
     for (auto& g : stompGuids[f])
     {
         const int b = blockOf (g);
-        if (b >= 0) names.add (blockName (blk[b]));
+        if (b < 0) continue;
+        if (g.startsWith ("ab:"))                    // A <-> B : la voie qui sonne
+        {
+            const int k = groupAt (blk[b]);
+            const int l = k >= 0 ? soloLane (k) : -1;
+            const auto& G = grp[(size_t) juce::jmax (0, k)];
+            names.add (l >= 0 ? juce::String::charToString ((juce::juce_wchar) ('A' + l)) + " : "
+                                  + (G.lanes[(size_t) l].isEmpty() ? juce::String ("-") : FxCat::shortName (fx.getReference (G.lanes[(size_t) l][0]).name))
+                              : "A / B : " + blockName (blk[b]));
+        }
+        else names.add (blockName (blk[b]));
     }
     return names.isEmpty() ? juce::String ("-") : names.joinIntoString (" + ");
 }
@@ -839,6 +895,7 @@ bool OctopusEngine::fsLit (int f) const
     for (auto& g : stompGuids[f])
     {
         const int b = blockOf (g);
+        if (b >= 0 && g.startsWith ("ab:")) { const int k = groupAt (blk[b]); if (k >= 0 && soloLane (k) > 0) return true; continue; }   // allumé sur B (ou C)
         if (b >= 0 && fx.getReference (blk[b]).enabled) return true;
     }
     return false;
@@ -898,7 +955,7 @@ bool OctopusEngine::save (int idx)
     for (int f = 0; f < kKeys; ++f)
     {
         p.stomp[f].clear();
-        for (auto& g : stompGuids[f]) { const int b = blockOf (g); if (b >= 0) p.stomp[f].add (b); }
+        for (auto& g : stompGuids[f]) { const int b = blockOf (g); if (b >= 0) p.stomp[f].add (g.startsWith ("ab:") ? b + 10000 : b); }   // A <-> B : + 10000
     }
     p.saved = true;
     if (p.semi >= 0 && semiNow) p.semi = semiNow();                     // preset lié à Semitones : garde la transposition du moment
@@ -992,7 +1049,11 @@ bool OctopusEngine::load (int idx)
     {
         stompGuids[f].clear();
         for (auto b : p.stomp[f])
-            if (juce::isPositiveAndBelow (b, blk.size())) stompGuids[f].add (fx.getReference (blk[b]).guid);
+        {
+            const bool ab = b >= 10000;
+            const int bb = ab ? b - 10000 : b;
+            if (juce::isPositiveAndBelow (bb, blk.size())) stompGuids[f].add ((ab ? "ab:" : "") + fx.getReference (blk[bb]).guid);
+        }
     }
     cur = idx;
     viewBank = idx / kSlots;

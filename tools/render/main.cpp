@@ -172,6 +172,20 @@ int main (int argc, char** argv)
         e.rename (14, "Stack Amps");
         e.save (14);
         shot ("octopus_split");
+        // footswitch A : passer de la voie A à la voie B (et retour)
+        e.toggleAssign (0, e.swapKeyOf (0));
+        e.setMode (OctopusEngine::stompMode);
+        e.press (0); pump (3);
+        check (e.soloLane (0) == 0 && e.fsText (0).startsWith ("A :"), "footswitch A/B : 1er appui, voie A seule (" + e.fsText (0) + ")");
+        shot ("octopus_split_ab_a");
+        e.press (0); pump (3);
+        check (e.soloLane (0) == 1 && e.fsLit (0), "footswitch A/B : 2e appui, voie B seule (" + e.fsText (0) + ")");
+        shot ("octopus_split_ab_b");
+        e.press (0); pump (3);
+        check (e.soloLane (0) == 0, "footswitch A/B : 3e appui, retour à la voie A");
+        e.setMix (0, 1, Routing::mixMute, 0.0);
+        e.toggleAssign (0, e.swapKeyOf (0));
+        e.setMode (OctopusEngine::presetMode);
         e.setMix (0, 1, Routing::mixLevel, -4.5);
         e.setMix (0, 0, Routing::mixPan, -30.0); e.setMix (0, 1, Routing::mixPan, 30.0);
         e.setMix (0, 1, Routing::mixPhase, 1.0);

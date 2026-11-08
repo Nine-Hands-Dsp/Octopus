@@ -593,12 +593,23 @@ int main()
                && tr.fx[7].params[(size_t) Routing::pPaths] > 0.5, "voie C avec Pipeline : " + rnames (tr));
         eng.moveBlock (eng.groups()[0].lanes[2][0], eng.blocks().indexOf (eng.groups()[0].lanes[1][0]));
         check (rnames (tr) == "[OCTO] < Doorn |B Pipeline Holyverb |C > Holyverb", "Pipeline déplacé dans la voie B : " + rnames (tr));
+        eng.toggleAssign (1, eng.swapKeyOf (0));
+        eng.setMode (OctopusEngine::stompMode);
+        eng.press (1);
+        const bool soloA = eng.soloLane (0) == 0;
+        eng.press (1);
+        const bool soloB = eng.soloLane (0) == 1;
+        eng.press (1);
+        check (soloA && soloB && eng.soloLane (0) == 0, "footswitch B : A -> B -> A (voie C vide sautée, voies coupées dans Merge)");
+        eng.setMode (OctopusEngine::presetMode);
         eng.save (20);
         eng.unsplit (0);
         check (rnames (tr) == "[OCTO] Doorn Pipeline Holyverb Holyverb" && eng.groups().empty(), "voies remises en série : " + rnames (tr));
         eng.load (20);
         check (rnames (tr) == "[OCTO] < Doorn |B Pipeline Holyverb |C > Holyverb" && eng.groups().size() == 1 && eng.groups()[0].lanes.size() == 3,
                "preset rappelé : groupe à 3 voies rétabli : " + rnames (tr));
+        check (eng.isAssigned (1, eng.swapKeyOf (0)) && eng.soloLane (0) == 0, "preset rappelé : footswitch A/B et voie choisie gardés");
+        eng.toggleAssign (1, eng.swapKeyOf (0));
         eng.removePath (0, 0);
         check (rnames (tr) == "[OCTO] < Pipeline Holyverb |B > Holyverb" && eng.groups()[0].lanes.size() == 2 && eng.groups()[0].lanes[1].isEmpty(),
                "voie A retirée : B devient A, C (vide) devient B : " + rnames (tr));

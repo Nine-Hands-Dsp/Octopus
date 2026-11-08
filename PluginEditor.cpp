@@ -1118,7 +1118,12 @@ private:
             const auto& cell = gCells[k];
             if (! rowVisible (cell.row)) continue;
             const auto cc = cellCentre (cell);
-            if (cell.kind == cBlock) drawBlock (g, cell.slot, fx.getReference (blocks[cell.slot]), cc, cell.slot == dragFrom ? 0.25f : 1.0f, false);
+            if (cell.kind == cBlock)
+            {
+                // voie coupée dans le mixeur (mute, ou A / B au footswitch) : bloc estompé
+                const bool muted = cell.group >= 0 && eng.mixValue (cell.group, cell.lane, Routing::mixMute) > 0.5;
+                drawBlock (g, cell.slot, fx.getReference (blocks[cell.slot]), cc, cell.slot == dragFrom ? 0.25f : (muted ? 0.38f : 1.0f), false);
+            }
             else if (cell.kind == cAdd) drawAddTile (g, cc, hoverSlot == cell.slot, blocks.isEmpty() ? "Add an effect" : "Add", false);
             else if (cell.kind == cLaneAdd) drawAddTile (g, cc, hoverLaneAdd == (int) k, String ("Path ") + String::charToString ((juce_wchar) ('A' + cell.lane)), true);
             else if (cell.kind == cFolded)
@@ -1155,9 +1160,10 @@ private:
             for (int l = 0; l < gg.lanes; ++l)
             {
                 const auto pr = S (Rectangle<float> (y0.x + 13.0f, y0.y + kLanePitch * (float) l - 22.0f, 15.0f, 14.0f));
-                g.setColour ((on ? kAmber : kDim).withAlpha (0.16f));
+                const bool live = on && eng.mixValue (gg.group, l, Routing::mixMute) < 0.5;
+                g.setColour ((live ? kAmber : kDim).withAlpha (0.16f));
                 g.fillRoundedRectangle (pr, S (3.0f));
-                g.setColour (on ? kAmber : kDim);
+                g.setColour (live ? kAmber : kDim);
                 g.setFont (font (tfBold, 11.0f));
                 g.drawText (String::charToString ((juce_wchar) ('A' + l)), pr, Justification::centred);
             }
@@ -3503,6 +3509,14 @@ private:
             assign.addItem (20 + k, "Footswitch " + fsLetter (k) + (k == 4 ? "  (A+B)" : k == 5 ? "  (C+D)" : ""), true, eng.isAssigned (k, guid));
         }
         m.addSubMenu ("Assign the group to footswitch (STOMP)", assign);
+        PopupMenu swap;
+        const String sk = OctopusEngine::swapKey (guid);
+        for (int k = 0; k < OctopusEngine::kKeys; ++k)
+        {
+            if (k == 4) swap.addSeparator();
+            swap.addItem (30 + k, "Footswitch " + fsLetter (k) + (k == 4 ? "  (A+B)" : k == 5 ? "  (C+D)" : ""), true, eng.isAssigned (k, sk));
+        }
+        m.addSubMenu ("Switch path A / B with footswitch (STOMP)", swap);
         SafePointer<PedalView> sp (this);
         m.showMenuAsync (PopupMenu::Options(), [sp, guid] (int r)
         {
@@ -3521,6 +3535,7 @@ private:
                 default:
                     if (r >= 10 && r < 10 + Routing::kMaxLanes) e.removePath (gi, r - 10);
                     else if (r >= 20 && r < 20 + OctopusEngine::kKeys) e.toggleAssign (r - 20, guid);
+                    else if (r >= 30 && r < 30 + OctopusEngine::kKeys) e.toggleAssign (r - 30, OctopusEngine::swapKey (guid));
                     break;
             }
         });

@@ -85,6 +85,12 @@ public:
     double mixValue (int g, int lane, int what) const;   // Routing::MixParam, valeurs réelles (dB, pan -100..100, 0 / 1)
     void setMix (int g, int lane, int what, double value);
     bool isFolded (int g) const;
+    // footswitch « A <-> B » d'un groupe : chaque appui ne laisse entendre qu'une voie (A, puis B, puis C...) ; les autres
+    // sont coupées dans le mixeur (fondu de 10 ms, sans clic). Assignation : toggleAssign (fs, swapKey (g)).
+    static juce::String swapKey (const juce::String& splitGuid) { return "ab:" + splitGuid; }
+    juce::String swapKeyOf (int g) const;
+    int soloLane (int g) const;                       // la seule voie qui sonne, -1 si plusieurs (ou aucune)
+    void nextLane (int g);
     void toggleFold (int g);
 
     const juce::Array<InstalledFx>& installedList (bool reload = false);
