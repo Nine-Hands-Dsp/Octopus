@@ -1561,6 +1561,13 @@ private:
     {
         if (semiOpen && (tunerShown() || ! eng.isReady())) closeSemiDrum();
         if (modeOpen && ! tunerShown()) closeModeDrum();
+        if (insertOpen && overlay != Overlay::browser) closeInsertDrum();
+        if (insertOpen && std::abs (insertDrumPos - (float) insertTarget) > 0.001f)
+        {
+            insertDrumPos += ((float) insertTarget - insertDrumPos) * 0.35f;
+            if (std::abs (insertDrumPos - (float) insertTarget) < 0.01f) insertDrumPos = (float) insertTarget;
+            askRepaint (screenPx());
+        }
         if (std::abs (listPos - (float) listScroll) > 0.001f)          // liste du navigateur : glisse vers la ligne visée
         {
             listPos += ((float) listScroll - listPos) * 0.3f;
@@ -1959,6 +1966,7 @@ private:
             g.setColour (Colour (0xff1c2129));
             g.fillRect (S (Rectangle<float> (16.0f, kTabsY + kTabsH, kSW - 32.0f, 1.0f)));
             drawBrowserList (g);
+            if (insertOpen) drawInsertDrum (g);
         }
         else if (overlay == Overlay::params) drawParams (g);
         else if (overlay == Overlay::banks)  drawBanks (g);
@@ -1997,11 +2005,9 @@ private:
             if (b.id == bInsertWhere)                               // emplacement : pastille cliquable « → before Pipeline ▾ »
             {
                 const auto rr = S (b.r);
-                const bool hov = hoverBtn == b.id;
-                g.setColour (hov ? Colour (0xff1a1f27) : Colour (0xff13171d));
-                g.fillRoundedRectangle (rr, rr.getHeight() * 0.5f);
-                g.setColour (hov ? kDim : Colour (0xff262c36));
-                g.drawRoundedRectangle (rr.reduced (S (0.6f)), rr.getHeight() * 0.5f, S (1.0f));
+                const bool hov = hoverBtn == b.id || insertOpen;               // même forme que ADD, sans remplissage
+                g.setColour (insertOpen ? kAccent.withAlpha (0.8f) : hov ? kDim : Colour (0xff2c333e));
+                g.drawRoundedRectangle (rr.reduced (S (0.6f)), S (7.0f), S (1.2f));
                 const auto fd = font (tfRegular, 14.0f), fn = font (tfMedium, 14.5f);
                 const String pre = insertPos >= eng.blocks().size() ? String (CharPointer_UTF8 ("\xe2\x86\x92  at")) : String (CharPointer_UTF8 ("\xe2\x86\x92  before"));
                 float x = b.r.getX() + 14.0f;
@@ -2304,27 +2310,103 @@ private:
         const float x = 16.0f + unitsOf (font (tfBold, 20.0f), "ADD AN EFFECT") + 16.0f;   // juste après le titre
         return { x, kRowY, w, kRowH };
     }
-    // menu de l'emplacement : au début, avant chaque bloc (un groupe compte pour un), à la fin
-    void insertWhereMenu()
+    // ---- tambour de l'emplacement (comme celui de Semitones) : au début, avant chaque bloc (un groupe compte pour un), à la fin
+    bool insertOpen = false; int insertTarget = 0, hoverInsert = -1; float insertDrumPos = 0.0f;
+    std::vector<std::pair<int, String>> insertChoices() const
     {
-        PopupMenu m;
-        menuHeader (m, MenuStyle::Badge::ofUi (MenuStyle::icoAdd), "Insert the effects", "Position in the chain");
+        std::vector<std::pair<int, String>> v;
         const auto& bl = eng.blocks();
         for (int k = 0; k < bl.size(); ++k)
         {
             const int role = eng.roleAt (bl[k]);
             if (role != Routing::none && role != Routing::split) continue;     // repères des voies parallèles : pas un emplacement
             if (eng.groupAt (bl[k]) >= 0 && role != Routing::split) continue;   // dans un groupe : on insère avant le groupe
-            m.addItem (1 + k, (k == 0 ? "At the start, before " : "Before ") + eng.blockName (bl[k]), true, insertPos == k);
+            v.push_back ({ k, (v.empty() ? "At the start, before " : "Before ") + eng.blockName (bl[k]).replace (" || ", String (CharPointer_UTF8 (" \xe2\x80\x96 "))) });
         }
-        m.addItem (1 + bl.size(), "At the end of the chain", true, insertPos >= bl.size());
-        SafePointer<PedalView> sp (this);
-        styled (m).showMenuAsync (PopupMenu::Options().withTargetScreenArea (localAreaToGlobal (S (insertWhereRect()).toNearestInt())), [sp] (int r)
+        v.push_back ({ bl.size(), "At the end of the chain" });
+        return v;
+    }
+    static constexpr float kInsMidY = 330.0f, kInsR = 150.0f, kInsStep = 15.0f;
+    float insY (float d) const { return kInsMidY + kInsR * std::sin (jlimit (-5.5f, 5.5f, d) * kInsStep * MathConstants<float>::pi / 180.0f); }
+    float insNamesW() const { float w = 0.0f; for (auto& c : insertChoices()) w = jmax (w, unitsOf (font (tfBold, 17.5f), c.second)); return w; }
+    Rectangle<float> insBand() const
+    {
+        const float w = insNamesW() + 48.0f, cx = jlimit (16.0f + w * 0.5f, kSW - 16.0f - w * 0.5f, insertWhereRect().getCentreX());
+        return { cx - w * 0.5f, kInsMidY - 16.0f, w, 32.0f };
+    }
+    void openInsertDrum()
+    {
+        const auto ch = insertChoices();
+        insertTarget = (int) ch.size() - 1;
+        for (int i = (int) ch.size() - 1; i >= 0; --i) if (ch[(size_t) i].first <= jmin (insertPos, eng.blocks().size())) { insertTarget = i; break; }   // dans un groupe : avant le groupe
+        insertDrumPos = (float) insertTarget; hoverInsert = -1; insertOpen = true;
+        askRepaint (screenPx());
+    }
+    void closeInsertDrum() { if (! insertOpen) return; insertOpen = false; hoverInsert = -1; askRepaint (screenPx()); }
+    void chooseInsert (int i)
+    {
+        const auto ch = insertChoices();
+        if (! isPositiveAndBelow (i, (int) ch.size())) return;
+        insertPos = ch[(size_t) i].first; insertTarget = i;
+        askRepaint (screenPx());
+    }
+    int insertItemAt (Point<float> p) const
+    {
+        const auto band = insBand();
+        if (p.x < band.getX() || p.x > band.getRight()) return -1;
+        const int n = (int) insertChoices().size();
+        for (int i = 0; i < n; ++i)
         {
-            if (sp == nullptr || r <= 0) return;
-            sp->insertPos = r - 1;
-            sp->askRepaint (sp->screenPx());
-        });
+            const float d = (float) i - insertDrumPos;
+            if (std::abs (d) > 4.3f) continue;
+            const float h = 13.5f * std::cos (d * kInsStep * MathConstants<float>::pi / 180.0f);
+            if (std::abs (p.y - insY (d)) <= h) return i;
+        }
+        return -1;
+    }
+    void drawInsertDrum (Graphics& g)
+    {
+        const auto col = kAccent;
+        const auto ch = insertChoices();
+        g.setColour (Colour (0xff05070b).withAlpha (0.94f));
+        g.fillRect (S (Rectangle<float> (0.0f, 122.0f, kSW, kSH - 122.0f)));
+        const auto band = S (insBand());
+        for (int l = 3; l >= 1; --l)
+        {
+            g.setColour (col.withAlpha (0.05f));
+            g.fillRoundedRectangle (band.expanded (S (3.0f * (float) l)), S (6.0f + 3.0f * (float) l));
+        }
+        g.setColour (col.withAlpha (0.10f));
+        g.fillRoundedRectangle (band, S (6.0f));
+        g.setColour (col.withAlpha (0.55f));
+        g.drawRoundedRectangle (band, S (6.0f), S (0.9f));
+        const float cx = insBand().getCentreX();
+        for (int i = 0; i < (int) ch.size(); ++i)
+        {
+            const float d = (float) i - insertDrumPos, ad = std::abs (d);
+            if (ad > 4.6f) continue;
+            const float a = d * kInsStep * MathConstants<float>::pi / 180.0f;
+            float op = jmax (0.06f, 1.0f - ad * 0.22f);
+            if (i == hoverInsert && ad > 0.5f) op = jmin (1.0f, op + 0.25f);
+            const bool sel = ad < 0.5f;
+            const auto cy = S (Point<float> (cx, insY (d)));
+            Graphics::ScopedSaveState ss (g);
+            g.addTransform (AffineTransform::scale (1.0f - ad * 0.06f, (1.0f - ad * 0.06f) * std::cos (a), cy.x, cy.y));
+            g.setFont (sel ? font (tfBold, 17.5f) : font (tfMedium, 16.5f));
+            g.setColour ((sel ? Colours::white : kText).withAlpha (op));
+            g.drawText (ch[(size_t) i].second, Rectangle<float> (cy.x - S (insNamesW() * 0.5f + 20.0f), cy.y - S (14.0f), S (insNamesW() + 40.0f), S (28.0f)), Justification::centred, false);
+        }
+        const auto hintF = font (tfBold, 11.6f).withExtraKerningFactor (0.14f);
+        const String hintT = CharPointer_UTF8 ("SCROLL  \xc2\xb7  CLICK TO CHOOSE");
+        const float hx = cx - (13.0f + 6.0f + unitsOf (hintF, hintT)) * 0.5f, hy = kInsMidY + kInsR + 22.0f;
+        const auto mr = S (Rectangle<float> (hx, hy, 13.0f, 19.0f));
+        g.setColour (Colour (0xff9aa4b4));
+        g.drawRoundedRectangle (mr, mr.getWidth() * 0.5f, S (1.2f));
+        g.setColour (col);
+        g.fillRoundedRectangle (S (Rectangle<float> (hx + 5.3f, hy + 3.6f, 2.4f, 5.4f)), S (1.2f));
+        g.setFont (hintF);
+        g.setColour (Colour (0xff9aa4b4));
+        g.drawText (hintT, S (Rectangle<float> (hx + 19.0f, hy, 220.0f, 19.0f)), Justification::centredLeft);
     }
     int chipCount (int c)
     {
@@ -3486,6 +3568,11 @@ private:
             const bool hm2 = overlay == Overlay::browser && morePill.contains (toLocal (e.position));
             if (hm2 != hoverMore) { hoverMore = hm2; askRepaint (screenPx()); }
         }
+        if (insertOpen)
+        {
+            const int hi = insertItemAt (toLocal (e.position));
+            if (hi != hoverInsert) { hoverInsert = hi; askRepaint (screenPx()); }
+        }
         if (modeOpen)
         {
             const int hm = modeItemAt (toLocal (e.position));
@@ -3545,6 +3632,17 @@ private:
 
         if (! L::glass.contains (unit)) { closeSemiDrum(); if (e.mods.isPopupMenu()) pedalMenu(); return; }
 
+        // tambour de l'emplacement ouvert : clic sur une ligne = la choisir, sur la pastille = fermer, ailleurs = fermer
+        if (insertOpen)
+        {
+            if (! insertWhereRect().contains (p))
+            {
+                const int it = insertItemAt (p);
+                if (it >= 0 && ! e.mods.isPopupMenu()) chooseInsert (it);
+            }
+            closeInsertDrum();
+            return;
+        }
         // tambour du mode de CHROMA ouvert : clic sur un mode = le choisir, ailleurs = fermer
         if (modeOpen)
         {
@@ -3795,6 +3893,13 @@ private:
         const auto p = toLocal (e.position);
         const int dir = w.deltaY < 0 ? 1 : (w.deltaY > 0 ? -1 : 0);
         if (dir == 0 || ! Rectangle<float> (0, 0, kSW, kSH).contains (p)) return;
+        if (insertOpen)
+        {
+            insertTarget = jlimit (0, (int) insertChoices().size() - 1, insertTarget + dir);
+            hoverInsert = -1;
+            askRepaint (screenPx());
+            return;
+        }
         if (modeOpen)
         {
             modeTarget = jlimit (0, 2, modeTarget + dir);
@@ -3831,6 +3936,8 @@ private:
 
     bool keyPressed (const KeyPress& k) override
     {
+        if (k == KeyPress::escapeKey && insertOpen) { closeInsertDrum(); return true; }
+        if (k == KeyPress::returnKey && insertOpen) { chooseInsert (insertTarget); closeInsertDrum(); return true; }
         if (k == KeyPress::escapeKey && modeOpen) { closeModeDrum(); return true; }
         if (k == KeyPress::returnKey && modeOpen) { chooseMode (modeTarget); closeModeDrum(); return true; }
         if (k == KeyPress::escapeKey && semiOpen) { closeSemiDrum(); return true; }
@@ -3867,7 +3974,7 @@ private:
             case bPresetRescan: openPresets (true); break;
             case bAddPicked:  addPicked(); break;
             case bClearPicked: picked.clear(); break;
-            case bInsertWhere: insertWhereMenu(); break;
+            case bInsertWhere: if (insertOpen) closeInsertDrum(); else openInsertDrum(); break;
             case bTunerTunings: tuningMenu(); break;
             case bPresetSave: startPresetSave (-1); break;
             case bTunerMute:  proc.chromaSetMute (! proc.chroma().muted); break;
@@ -4714,6 +4821,7 @@ void OctopusEditor::showScreen (int which, int arg)
         case 15: view->openMixer (arg); break;   // rendus : mixeur d'un groupe (-1 : fermé)
         case 13: view->recGlowPc = arg; view->askRepaint (view->screenPx()); break;   // rendus : glow de l'effet record
         case 14: view->recColourMenu(); break;
+        case 20: if (arg != 0) view->openInsertDrum(); else view->closeInsertDrum(); break;   // rendus : tambour de l'emplacement
         case 19: if (arg != 0) view->openModeDrum(); else view->closeModeDrum(); break;   // rendus : tambour du mode de CHROMA
         case 12: view->recPreview = arg == 0 ? -1 : (arg == 1 ? 1 : 2); view->recBlinkOn = arg != 2; view->askRepaint (view->screenPx()); break;   // rendus : 1 = armée (REC fixe), 2 = enregistrement (REC éteint), 3 = enregistrement (REC allumé)
         case 11: view->openPicker ("Semitones colour", view->semiColour(), view->S (view->semiRect()), true, [] (Colour) {}); break;

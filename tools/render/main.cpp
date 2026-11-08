@@ -171,6 +171,9 @@ int main (int argc, char** argv)
         check (e.groups()[0].lanes[0].size() == 2 && e.groups()[0].lanes[1].size() == 2, "voies A et B : ampli + IR chacune");
         e.rename (14, "Stack Amps");
         e.save (14);
+        ed->showScreen (1, 3); pump (3); ed->showScreen (20, 1); pump (8);
+        shot ("octopus_add_insert_drum");
+        ed->showScreen (20, 0); ed->showScreen (0); pump (2);
         shot ("octopus_split");
         {   // menu clic droit du footswitch A : grille des blocs (A <-> B du groupe + Holyverb cochés)
             e.toggleAssign (0, e.swapKeyOf (0));
