@@ -85,7 +85,7 @@ namespace
     {
         bNone = 0, bBankPrev, bBankNext, bModePreset, bModeStomp, bSave, bBanks, bClose,
         bParamOnOff, bParamWindow, bPagePrev, bPageNext, bExport, bImport, bPc, bReload,
-        bAddPicked, bClearPicked, bParamMidi, bPresets, bTunerTunings, bPresetSave, bPresetRescan, bTunerMute, bTunerMode, bTunerExit, bChroma, bSemi,
+        bAddPicked, bClearPicked, bParamMidi, bPresets, bTunerTunings, bPresetSave, bPresetRescan, bTunerMute, bTunerMode, bTunerExit, bChroma, bSemi, bInsertWhere,
         bChip = 100,                     // + catégorie du navigateur
         bSortAZ = 150, bSortType,        // tri du navigateur : A-Z / par type
         bBank = 200,                     // + numéro de bank
@@ -120,6 +120,10 @@ public:
         for (auto& l : ledLevel) l = 0.0f;
 
         styleEditor (search, "Search plug-ins...");
+        search.setColour (TextEditor::backgroundColourId, Colours::transparentBlack);   // fond, cadre arrondi et loupe dessinés par l'écran
+        search.setColour (TextEditor::outlineColourId, Colours::transparentBlack);
+        search.setColour (TextEditor::focusedOutlineColourId, Colours::transparentBlack);
+        search.onFocusLost = [this] { askRepaint (screenPx()); };
         search.onTextChange = [this] { listScroll = 0; askRepaint (screenPx()); };
         search.onEscapeKey = [this] { closeOverlay(); };
         search.onReturnKey = [this]
@@ -464,9 +468,9 @@ private:
     void layoutEditors()
     {
         const float h = 18.0f * s;
-        search.setBounds (S (Rectangle<float> (16.0f, 130.0f, jmax (160.0f, chipsStartX() - 10.0f - 16.0f), 38.0f)).toNearestInt());
-        search.setFont (font (tfMedium, 18.0f));
-        search.setIndents (roundToInt (S (10.0f)), jmax (0, roundToInt ((S (38.0f) - h) * 0.5f) - 1));
+        search.setBounds (S (kSearchR.withTrimmedLeft (40.0f).withTrimmedRight (8.0f)).toNearestInt());   // à droite de la loupe
+        search.setFont (font (tfMedium, 17.0f));
+        search.setIndents (0, jmax (0, roundToInt ((S (kSearchR.getHeight()) - h) * 0.5f) - 1));
         if (renameSlot >= 0)
         {
             renameEd.setBounds (S (cardRect (renameSlot).withTrimmedLeft (80.0f).withWidth (250.0f).reduced (0.0f, 14.0f)).toNearestInt());
@@ -1596,21 +1600,24 @@ private:
     {
         std::vector<Btn> v;
         if (overlay == Overlay::none) return v;
-        v.push_back ({ { 1008.0f, 84.0f, 40.0f, 36.0f }, bClose, CharPointer_UTF8 ("\xe2\x9c\x95") });
+        v.push_back ({ { 1008.0f, 84.0f, 40.0f, 36.0f }, bClose, CharPointer_UTF8 ("\xe2\x9c\x95") });   // (navigateur : 1008, à côté de rescan)
         if (overlay == Overlay::browser)
         {
-            float x = chipsStartX();
+            // onglets des filtres (texte + nombre, souligné quand actif)
+            float x = 16.0f;
             for (int c = 0; c < kNumChips; ++c)
             {
                 const float w = chipWidth (c);
-                v.push_back ({ { x, 130.0f, w, 38.0f }, bChip + c, kChips[c], chip == c });
-                x += w + 6.0f;
+                v.push_back ({ { x - 4.0f, kTabsY, w + 8.0f, kTabsH }, bChip + c, kChips[c], chip == c });
+                x += w + kTabGap;
             }
-            v.push_back ({ { 232.0f, 88.0f, 58.0f, 28.0f }, bSortAZ, "A - Z", ! browserByType });
-            v.push_back ({ { 290.0f, 88.0f, 62.0f, 28.0f }, bSortType, "TYPE", browserByType });
-            v.push_back ({ { 702.0f, 84.0f, 84.0f, 36.0f }, bClearPicked, "CLEAR", false, picked.size() > 0 });
-            v.push_back ({ { 792.0f, 84.0f, 112.0f, 36.0f }, bAddPicked, picked.isEmpty() ? String ("ADD") : "ADD " + String (picked.size()), picked.size() > 0, picked.size() > 0 });
-            v.push_back ({ { 910.0f, 84.0f, 90.0f, 36.0f }, bReload, "RESCAN" });
+            // ligne du titre : emplacement (menu), tri, sélection, ADD, rescan, fermer
+            v.push_back ({ insertWhereRect(), bInsertWhere, insertWhereText() });
+            v.push_back ({ { kSortX, 85.0f, 62.0f, 34.0f }, bSortAZ, "A - Z", ! browserByType });
+            v.push_back ({ { kSortX + 62.0f, 85.0f, 62.0f, 34.0f }, bSortType, "TYPE", browserByType });
+            if (picked.size() > 0) v.push_back ({ selPillRect(), bClearPicked, String (picked.size()) + " selected", false, true });
+            v.push_back ({ { 852.0f, 84.0f, 102.0f, 36.0f }, bAddPicked, picked.isEmpty() ? String ("ADD") : "ADD " + String (picked.size()), picked.size() > 0, picked.size() > 0 });
+            v.push_back ({ { 962.0f, 84.0f, 40.0f, 36.0f }, bReload, {} });
         }
         else if (overlay == Overlay::params)
         {
@@ -1923,19 +1930,30 @@ private:
         if (overlay == Overlay::browser)
         {
             g.drawText ("ADD AN EFFECT", S (Rectangle<float> (16.0f, 84.0f, 220.0f, 36.0f)), Justification::centredLeft);
-            g.setFont (font (tfRegular, 16.0f));
-            g.setColour (kDim);
-            const int n = eng.blocks().size();
-            const String where = insertPos >= n ? "at the end of the chain" : "before " + FxCat::shortName (eng.chain().getReference (eng.blocks()[insertPos]).name);
-            g.setFont (font (tfBold, 12.5f).withExtraKerningFactor (0.14f));
-            g.drawText ("SORT", S (Rectangle<float> (186.0f, 84.0f, 44.0f, 36.0f)), Justification::centredLeft);
-            g.setColour (Colour (0xff0b0e12));
-            g.fillRoundedRectangle (S (Rectangle<float> (229.0f, 85.0f, 126.0f, 34.0f)), S (17.0f));
-            g.setColour (Colours::white.withAlpha (0.07f));
-            g.drawRoundedRectangle (S (Rectangle<float> (229.0f, 85.0f, 126.0f, 34.0f)), S (17.0f), S (1.0f));
-            g.setFont (font (tfRegular, 15.0f));
-            g.setColour (kDim);
-            g.drawText (where + "  -  click to select (several in a row), ADD", S (Rectangle<float> (372.0f, 84.0f, 324.0f, 36.0f)), Justification::centredLeft, true);
+            // tri : interrupteur segmenté (fond commun)
+            const auto seg = Rectangle<float> (kSortX - 3.0f, 82.0f, 130.0f, 40.0f);
+            g.setColour (Colour (0xff13171d));
+            g.fillRoundedRectangle (S (seg), S (10.0f));
+            g.setColour (Colour (0xff262c36));
+            g.drawRoundedRectangle (S (seg).reduced (S (0.5f)), S (10.0f), S (1.0f));
+            // champ de recherche : fond, cadre arrondi (bleu quand on tape), loupe
+            const bool foc = search.hasKeyboardFocus (true);
+            g.setColour (Colour (0xff13171d));
+            g.fillRoundedRectangle (S (kSearchR), S (10.0f));
+            g.setColour (foc ? kAccent.withAlpha (0.8f) : Colour (0xff262c36));
+            g.drawRoundedRectangle (S (kSearchR).reduced (S (0.6f)), S (10.0f), S (1.2f));
+            {
+                const auto c = Point<float> (kSearchR.getX() + 21.0f, kSearchR.getCentreY() - 1.0f);
+                Path lens;
+                lens.addEllipse (S (Rectangle<float> (13.0f, 13.0f).withCentre (c)));
+                lens.startNewSubPath (S (c + Point<float> (5.0f, 5.0f)));
+                lens.lineTo (S (c + Point<float> (10.0f, 10.0f)));
+                g.setColour (kDim);
+                g.strokePath (lens, PathStrokeType (S (1.8f), PathStrokeType::curved, PathStrokeType::rounded));
+            }
+            // filet sous les onglets
+            g.setColour (Colour (0xff1c2129));
+            g.fillRect (S (Rectangle<float> (16.0f, kTabsY + kTabsH, kSW - 32.0f, 1.0f)));
             drawBrowserList (g);
         }
         else if (overlay == Overlay::params) drawParams (g);
@@ -1943,35 +1961,113 @@ private:
         for (auto& b : overlayButtons())
         {
             const bool colourBtn = b.id >= bFsColour && b.id <= bFsColour + OctopusEngine::kFs;
-            if (b.id == bSortAZ || b.id == bSortType)                // tri : interrupteur arrondi
+            if (b.id == bSortAZ || b.id == bSortType)                // tri : moitié de l'interrupteur segmenté
             {
-                const auto rr = S (b.r.reduced (2.0f, 1.0f));
-                if (b.active) { g.setColour (kAccent); g.fillRoundedRectangle (rr, rr.getHeight() * 0.5f); }
-                else if (hoverBtn == b.id) { g.setColour (Colours::white.withAlpha (0.06f)); g.fillRoundedRectangle (rr, rr.getHeight() * 0.5f); }
+                const auto rr = S (b.r.reduced (1.0f, 1.0f));
+                if (b.active) { g.setColour (kAccent); g.fillRoundedRectangle (rr, S (8.0f)); }
+                else if (hoverBtn == b.id) { g.setColour (Colours::white.withAlpha (0.06f)); g.fillRoundedRectangle (rr, S (8.0f)); }
                 g.setFont (font (tfBold, 12.5f).withExtraKerningFactor (0.12f));
                 g.setColour (b.active ? kScrBg : kDim);
                 g.drawText (b.text, rr, Justification::centred, false);
                 continue;
             }
-            if (b.id >= bChip && b.id < bChip + kNumChips)          // filtre + nombre de plugins
+            if (b.id >= bChip && b.id < bChip + kNumChips)          // onglet : texte + nombre, souligné quand actif
+            {
+                const int cnt = chipCount (b.id - bChip);
+                const auto f = font (tfMedium, 15.5f);
+                const auto fc = font (tfMedium, 12.0f);
+                const float tw = unitsOf (f, b.text), x0 = b.r.getX() + 4.0f;
+                const bool hov = hoverBtn == b.id;
+                const auto ty = Rectangle<float> (x0, b.r.getY(), tw + 4.0f, b.r.getHeight() - 6.0f);
+                g.setFont (f);
+                g.setColour (b.active ? kText : (hov ? kText.withAlpha (0.85f) : kDim));
+                g.drawText (b.text, S (ty), Justification::centredLeft, false);
+                if (cnt > 0)
+                {
+                    g.setFont (fc);
+                    g.setColour (b.active ? kAccent : Colour (0xff596273));
+                    g.drawText (String (cnt), S (Rectangle<float> (x0 + tw + 6.0f, b.r.getY() + 1.0f, 60.0f, b.r.getHeight() - 6.0f)), Justification::centredLeft, false);
+                }
+                if (b.active)
+                {
+                    g.setColour (kAccent);
+                    g.fillRoundedRectangle (S (Rectangle<float> (x0, b.r.getBottom() - 1.5f, b.r.getWidth() - 8.0f, 2.5f)), S (1.2f));
+                }
+                continue;
+            }
+            if (b.id == bInsertWhere)                               // emplacement : pastille cliquable « → before Pipeline ▾ »
+            {
+                const auto rr = S (b.r);
+                const bool hov = hoverBtn == b.id;
+                g.setColour (hov ? Colour (0xff1a1f27) : Colour (0xff13171d));
+                g.fillRoundedRectangle (rr, rr.getHeight() * 0.5f);
+                g.setColour (hov ? kDim : Colour (0xff262c36));
+                g.drawRoundedRectangle (rr.reduced (S (0.6f)), rr.getHeight() * 0.5f, S (1.0f));
+                const auto fd = font (tfRegular, 14.0f), fn = font (tfMedium, 14.5f);
+                const String pre = insertPos >= eng.blocks().size() ? String (CharPointer_UTF8 ("\xe2\x86\x92  at")) : String (CharPointer_UTF8 ("\xe2\x86\x92  before"));
+                float x = b.r.getX() + 14.0f;
+                const float pw = unitsOf (fd, pre);
+                g.setFont (fd); g.setColour (kDim);
+                g.drawText (pre, S (Rectangle<float> (x, b.r.getY(), pw + 4.0f, b.r.getHeight())), Justification::centredLeft, false);
+                x += pw + 6.0f;
+                g.setFont (fn); g.setColour (kText);
+                g.drawText (b.text, S (Rectangle<float> (x, b.r.getY(), b.r.getRight() - 26.0f - x, b.r.getHeight())), Justification::centredLeft, true);
+                Path tri;                                              // ▾
+                const float cx = b.r.getRight() - 16.0f, cy = b.r.getCentreY();
+                tri.addTriangle (S (Point<float> (cx - 4.0f, cy - 2.0f)), S (Point<float> (cx + 4.0f, cy - 2.0f)), S (Point<float> (cx, cy + 3.0f)));
+                g.setColour (kDim);
+                g.fillPath (tri);
+                continue;
+            }
+            if (overlay == Overlay::browser && b.id == bClearPicked)    // « 3 selected  ✕ » : un clic vide la sélection
+            {
+                const auto rr = S (b.r);
+                const bool hov = hoverBtn == b.id;
+                g.setColour (hov ? Colour (0xff1a1f27) : Colour (0xff13171d));
+                g.fillRoundedRectangle (rr, S (10.0f));
+                g.setColour (hov ? kDim : Colour (0xff262c36));
+                g.drawRoundedRectangle (rr.reduced (S (0.6f)), S (10.0f), S (1.0f));
+                g.setFont (font (tfMedium, 15.0f));
+                g.setColour (kText);
+                g.drawText (b.text, S (b.r.withTrimmedLeft (14.0f).withTrimmedRight (30.0f)), Justification::centredLeft, false);
+                g.setFont (font (tfRegular, 15.0f));
+                g.setColour (hov ? kText : kDim);
+                g.drawText (CharPointer_UTF8 ("\xe2\x9c\x95"), S (b.r.withTrimmedLeft (b.r.getWidth() - 30.0f)), Justification::centred, false);
+                continue;
+            }
+            if (overlay == Overlay::browser && b.id == bAddPicked)      // ADD : bouton principal plein quand il y a une sélection
+            {
+                const auto rr = S (b.r);
+                const bool hov = hoverBtn == b.id && b.enabled;
+                if (b.enabled)
+                {
+                    g.setColour (hov ? kAccent.brighter (0.15f) : kAccent);
+                    g.fillRoundedRectangle (rr, S (9.0f));
+                }
+                else
+                {
+                    g.setColour (kAccent.withAlpha (0.16f));
+                    g.fillRoundedRectangle (rr, S (9.0f));
+                }
+                g.setFont (font (tfBold, 14.5f).withExtraKerningFactor (0.08f));
+                g.setColour (b.enabled ? kScrBg : kAccent.withAlpha (0.45f));
+                g.drawText (b.text, rr, Justification::centred, false);
+                continue;
+            }
+            if (b.id == bReload)                                    // rescan : icône (flèche circulaire)
             {
                 auto bb = b; bb.text = {};
                 drawButton (g, bb);
-                const int cnt = chipCount (b.id - bChip);
-                const auto f = font (tfBold, 15.0f);
-                const auto fc = font (tfBold, 13.5f);
-                const float tw = unitsOf (f, b.text), pw = cnt > 0 ? unitsOf (fc, String (cnt)) : 0.0f;
-                const float x0 = b.r.getCentreX() - (tw + (cnt > 0 ? 8.0f + pw : 0.0f)) * 0.5f;
-                g.setFont (f);
-                g.setColour (kText.withAlpha (b.active ? 1.0f : 0.85f));
-                g.drawText (b.text, S (Rectangle<float> (x0, b.r.getY(), tw + 4.0f, b.r.getHeight())), Justification::centredLeft, false);
-                if (cnt > 0)
-                {
-                    const auto pr = Rectangle<float> (x0 + tw + 8.0f, b.r.getY(), pw + 4.0f, b.r.getHeight());   // nombre seul, sans pastille
-                    g.setFont (fc);
-                    g.setColour (b.active ? kAccent : kDim);
-                    g.drawText (String (cnt), S (pr), Justification::centredLeft, false);
-                }
+                const auto c = S (b.r.getCentre());
+                const float rad = S (7.0f);
+                Path arc;
+                arc.addCentredArc (c.x, c.y, rad, rad, 0.0f, MathConstants<float>::pi * 0.45f, MathConstants<float>::pi * 1.95f, true);
+                g.setColour (kText.withAlpha (hoverBtn == b.id ? 1.0f : 0.8f));
+                g.strokePath (arc, PathStrokeType (S (1.8f), PathStrokeType::curved, PathStrokeType::rounded));
+                const auto top = c + Point<float> (0.0f, -rad);         // bout de l'arc en haut : flèche vers la droite (sens horaire)
+                Path head;
+                head.addTriangle (top + Point<float> (S (4.0f), 0.0f), top + Point<float> (S (-1.5f), S (-4.0f)), top + Point<float> (S (-1.5f), S (4.0f)));
+                g.fillPath (head);
                 continue;
             }
             if (! colourBtn) drawButton (g, b, b.id == bClose ? 18.0f : 15.0f);
@@ -2149,6 +2245,7 @@ private:
     Rectangle<float> itemRect (int visibleIndex) const
     {
         const int col = visibleIndex / kListRows, row = visibleIndex % kListRows;
+        if (overlay == Overlay::browser) return { 16.0f + 520.0f * (float) col, kListTopB + 33.0f * (float) row, 512.0f, 30.0f };   // sous les onglets
         return { 16.0f + 520.0f * (float) col, 182.0f + 34.0f * (float) row, 512.0f, 31.0f };
     }
 
@@ -2187,6 +2284,44 @@ private:
         const int r = browserRowAt (v);
         return isPositiveAndBelow (r, (int) rows.size()) ? rows[(size_t) r].item : -1;
     }
+    // ---- haut du navigateur : titre, emplacement, tri, sélection, ADD ; recherche pleine largeur ; onglets
+    static constexpr float kSortX = 580.0f, kTabsY = 176.0f, kTabsH = 28.0f, kTabGap = 26.0f, kListTopB = 214.0f;
+    static inline const Rectangle<float> kSearchR { 16.0f, 130.0f, 1032.0f, 38.0f };
+    Rectangle<float> selPillRect() const { return { 724.0f, 84.0f, 120.0f, 36.0f }; }
+    String insertWhereText() const
+    {
+        const int n = eng.blocks().size();
+        if (insertPos >= n) return "the end of the chain";
+        return eng.blockName (eng.blocks()[insertPos]);
+    }
+    Rectangle<float> insertWhereRect() const
+    {
+        const float pre = unitsOf (font (tfRegular, 14.0f), insertPos >= eng.blocks().size() ? String (CharPointer_UTF8 ("\xe2\x86\x92  at")) : String (CharPointer_UTF8 ("\xe2\x86\x92  before")));
+        const float w = jmin (330.0f, 14.0f + pre + 6.0f + unitsOf (font (tfMedium, 14.5f), insertWhereText()) + 30.0f);
+        return { 214.0f, 87.0f, w, 30.0f };
+    }
+    // menu de l'emplacement : au début, avant chaque bloc (un groupe compte pour un), à la fin
+    void insertWhereMenu()
+    {
+        PopupMenu m;
+        m.addSectionHeader ("Insert the effects");
+        const auto& bl = eng.blocks();
+        for (int k = 0; k < bl.size(); ++k)
+        {
+            const int role = eng.roleAt (bl[k]);
+            if (role != Routing::none && role != Routing::split) continue;     // repères des voies parallèles : pas un emplacement
+            if (eng.groupAt (bl[k]) >= 0 && role != Routing::split) continue;   // dans un groupe : on insère avant le groupe
+            m.addItem (1 + k, (k == 0 ? "At the start, before " : "Before ") + eng.blockName (bl[k]), true, insertPos == k);
+        }
+        m.addItem (1 + bl.size(), "At the end of the chain", true, insertPos >= bl.size());
+        SafePointer<PedalView> sp (this);
+        m.showMenuAsync (PopupMenu::Options().withTargetScreenArea (localAreaToGlobal (S (insertWhereRect()).toNearestInt())), [sp] (int r)
+        {
+            if (sp == nullptr || r <= 0) return;
+            sp->insertPos = r - 1;
+            sp->askRepaint (sp->screenPx());
+        });
+    }
     int chipCount (int c)
     {
         int n = 0;
@@ -2212,14 +2347,8 @@ private:
     float chipWidth (int c) const
     {
         const int cnt = const_cast<PedalView*> (this)->chipCount (c);
-        const float tw = unitsOf (font (tfBold, 15.0f), kChips[c]);
-        return 16.0f + tw + (cnt > 0 ? 8.0f + unitsOf (font (tfBold, 13.5f), String (cnt)) : 0.0f) + 16.0f;   // texte + nombre
-    }
-    float chipsStartX() const
-    {
-        float w = 0.0f;
-        for (int c = 0; c < kNumChips; ++c) w += chipWidth (c) + (c > 0 ? 6.0f : 0.0f);
-        return kSW - 16.0f - w;
+        const float tw = unitsOf (font (tfMedium, 15.5f), kChips[c]);
+        return tw + (cnt > 0 ? 6.0f + unitsOf (font (tfMedium, 12.0f), String (cnt)) : 0.0f);   // onglet : texte + nombre
     }
 
     // indices de défilement d'une liste à 2 colonnes : fondu, pastille « ▼ MORE », barre à droite, « 1 - 24 of 27 »
@@ -2254,7 +2383,7 @@ private:
         {
             g.setFont (font (tfRegular, 14.0f));
             g.setColour (kDim);
-            g.drawText (String (shownFrom) + " - " + String (shownTo) + " of " + String (total) + " " + noun, S (Rectangle<float> (16.0f, 598.0f, 1032.0f, 20.0f)), Justification::centredRight);
+            g.drawText (String (shownFrom) + " - " + String (shownTo) + " of " + String (total) + " " + noun, S (Rectangle<float> (16.0f, jmax (598.0f, bottom + 6.0f), 1032.0f, 20.0f)), Justification::centredRight);
         }
     }
 
@@ -3626,6 +3755,7 @@ private:
             case bPresetRescan: openPresets (true); break;
             case bAddPicked:  addPicked(); break;
             case bClearPicked: picked.clear(); break;
+            case bInsertWhere: insertWhereMenu(); break;
             case bTunerTunings: tuningMenu(); break;
             case bPresetSave: startPresetSave (-1); break;
             case bTunerMute:  proc.chromaSetMute (! proc.chroma().muted); break;
