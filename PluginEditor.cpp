@@ -2099,7 +2099,7 @@ private:
         {
             g.setFont (font (tfBold, 15.0f));
             g.setColour (kDim);
-            g.drawText ("COLOURS AND GLOW (PRESET MODE)", S (Rectangle<float> (16.0f, 480.0f, 330.0f, 44.0f)), Justification::centredRight);
+            g.drawText ("COLOURS AND GLOW (PRESET MODE)", S (Rectangle<float> (16.0f, 480.0f, bankRect (3).getRight() - 16.0f, 44.0f)), Justification::centredRight);
         }
     }
 
