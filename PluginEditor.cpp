@@ -87,6 +87,7 @@ namespace
         bParamOnOff, bParamWindow, bPagePrev, bPageNext, bExport, bImport, bPc, bReload,
         bAddPicked, bClearPicked, bParamMidi, bPresets, bTunerTunings, bPresetSave, bPresetRescan, bTunerMute, bTunerMode, bTunerExit, bChroma, bSemi,
         bChip = 100,                     // + catégorie du navigateur
+        bSortAZ = 150, bSortType,        // tri du navigateur : A-Z / par type
         bBank = 200,                     // + numéro de bank
         bCard = 300,                     // + slot * 10 + action
         bFsColour = 450                  // + footswitch
@@ -463,7 +464,7 @@ private:
     void layoutEditors()
     {
         const float h = 18.0f * s;
-        search.setBounds (S (Rectangle<float> (16.0f, 130.0f, 330.0f, 38.0f)).toNearestInt());
+        search.setBounds (S (Rectangle<float> (16.0f, 130.0f, jmax (160.0f, chipsStartX() - 10.0f - 16.0f), 38.0f)).toNearestInt());
         search.setFont (font (tfMedium, 18.0f));
         search.setIndents (roundToInt (S (10.0f)), jmax (0, roundToInt ((S (38.0f) - h) * 0.5f) - 1));
         if (renameSlot >= 0)
@@ -1322,7 +1323,7 @@ private:
     void drawMiniArrow (Graphics& g, const MiniNote& n, Rectangle<float> b)
     {
         if (! n.has || ! n.sounding || n.inTune) return;
-        const bool up = n.cents > 0.0f;
+        const bool up = n.cents < 0.0f;            // trop bas : flèche vers le haut (il faut monter), trop haut : vers le bas
         const auto col = chromaOffColour();
         const float k = (float) chromaGlowPc / 100.0f;
         const float x = b.getX() + 35.0f, cy = b.getCentreY(), d = up ? -1.0f : 1.0f;
@@ -1598,14 +1599,15 @@ private:
         v.push_back ({ { 1008.0f, 84.0f, 40.0f, 36.0f }, bClose, CharPointer_UTF8 ("\xe2\x9c\x95") });
         if (overlay == Overlay::browser)
         {
-            float x = 360.0f;
+            float x = chipsStartX();
             for (int c = 0; c < kNumChips; ++c)
             {
-                const String t (kChips[c]);
-                const float w = 26.0f + (t == t.toUpperCase() ? 10.5f : 9.4f) * (float) t.length();   // capitales plus larges
+                const float w = chipWidth (c);
                 v.push_back ({ { x, 130.0f, w, 38.0f }, bChip + c, kChips[c], chip == c });
                 x += w + 6.0f;
             }
+            v.push_back ({ { 232.0f, 88.0f, 58.0f, 28.0f }, bSortAZ, "A - Z", ! browserByType });
+            v.push_back ({ { 290.0f, 88.0f, 62.0f, 28.0f }, bSortType, "TYPE", browserByType });
             v.push_back ({ { 702.0f, 84.0f, 84.0f, 36.0f }, bClearPicked, "CLEAR", false, picked.size() > 0 });
             v.push_back ({ { 792.0f, 84.0f, 112.0f, 36.0f }, bAddPicked, picked.isEmpty() ? String ("ADD") : "ADD " + String (picked.size()), picked.size() > 0, picked.size() > 0 });
             v.push_back ({ { 910.0f, 84.0f, 90.0f, 36.0f }, bReload, "RESCAN" });
@@ -1925,7 +1927,15 @@ private:
             g.setColour (kDim);
             const int n = eng.blocks().size();
             const String where = insertPos >= n ? "at the end of the chain" : "before " + FxCat::shortName (eng.chain().getReference (eng.blocks()[insertPos]).name);
-            g.drawText (where + "  -  click to select (several in a row), ADD", S (Rectangle<float> (236.0f, 84.0f, 460.0f, 36.0f)), Justification::centredLeft, true);
+            g.setFont (font (tfBold, 12.5f).withExtraKerningFactor (0.14f));
+            g.drawText ("SORT", S (Rectangle<float> (186.0f, 84.0f, 44.0f, 36.0f)), Justification::centredLeft);
+            g.setColour (Colour (0xff0b0e12));
+            g.fillRoundedRectangle (S (Rectangle<float> (229.0f, 85.0f, 126.0f, 34.0f)), S (17.0f));
+            g.setColour (Colours::white.withAlpha (0.07f));
+            g.drawRoundedRectangle (S (Rectangle<float> (229.0f, 85.0f, 126.0f, 34.0f)), S (17.0f), S (1.0f));
+            g.setFont (font (tfRegular, 15.0f));
+            g.setColour (kDim);
+            g.drawText (where + "  -  click to select (several in a row), ADD", S (Rectangle<float> (372.0f, 84.0f, 324.0f, 36.0f)), Justification::centredLeft, true);
             drawBrowserList (g);
         }
         else if (overlay == Overlay::params) drawParams (g);
@@ -1933,6 +1943,38 @@ private:
         for (auto& b : overlayButtons())
         {
             const bool colourBtn = b.id >= bFsColour && b.id <= bFsColour + OctopusEngine::kFs;
+            if (b.id == bSortAZ || b.id == bSortType)                // tri : interrupteur arrondi
+            {
+                const auto rr = S (b.r.reduced (2.0f, 1.0f));
+                if (b.active) { g.setColour (kAccent); g.fillRoundedRectangle (rr, rr.getHeight() * 0.5f); }
+                else if (hoverBtn == b.id) { g.setColour (Colours::white.withAlpha (0.06f)); g.fillRoundedRectangle (rr, rr.getHeight() * 0.5f); }
+                g.setFont (font (tfBold, 12.5f).withExtraKerningFactor (0.12f));
+                g.setColour (b.active ? kScrBg : kDim);
+                g.drawText (b.text, rr, Justification::centred, false);
+                continue;
+            }
+            if (b.id >= bChip && b.id < bChip + kNumChips)          // filtre + nombre de plugins
+            {
+                auto bb = b; bb.text = {};
+                drawButton (g, bb);
+                const int cnt = chipCount (b.id - bChip);
+                const auto f = font (tfBold, 15.0f);
+                const float tw = unitsOf (f, b.text), pw = cnt > 0 ? 12.0f + 7.6f * (float) String (cnt).length() : 0.0f;
+                const float x0 = b.r.getCentreX() - (tw + (cnt > 0 ? 7.0f + pw : 0.0f)) * 0.5f;
+                g.setFont (f);
+                g.setColour (kText.withAlpha (b.active ? 1.0f : 0.85f));
+                g.drawText (b.text, S (Rectangle<float> (x0, b.r.getY(), tw + 4.0f, b.r.getHeight())), Justification::centredLeft, false);
+                if (cnt > 0)
+                {
+                    const auto pr = Rectangle<float> (x0 + tw + 7.0f, b.r.getCentreY() - 9.0f, pw, 18.0f);
+                    g.setColour (b.active ? Colour (0xff0b1c26) : Colour (0xff0b0e12));
+                    g.fillRoundedRectangle (S (pr), S (9.0f));
+                    g.setFont (font (tfBold, 12.5f));
+                    g.setColour (b.active ? kAccent : kDim);
+                    g.drawText (String (cnt), S (pr), Justification::centred, false);
+                }
+                continue;
+            }
             if (! colourBtn) drawButton (g, b, b.id == bClose ? 18.0f : 15.0f);
             else                                                   // pastille à gauche, nom centré dans la place qui reste
             {
@@ -2004,7 +2046,8 @@ private:
         if (favs.contains (f.name)) { favs.removeString (f.name); eng.say (FxCat::shortName (f.name) + " removed from favorites"); }
         else { favs.add (f.name); eng.say (FxCat::shortName (f.name) + " added to favorites"); }
         OctoSettings::setFavourites (favs);
-        if (chip == kChipFavourites) listScroll = jlimit (0, jmax (0, (filtered().size() + kListRows - 1) / kListRows - 2), listScroll);
+        if (chip == kChipFavourites) listScroll = jlimit (0, jmax (0, browserCols() - 2), listScroll);
+        layoutEditors();                                   // le nombre de favoris a changé : largeur des filtres
         askRepaint (screenPx());
     }
     static Path starPath (Rectangle<float> r)
@@ -2065,7 +2108,7 @@ private:
         if (overlay != Overlay::browser || hoverItem < 0) return;
         if (Time::getMillisecondCounterHiRes() - hoverItemMs < kTipDelayMs) return;      // la bulle n'apparaît qu'au bout de 0,8 s
         const auto items = filtered();
-        const int i = listScroll * kListRows + hoverItem;
+        const int i = browserItemAt (hoverItem);
         if (! isPositiveAndBelow (i, items.size())) return;
         const auto& f = items.getReference (i);
         if (! FxCat::isOwnVendor (FxCat::vendor (f.name)) || FxCat::typeOf (f.name).toUpperCase() != "VST3") return;
@@ -2105,9 +2148,108 @@ private:
         return { 16.0f + 520.0f * (float) col, 182.0f + 34.0f * (float) row, 512.0f, 31.0f };
     }
 
+    // ---- navigateur : tri A-Z ou par type (titres colorés), indices « il y en a d'autres »
+    bool browserByType = OctoSettings::glowOf ("browserByType") == 1;
+    struct BRow { int item = -1, kind = -1, count = 0; };            // item >= 0 : plugin (indice dans filtered()) ; sinon titre (kind) ou vide
+    static const int* kindOrder() { static const int o[] = { FxCat::amp, FxCat::cab, FxCat::drive, FxCat::dynamics, FxCat::filter, FxCat::delay, FxCat::reverb,
+                                                             FxCat::mod, FxCat::pitch, FxCat::special, FxCat::tuner, FxCat::eq, FxCat::utility, FxCat::other }; return o; }
+    std::vector<BRow> browserRows (const Array<InstalledFx>& items) const
+    {
+        std::vector<BRow> rows;
+        if (! browserByType) { for (int i = 0; i < items.size(); ++i) rows.push_back ({ i, -1, 0 }); return rows; }
+        for (int k = 0; k < FxCat::numKinds; ++k)
+        {
+            const int kind = kindOrder()[k];
+            Array<int> idx;
+            for (int i = 0; i < items.size(); ++i) if (FxCat::classify (items.getReference (i).name) == kind) idx.add (i);
+            if (idx.isEmpty()) continue;
+            if ((int) rows.size() % kListRows == kListRows - 1) rows.push_back ({});      // pas de titre seul en bas d'une colonne
+            rows.push_back ({ -1, kind, idx.size() });
+            for (auto i : idx) rows.push_back ({ i, kind, 0 });
+        }
+        return rows;
+    }
+    int browserItemAt (int v)                                        // plugin sous la case visible v (indice dans filtered()), -1 sinon
+    {
+        const auto rows = browserRows (filtered());
+        const int r = listScroll * kListRows + v;
+        return isPositiveAndBelow (r, (int) rows.size()) ? rows[(size_t) r].item : -1;
+    }
+    int browserCols() { return ((int) browserRows (filtered()).size() + kListRows - 1) / kListRows; }
+    int chipCount (int c)
+    {
+        int n = 0;
+        for (auto& f : eng.installedList())
+        {
+            const auto type = FxCat::typeOf (f.name).toUpperCase();
+            if (type.endsWith ("I")) continue;
+            switch (c)
+            {
+                case 1: if (! favs.contains (f.name)) continue; break;
+                case 2: if (! FxCat::isOwnVendor (FxCat::vendor (f.name))) continue; break;
+                case 3: if (type != "VST3") continue; break;
+                case 4: if (type != "VST" && type != "VST2") continue; break;
+                case 5: if (type != "CLAP") continue; break;
+                case 6: if (type != "JS") continue; break;
+                case 7: if (type != "AU") continue; break;
+                default: break;
+            }
+            ++n;
+        }
+        return n;
+    }
+    float chipWidth (int c) const
+    {
+        const int cnt = const_cast<PedalView*> (this)->chipCount (c);
+        const float tw = unitsOf (font (tfBold, 15.0f), kChips[c]);
+        return 16.0f + tw + (cnt > 0 ? 7.0f + 12.0f + 7.6f * (float) String (cnt).length() : 0.0f) + 16.0f;   // texte + pastille du nombre
+    }
+    float chipsStartX() const
+    {
+        float w = 0.0f;
+        for (int c = 0; c < kNumChips; ++c) w += chipWidth (c) + (c > 0 ? 6.0f : 0.0f);
+        return kSW - 16.0f - w;
+    }
+
+    // indices de défilement d'une liste à 2 colonnes : fondu, pastille « ▼ MORE », barre à droite, « 1 - 24 of 27 »
+    Rectangle<float> morePill;
+    void drawListCues (Graphics& g, int cols, int scroll, int shownFrom, int shownTo, int total, const String& noun, const String& moreText)
+    {
+        morePill = {};
+        const float top = itemRect (0).getY(), bottom = itemRect (kListRows - 1).getBottom();
+        if (cols > 2)
+        {
+            const float tx = kSW - 9.0f, th = bottom - top;
+            g.setColour (Colour (0xff161a21));
+            g.fillRoundedRectangle (S (Rectangle<float> (tx, top, 4.0f, th)), S (2.0f));
+            const float thumb = jmax (24.0f, th * 2.0f / (float) cols), y = top + (th - thumb) * (float) scroll / (float) jmax (1, cols - 2);
+            g.setColour (Colour (0xff4a5363));
+            g.fillRoundedRectangle (S (Rectangle<float> (tx, y, 4.0f, thumb)), S (2.0f));
+        }
+        if (cols > scroll + 2)
+        {
+            const float fy = itemRect (kListRows - 2).getY();
+            g.setGradientFill (ColourGradient (Colour (0x000a0c10), 0.0f, S (fy), Colour (0xf20a0c10), 0.0f, S (bottom), false));
+            g.fillRect (S (Rectangle<float> (12.0f, fy, kSW - 26.0f, bottom - fy + 2.0f)));
+            const auto f = font (tfBold, 13.0f).withExtraKerningFactor (0.06f);
+            const float w = unitsOf (f, moreText) + 40.0f;
+            morePill = Rectangle<float> (w, 26.0f).withCentre ({ kSW * 0.5f, bottom - 14.0f });
+            g.setFont (f);                                     // sans cadre : texte seul (cliquable)
+            g.setColour (kAccent);
+            g.drawText (String (CharPointer_UTF8 ("\xe2\x96\xbc  ")) + moreText, S (morePill), Justification::centred, false);
+        }
+        if (total > 0 && cols > 2)
+        {
+            g.setFont (font (tfRegular, 14.0f));
+            g.setColour (kDim);
+            g.drawText (String (shownFrom) + " - " + String (shownTo) + " of " + String (total) + " " + noun, S (Rectangle<float> (16.0f, 598.0f, 1032.0f, 20.0f)), Justification::centredRight);
+        }
+    }
+
     void drawBrowserList (Graphics& g)
     {
         const auto items = filtered();
+        morePill = {};
         const int perPage = kListRows * 2;
         if (items.isEmpty())
         {
@@ -2119,10 +2261,34 @@ private:
                         S (Rectangle<float> (16.0f, 230.0f, 1032.0f, 40.0f)), Justification::centred);
             return;
         }
+        const auto rows = browserRows (items);
+        int firstShown = -1, lastShown = -1;
         for (int v = 0; v < perPage; ++v)
         {
-            const int i = listScroll * kListRows + v;
-            if (i >= items.size()) break;
+            const int r = listScroll * kListRows + v;
+            if (r >= (int) rows.size()) break;
+            const auto& row = rows[(size_t) r];
+            if (row.item < 0)
+            {
+                if (row.kind < 0) continue;
+                // titre de type : nom coloré, nombre, filet
+                const auto ir = itemRect (v);
+                const auto col = FxCat::colour (row.kind);
+                const auto f = font (tfBold, 13.5f).withExtraKerningFactor (0.14f);
+                const String t = String (FxCat::label (row.kind)).toUpperCase();
+                g.setFont (f);
+                g.setColour (col);
+                const float tw = unitsOf (f, t);
+                g.drawText (t, S (Rectangle<float> (ir.getX() + 2.0f, ir.getY() + 4.0f, tw + 6.0f, ir.getHeight() - 4.0f)), Justification::centredLeft, false);
+                g.setColour (kDim.withAlpha (0.7f));
+                g.drawText (String (row.count), S (Rectangle<float> (ir.getX() + tw + 12.0f, ir.getY() + 4.0f, 30.0f, ir.getHeight() - 4.0f)), Justification::centredLeft, false);
+                g.setColour (Colour (0xff232933));
+                g.fillRect (S (Rectangle<float> (ir.getX() + tw + 40.0f, ir.getCentreY() + 2.0f, ir.getRight() - (ir.getX() + tw + 40.0f), 1.0f)));
+                continue;
+            }
+            const int i = row.item;
+            if (firstShown < 0) firstShown = i;
+            lastShown = jmax (lastShown, i);
             const auto& f = items.getReference (i);
             const auto ir = S (itemRect (v));
             const bool hov = hoverItem == v;
@@ -2164,13 +2330,26 @@ private:
                 g.strokePath (star, PathStrokeType (S (1.2f), PathStrokeType::curved));
             }
         }
-        const int pages = (items.size() + kListRows - 1) / kListRows;
-        if (pages > 2)
+        // ce qui reste plus bas : nombre de plugins (A-Z) ou types (TYPE)
+        const int cols = ((int) rows.size() + kListRows - 1) / kListRows;
+        const int lastRow = (listScroll + 2) * kListRows;
+        int remaining = 0;
+        StringArray kinds;
+        for (int r = lastRow; r < (int) rows.size(); ++r)
         {
-            g.setFont (font (tfRegular, 14.0f));
-            g.setColour (kDim);
-            g.drawText (String (items.size()) + " plug-ins  -  scroll for more", S (Rectangle<float> (16.0f, 598.0f, 1032.0f, 20.0f)), Justification::centredRight);
+            if (rows[(size_t) r].item >= 0) ++remaining;
+            const int kd = rows[(size_t) r].kind;
+            if (kd >= 0 && kinds.size() < 4) kinds.addIfNotAlreadyThere (String (FxCat::label (kd)).toUpperCase());
         }
+        if (browserByType && lastRow < (int) rows.size() && rows[(size_t) lastRow - 1].kind >= 0)        // type commencé plus haut : il continue
+            kinds.removeString (String (FxCat::label (rows[(size_t) lastRow - 1].kind)).toUpperCase());
+        const String more = browserByType && kinds.size() > 0 ? "MORE : " + kinds.joinIntoString (", ") : String (remaining) + " MORE";
+        int shownCount = 0;
+        for (int r = listScroll * kListRows; r < jmin ((int) rows.size(), lastRow); ++r) if (rows[(size_t) r].item >= 0) ++shownCount;
+        int before = 0;
+        for (int r = 0; r < listScroll * kListRows && r < (int) rows.size(); ++r) if (rows[(size_t) r].item >= 0) ++before;
+        drawListCues (g, cols, listScroll, before + 1, before + shownCount, items.size(), "plug-ins", more);
+        juce::ignoreUnused (firstShown, lastShown);
     }
 
     void addFromBrowser (const InstalledFx& f)
@@ -2558,12 +2737,8 @@ private:
             g.drawText ("REAPER presets of this plug-in : use the arrows", S (Rectangle<float> (16.0f, 598.0f, 600.0f, 20.0f)), Justification::centredLeft);
         }
         const int rows = (presetTotal() + kListRows - 1) / kListRows;
-        if (rows > 2)
-        {
-            g.setFont (font (tfRegular, 14.0f));
-            g.setColour (kDim);
-            g.drawText (String (presetTotal()) + " presets  -  scroll for more", S (Rectangle<float> (16.0f, 598.0f, 1032.0f, 20.0f)), Justification::centredRight);
-        }
+        const int shownTo = jmin (presetTotal(), (presetScroll + 2) * kListRows);
+        drawListCues (g, rows, presetScroll, presetScroll * kListRows + 1, shownTo, presetTotal(), "presets", String (presetTotal() - shownTo) + " MORE");
     }
 
     void setParamFromX (int k, float x)
@@ -3047,7 +3222,7 @@ private:
         else if (overlay == Overlay::browser)
         {
             for (int v = 0; v < kListRows * 2; ++v) if (itemRect (v).contains (p)) { hi = v; break; }
-            if (hi >= 0 && listScroll * kListRows + hi >= filtered().size()) hi = -1;
+            if (hi >= 0 && browserItemAt (hi) < 0) hi = -1;
         }
         else if (overlay == Overlay::params && presetMode)
         {
@@ -3166,12 +3341,13 @@ private:
         {
             // clic : choisir / retirer (numérotés dans l'ordre) ; double-clic : ajouter tout de suite ; clic droit : rien
             if (e.mods.isPopupMenu()) return;
+            if (morePill.contains (p)) { listScroll = jlimit (0, jmax (0, browserCols() - 2), listScroll + 2); askRepaint (screenPx()); return; }
             for (int v = 0; v < kListRows * 2; ++v)
                 if (itemRect (v).contains (p))
                 {
                     const auto items = filtered();
-                    const int i = listScroll * kListRows + v;
-                    if (i >= items.size()) return;
+                    const int i = browserItemAt (v);
+                    if (i < 0 || i >= items.size()) return;
                     const auto& fx = items.getReference (i);
                     if (starRect (itemRect (v)).expanded (3.0f).contains (p)) { toggleFavourite (fx); return; }
                     if (e.getNumberOfClicks() >= 2) { if (pickedIndex (fx) < 0) picked.add (fx); addPicked(); }
@@ -3182,6 +3358,7 @@ private:
         }
         if (overlay == Overlay::params && presetMode)
         {
+            if (morePill.contains (p)) { presetScroll = jlimit (0, jmax (0, (presetTotal() + kListRows - 1) / kListRows - 2), presetScroll + 2); askRepaint (screenPx()); return; }
             for (int v = 0; v < kListRows * 2; ++v)
                 if (itemRect (v).contains (p))
                 {
@@ -3383,8 +3560,7 @@ private:
         }
         if (overlay == Overlay::browser)
         {
-            const int rows = (filtered().size() + kListRows - 1) / kListRows;
-            listScroll = jlimit (0, jmax (0, rows - 2), listScroll + dir);
+            listScroll = jlimit (0, jmax (0, browserCols() - 2), listScroll + dir);
         }
         else if (overlay == Overlay::params && presetMode)
         {
@@ -3450,6 +3626,7 @@ private:
             case bPc:         eng.setProgramChange (! eng.programChange); break;
             default:
                 if (b >= bChip && b < bChip + kNumChips) setChip (b - bChip);
+                if (b == bSortAZ || b == bSortType) { browserByType = b == bSortType; listScroll = 0; OctoSettings::setGlowOf ("browserByType", browserByType ? 1 : 0); askRepaint (screenPx()); }
                 else if (b == bFsColour + OctopusEngine::kFs) tunerColourMenu (S (colourBtnRect (OctopusEngine::kFs)));
                 else if (b >= bFsColour && b < bFsColour + OctopusEngine::kFs) colourMenu (b - bFsColour);
                 else if (b >= bBank && b < bBank + OctopusEngine::kBanks) eng.setBank (b - bBank);
@@ -4199,6 +4376,7 @@ void OctopusEditor::showScreen (int which, int arg)
         case 8: view->openBanks(); view->tunerColourMenu (view->S (PedalView::colourBtnRect (OctopusEngine::kFs))); break;
         case 9: view->openSemiDrum(); break;                                      // tambour de Semitones
         case 10: view->semiTarget = jlimit (0, semi::kCount - 1, view->semiTarget + arg); break;   // molette
+        case 17: view->browserByType = arg != 0; view->listScroll = 0; view->askRepaint (view->screenPx()); break;   // rendus : tri du navigateur
         case 15: view->openMixer (arg); break;   // rendus : mixeur d'un groupe (-1 : fermé)
         case 13: view->recGlowPc = arg; view->askRepaint (view->screenPx()); break;   // rendus : glow de l'effet record
         case 14: view->recColourMenu(); break;
@@ -4213,7 +4391,7 @@ void OctopusEditor::screenPick (int visibleIndex) { view->pickVisible (visibleIn
 void OctopusEditor::screenFavourite (int visibleIndex)
 {
     const auto items = view->filtered();
-    const int i = view->listScroll * PedalView::kListRows + visibleIndex;
+    const int i = view->browserItemAt (visibleIndex);
     if (isPositiveAndBelow (i, items.size())) view->toggleFavourite (items.getReference (i));
 }
 

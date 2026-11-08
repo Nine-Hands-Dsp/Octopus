@@ -105,7 +105,7 @@ namespace FxCat
         if (has ({ "verb", "hall", "plate", "shimmer", "room", "space", "ambien" }))                         return reverb;
         if (has ({ "chorus", "flang", "phase", "phaser", "vibrato", "tremolo", "rotary", "leslie", "small tone",
                   "wack", "pipeline", "vibe", "ensemble", "modul", "doubler" }) || word ({ "trem", "uni" }))  return mod;
-        if (has ({ "drive", "distort", "fuzz", "screamer", "doorn", "peachy", "thorn", "saturat", "crush", "pickle",
+        if (has ({ "drive", "distort", "fuzz", "screamer", "doorn", "peachy", "darkbass", "thorn", "saturat", "crush", "pickle",
                   "klon", "muff", "boost", "tube", "overdrive", "exciter" }) || word ({ "od", "rat", "dist", "sat" })) return drive;
         if (has ({ "compress", "gate", "limit", "expander", "transient", "dynamic", "reacomp", "squeez", "sustain" })
             || word ({ "comp", "ngate" }))                                                                   return dynamics;
@@ -116,10 +116,11 @@ namespace FxCat
     }
 
     // icônes propres à un plugin (sinon celle de sa famille)
-    enum Icon { iconFamily = 0, iconTube };
+    enum Icon { iconFamily = 0, iconTube, iconBassHead };
     inline int iconOf (const juce::String& fullName)
     {
-        return shortName (fullName).toLowerCase().contains ("anode") ? iconTube : iconFamily;
+        const auto n = shortName (fullName).toLowerCase();
+        return n.contains ("anode") ? iconTube : n.contains ("darkbass") ? iconBassHead : iconFamily;
     }
 
     // icône vectorielle du bloc (dans le carré r) ; icon : iconOf (nom du plugin)
@@ -140,6 +141,21 @@ namespace FxCat
             for (float x : { 28.0f, 36.0f, 44.0f }) { p.startNewSubPath (P (x, 61)); p.lineTo (P (x, 67)); }
             g.strokePath (p, st);
             g.drawRoundedRectangle (Rectangle<float> (P (20, 52), P (52, 61)), 2.0f * k, stroke);
+            return;
+        }
+        if (icon == iconBassHead)       // Darkbass : tête de basse, 4 mécaniques (2 + 2), manche et cordes ; grille 24 x 24
+        {
+            g.setColour (c);
+            const float k = r.getWidth() / 24.0f;
+            auto P = [&] (float x, float y) { return Point<float> (r.getX() + x * k, r.getY() + y * k); };
+            PathStrokeType st (stroke, PathStrokeType::curved, PathStrokeType::rounded);
+            Path p;
+            p.startNewSubPath (P (9, 21)); p.lineTo (P (9, 10)); p.lineTo (P (7, 4)); p.lineTo (P (17, 4)); p.lineTo (P (15, 10)); p.lineTo (P (15, 21));
+            p.startNewSubPath (P (11, 10)); p.lineTo (P (11, 21));
+            p.startNewSubPath (P (13, 10)); p.lineTo (P (13, 21));
+            g.strokePath (p, st);
+            for (auto q : { P (5.4f, 6.6f), P (5.4f, 10.6f), P (18.6f, 6.6f), P (18.6f, 10.6f) })
+                g.fillEllipse (Rectangle<float> (2.9f * k, 2.9f * k).withCentre (q));
             return;
         }
         g.setColour (c);

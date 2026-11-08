@@ -157,7 +157,7 @@ int main (int argc, char** argv)
     // voies parallèles (split / merge)
     {
         e.load (14);                                                       // preset vide
-        for (auto* n : { "VST3: NGATE (NINE HANDS | DSP)", "VST3: Doorn (NINE HANDS | DSP)", "VST3: Genome (Two notes Audio Engineering)",
+        for (auto* n : { "VST3: NGATE (NINE HANDS | DSP)", "VST3: Darkbass (NINE HANDS | DSP)", "VST3: Genome (Two notes Audio Engineering)",
                          "VST3: Impulse (NINE HANDS | DSP)", "VST3: Holyverb (NINE HANDS | DSP)", "VST3: ECHOFLEX (NINE HANDS | DSP)",
                          "VST3: Small Tone (NINE HANDS | DSP)", "VST3: ReaEQ (Cockos)", "VST3: Wharry (NINE HANDS | DSP)", "VST3: Crycat (NINE HANDS | DSP)" })
             e.addFx ({ n, n }, e.blocks().size());
@@ -243,6 +243,14 @@ int main (int argc, char** argv)
     ed->screenHover ({ 2.0f, 2.0f });
     ed->screenSearch ("rea", 0);
     shot ("octopus_add_search");
+    ed->screenSearch ({}, 2);
+    ed->showScreen (17, 1); pump (3);                                        // tri par type
+    shot ("octopus_add_bytype");
+    ed->screenSearch ({}, 0);
+    ed->showScreen (17, 1); pump (3);
+    shot ("octopus_add_all_bytype");
+    ed->showScreen (17, 0); pump (3);
+    shot ("octopus_add_all_az");
 
     // clic / double-clic sur un bloc (temps simulés, en ms : appui, relâchement, ...)
     {
