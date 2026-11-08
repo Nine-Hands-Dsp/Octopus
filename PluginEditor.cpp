@@ -128,7 +128,7 @@ public:
         search.setColour (TextEditor::outlineColourId, Colours::transparentBlack);
         search.setColour (TextEditor::focusedOutlineColourId, Colours::transparentBlack);
         search.onFocusLost = [this] { askRepaint (screenPx()); };
-        search.onTextChange = [this] { listScroll = 0; askRepaint (screenPx()); };
+        search.onTextChange = [this] { listScroll = 0; listPos = 0.0f; askRepaint (screenPx()); };
         search.onEscapeKey = [this] { closeOverlay(); };
         search.onReturnKey = [this]
         {
@@ -169,7 +169,7 @@ public:
         favs = OctoSettings::favourites();
         overlay = Overlay::browser;
         insertPos = blockPos;
-        listScroll = 0;
+        listScroll = 0; listPos = 0.0f;
         picked.clear();
         eng.installedList();
         search.setText ({}, dontSendNotification);
@@ -203,7 +203,7 @@ public:
         hideEditors();
         askRepaint (screenPx());
     }
-    void setChip (int c) { chip = jlimit (0, kNumChips - 1, c); listScroll = 0; askRepaint (screenPx()); }
+    void setChip (int c) { chip = jlimit (0, kNumChips - 1, c); listScroll = 0; listPos = 0.0f; askRepaint (screenPx()); }
     void pickVisible (int v) { const auto items = filtered(); if (isPositiveAndBelow (v, items.size())) togglePick (items.getReference (v)); }
     void showPresets() { openPresets (true); }
     void setSearch (const String& t) { search.setText (t, sendNotification); }
@@ -403,6 +403,7 @@ private:
     TextEditor search, renameEd, presetNameEd, headerNameEd;
     bool headerRenaming = false;           // nom du preset chargé en cours de saisie (clic sur le nom en haut)
     int chip = 0, listScroll = 0, insertPos = 0;
+    float listPos = 0.0f;                                          // défilement affiché (glisse vers listScroll)
     // paramètres
     String paramGuid;
     int paramPage = 0, paramDrag = -1;
@@ -1560,6 +1561,12 @@ private:
     {
         if (semiOpen && (tunerShown() || ! eng.isReady())) closeSemiDrum();
         if (modeOpen && ! tunerShown()) closeModeDrum();
+        if (std::abs (listPos - (float) listScroll) > 0.001f)          // liste du navigateur : glisse vers la ligne visée
+        {
+            listPos += ((float) listScroll - listPos) * 0.3f;
+            if (std::abs (listPos - (float) listScroll) < 0.01f) listPos = (float) listScroll;
+            askRepaint (screenPx());
+        }
         if (modeOpen && std::abs (modePos - (float) modeTarget) > 0.001f)
         {
             modePos += ((float) modeTarget - modePos) * 0.35f;
@@ -1985,11 +1992,6 @@ private:
                     g.setColour (b.active ? kAccent : Colour (0xff596273));
                     g.drawText (String (cnt), S (Rectangle<float> (x0 + tw + 6.0f, b.r.getY() + 1.0f, 60.0f, b.r.getHeight() - 6.0f)), Justification::centredLeft, false);
                 }
-                if (b.active)
-                {
-                    g.setColour (kAccent);
-                    g.fillRoundedRectangle (S (Rectangle<float> (x0, b.r.getBottom() - 1.5f, b.r.getWidth() - 8.0f, 2.5f)), S (1.2f));
-                }
                 continue;
             }
             if (b.id == bInsertWhere)                               // emplacement : pastille cliquable « → before Pipeline ▾ »
@@ -2056,14 +2058,14 @@ private:
                 auto bb = b; bb.text = {};
                 drawButton (g, bb);
                 const auto c = S (b.r.getCentre());
-                const float rad = S (7.0f);
+                const float rad = S (5.5f);
                 Path arc;
                 arc.addCentredArc (c.x, c.y, rad, rad, 0.0f, MathConstants<float>::pi * 0.45f, MathConstants<float>::pi * 1.95f, true);
                 g.setColour (kText.withAlpha (hoverBtn == b.id ? 1.0f : 0.8f));
-                g.strokePath (arc, PathStrokeType (S (1.8f), PathStrokeType::curved, PathStrokeType::rounded));
+                g.strokePath (arc, PathStrokeType (S (1.6f), PathStrokeType::curved, PathStrokeType::rounded));
                 const auto top = c + Point<float> (0.0f, -rad);         // bout de l'arc en haut : flèche vers la droite (sens horaire)
                 Path head;
-                head.addTriangle (top + Point<float> (S (4.0f), 0.0f), top + Point<float> (S (-1.5f), S (-4.0f)), top + Point<float> (S (-1.5f), S (4.0f)));
+                head.addTriangle (top + Point<float> (S (3.2f), 0.0f), top + Point<float> (S (-1.2f), S (-3.2f)), top + Point<float> (S (-1.2f), S (3.2f)));
                 g.fillPath (head);
                 continue;
             }
@@ -2248,38 +2250,37 @@ private:
 
     // ---- navigateur : tri A-Z ou par type (titres colorés), indices « il y en a d'autres »
     bool browserByType = OctoSettings::glowOf ("browserByType") == 1;
-    struct BRow { int item = -1, kind = -1, count = 0; };            // item >= 0 : plugin (indice dans filtered()) ; sinon titre (kind) ou vide
+    // lignes de la liste (v1.18.0) : deux plugins côte à côte, ou un titre de type sur toute la largeur (TYPE) ;
+    // les deux tris défilent verticalement, ligne à ligne, en glissant
+    struct BLine { int a = -1, b = -1, kind = -1, count = 0; bool header() const { return a < 0 && kind >= 0; } };
     static const int* kindOrder() { static const int o[] = { FxCat::amp, FxCat::cab, FxCat::drive, FxCat::dynamics, FxCat::filter, FxCat::delay, FxCat::reverb,
                                                              FxCat::mod, FxCat::pitch, FxCat::special, FxCat::tuner, FxCat::eq, FxCat::utility, FxCat::other }; return o; }
-    std::vector<BRow> browserRows (const Array<InstalledFx>& items) const
+    std::vector<BLine> browserLines (const Array<InstalledFx>& items) const
     {
-        std::vector<BRow> rows;
-        if (! browserByType) { for (int i = 0; i < items.size(); ++i) rows.push_back ({ i, -1, 0 }); return rows; }
+        std::vector<BLine> lines;
+        auto pairs = [&] (const Array<int>& idx, int kind)
+        {
+            for (int k = 0; k < idx.size(); k += 2) lines.push_back ({ idx[k], k + 1 < idx.size() ? idx[k + 1] : -1, kind, 0 });
+        };
+        if (! browserByType) { Array<int> all; for (int i = 0; i < items.size(); ++i) all.add (i); pairs (all, -1); return lines; }
         for (int k = 0; k < FxCat::numKinds; ++k)
         {
             const int kind = kindOrder()[k];
             Array<int> idx;
             for (int i = 0; i < items.size(); ++i) if (FxCat::classify (items.getReference (i).name) == kind) idx.add (i);
             if (idx.isEmpty()) continue;
-            if ((int) rows.size() % kListRows == kListRows - 1) rows.push_back ({});      // pas de titre seul en bas d'une colonne
-            rows.push_back ({ -1, kind, idx.size() });
-            for (auto i : idx) rows.push_back ({ i, kind, 0 });
+            lines.push_back ({ -1, -1, kind, idx.size() });
+            pairs (idx, kind);
         }
-        return rows;
+        return lines;
     }
-    // A-Z : grille de 2 colonnes remplie ligne par ligne, qui défile vers le bas ligne à ligne ;
-    // TYPE : colonnes remplies de haut en bas (titres de type), qui défilent colonne par colonne
-    bool browserRowMajor() const { return ! browserByType; }
-    int browserFirstRow() const { return browserRowMajor() ? listScroll * 2 : listScroll * kListRows; }
-    int browserRowAt (int v) const { return browserRowMajor() ? (listScroll + v % kListRows) * 2 + v / kListRows : listScroll * kListRows + v; }
-    int browserVisible() const { return browserRowMajor() ? kListRows : 2; }
-    int browserUnits (int nRows) const { return browserRowMajor() ? (nRows + 1) / 2 : (nRows + kListRows - 1) / kListRows; }
-    int browserMaxScroll() { return jmax (0, browserUnits ((int) browserRows (filtered()).size()) - browserVisible()); }
+    int browserMaxScroll() { return jmax (0, (int) browserLines (filtered()).size() - kListRows); }
     int browserItemAt (int v)                                        // plugin sous la case visible v (indice dans filtered()), -1 sinon
     {
-        const auto rows = browserRows (filtered());
-        const int r = browserRowAt (v);
-        return isPositiveAndBelow (r, (int) rows.size()) ? rows[(size_t) r].item : -1;
+        const auto lines = browserLines (filtered());
+        const int l = listScroll + v % kListRows;
+        if (! isPositiveAndBelow (l, (int) lines.size())) return -1;
+        return v / kListRows == 0 ? lines[(size_t) l].a : lines[(size_t) l].b;
     }
     // ---- haut du navigateur : titre, emplacement, tri, sélection, ADD ; recherche pleine largeur ; onglets
     // ligne du titre centrée entre le bandeau (62) et la recherche (130)
@@ -2357,7 +2358,7 @@ private:
     // indices de défilement d'une liste à 2 colonnes : fondu, pastille « ▼ MORE », barre à droite, « 1 - 24 of 27 »
     Rectangle<float> morePill;
     // units : colonnes (ou lignes) en tout, visible : combien on en voit, scroll : la première visible
-    void drawListCues (Graphics& g, int units, int visible, int scroll, int shownFrom, int shownTo, int total, const String& noun, const String& moreText)
+    void drawListCues (Graphics& g, int units, int visible, float scroll, int shownFrom, int shownTo, int total, const String& noun)
     {
         morePill = {};
         const float top = itemRect (0).getY(), bottom = itemRect (kListRows - 1).getBottom();
@@ -2366,35 +2367,33 @@ private:
             const float tx = kSW - 9.0f, th = bottom - top;
             g.setColour (Colour (0xff161a21));
             g.fillRoundedRectangle (S (Rectangle<float> (tx, top, 4.0f, th)), S (2.0f));
-            const float thumb = jmax (24.0f, th * (float) visible / (float) units), y = top + (th - thumb) * (float) scroll / (float) jmax (1, units - visible);
+            const float thumb = jmax (24.0f, th * (float) visible / (float) units), y = top + (th - thumb) * jlimit (0.0f, 1.0f, scroll / (float) jmax (1, units - visible));
             g.setColour (Colour (0xff4a5363));
             g.fillRoundedRectangle (S (Rectangle<float> (tx, y, 4.0f, thumb)), S (2.0f));
         }
-        if (units > scroll + visible)
+        const float cueY = jmax (598.0f, bottom + 6.0f);
+        if ((float) units > scroll + (float) visible + 0.01f)          // encore des lignes plus bas : flèche bleue seule (cliquable)
         {
-            const float fy = itemRect (kListRows - 2).getY();
-            g.setGradientFill (ColourGradient (Colour (0x000a0c10), 0.0f, S (fy), Colour (0xf20a0c10), 0.0f, S (bottom), false));
-            g.fillRect (S (Rectangle<float> (12.0f, fy, kSW - 26.0f, bottom - fy + 2.0f)));
-            const auto f = font (tfBold, 13.0f).withExtraKerningFactor (0.06f);
-            const float w = unitsOf (f, moreText) + 40.0f;
-            morePill = Rectangle<float> (w, 26.0f).withCentre ({ kSW * 0.5f, bottom - 14.0f });
-            g.setFont (f);                                     // sans cadre : texte seul (cliquable)
-            g.setColour (kAccent);
-            g.drawText (String (CharPointer_UTF8 ("\xe2\x96\xbc  ")) + moreText, S (morePill), Justification::centred, false);
+            morePill = Rectangle<float> (60.0f, 20.0f).withCentre ({ kSW * 0.5f, cueY + 10.0f });
+            const auto c = morePill.getCentre();
+            Path tri;
+            tri.addTriangle (S (c + Point<float> (-6.0f, -3.5f)), S (c + Point<float> (6.0f, -3.5f)), S (c + Point<float> (0.0f, 4.0f)));
+            g.setColour (hoverMore ? kAccent.brighter (0.3f) : kAccent);
+            g.fillPath (tri);
         }
         if (total > 0 && units > visible)
         {
             g.setFont (font (tfRegular, 14.0f));
             g.setColour (kDim);
-            g.drawText (String (shownFrom) + " - " + String (shownTo) + " of " + String (total) + " " + noun, S (Rectangle<float> (16.0f, jmax (598.0f, bottom + 6.0f), 1032.0f, 20.0f)), Justification::centredRight);
+            g.drawText (String (shownFrom) + " - " + String (shownTo) + " of " + String (total) + " " + noun, S (Rectangle<float> (16.0f, cueY, 1032.0f, 20.0f)), Justification::centredRight);
         }
     }
+    bool hoverMore = false;
 
     void drawBrowserList (Graphics& g)
     {
         const auto items = filtered();
         morePill = {};
-        const int perPage = kListRows * 2;
         if (items.isEmpty())
         {
             g.setFont (font (tfMedium, 18.0f));
@@ -2405,95 +2404,88 @@ private:
                         S (Rectangle<float> (16.0f, 230.0f, 1032.0f, 40.0f)), Justification::centred);
             return;
         }
-        const auto rows = browserRows (items);
-        int firstShown = -1, lastShown = -1;
-        for (int v = 0; v < perPage; ++v)
+        const auto lines = browserLines (items);
+        const float pitch = itemRect (1).getY() - itemRect (0).getY();
+        const float top = itemRect (0).getY(), bottom = itemRect (kListRows - 1).getBottom();
+        const int base = (int) std::floor (listPos);
+        const float frac = listPos - (float) base;
         {
-            const int r = browserRowAt (v);
-            if (r >= (int) rows.size()) continue;
-            const auto& row = rows[(size_t) r];
-            if (row.item < 0)
+            Graphics::ScopedSaveState ss (g);
+            g.reduceClipRegion (S (Rectangle<float> (0.0f, top - 2.0f, kSW, bottom - top + 4.0f)).toNearestInt());
+            for (int k = 0; k <= kListRows; ++k)
             {
-                if (row.kind < 0) continue;
-                // titre de type : nom coloré, nombre, filet
-                const auto ir = itemRect (v);
-                const auto col = FxCat::colour (row.kind);
-                const auto f = font (tfBold, 13.5f).withExtraKerningFactor (0.14f);
-                const String t = String (FxCat::label (row.kind)).toUpperCase();
-                g.setFont (f);
-                g.setColour (col);
-                const float tw = unitsOf (f, t);
-                g.drawText (t, S (Rectangle<float> (ir.getX() + 2.0f, ir.getY() + 4.0f, tw + 6.0f, ir.getHeight() - 4.0f)), Justification::centredLeft, false);
-                g.setColour (kDim.withAlpha (0.7f));
-                g.drawText (String (row.count), S (Rectangle<float> (ir.getX() + tw + 12.0f, ir.getY() + 4.0f, 30.0f, ir.getHeight() - 4.0f)), Justification::centredLeft, false);
-                g.setColour (Colour (0xff232933));
-                g.fillRect (S (Rectangle<float> (ir.getX() + tw + 40.0f, ir.getCentreY() + 2.0f, ir.getRight() - (ir.getX() + tw + 40.0f), 1.0f)));
-                continue;
-            }
-            const int i = row.item;
-            if (firstShown < 0) firstShown = i;
-            lastShown = jmax (lastShown, i);
-            const auto& f = items.getReference (i);
-            const auto ir = S (itemRect (v));
-            const bool hov = hoverItem == v;
-            const int order = pickedIndex (f);
-            g.setColour (order >= 0 ? kAccent.withAlpha (0.20f) : (hov ? kScrPanel2.brighter (0.12f) : kScrPanel));
-            g.fillRoundedRectangle (ir, S (6.0f));
-            if (order >= 0)
-            {
-                g.setColour (kAccent);
-                g.drawRoundedRectangle (ir.reduced (S (0.6f)), S (6.0f), S (1.4f));
-                const auto badge = Rectangle<float> (S (24.0f), S (24.0f)).withCentre ({ ir.getRight() - S (216.0f), ir.getCentreY() });
-                g.fillEllipse (badge);
-                g.setFont (font (tfBold, 14.0f));
-                g.setColour (kScrBg);
-                g.drawText (String (order + 1), badge, Justification::centred);
-            }
-            const int kind = FxCat::classify (f.name);
-            g.setColour (FxCat::colour (kind));
-            g.fillRoundedRectangle (ir.withWidth (S (5.0f)), S (2.5f));
-            FxCat::drawIcon (g, kind, Rectangle<float> (S (22.0f), S (22.0f)).withCentre ({ ir.getX() + S (24.0f), ir.getCentreY() }), FxCat::colour (kind).brighter (0.3f), S (1.8f), FxCat::iconOf (f.name));
-            g.setFont (font (tfMedium, 17.0f));
-            g.setColour (kText);
-            g.drawText (FxCat::shortName (f.name), ir.withTrimmedLeft (S (44.0f)).withTrimmedRight (S (234.0f)), Justification::centredLeft, true);
-            g.setFont (font (tfRegular, 13.5f));
-            g.setColour (kDim);
-            const auto vend = FxCat::vendor (f.name);
-            g.drawText (FxCat::typeOf (f.name) + (vend.isNotEmpty() ? "  " + vend : String()), ir.withTrimmedRight (S (40.0f)).removeFromRight (S (166.0f)),
-                        Justification::centredRight, true);
-            // étoile des favoris : pleine jaune ou vide
-            const auto star = starPath (S (starRect (itemRect (v)).withSizeKeepingCentre (17.0f, 17.0f)));   // étoile discrète
-            if (favs.contains (f.name))
-            {
-                g.setColour (Colour (0xffffd23f));
-                g.fillPath (star);
-            }
-            else
-            {
-                g.setColour (kDim.withAlpha (0.8f));
-                g.strokePath (star, PathStrokeType (S (1.2f), PathStrokeType::curved));
+                const int l = base + k;
+                if (! isPositiveAndBelow (l, (int) lines.size())) continue;
+                const auto& ln = lines[(size_t) l];
+                const float dy = ((float) k - frac) * pitch - (itemRect (jmin (k, kListRows - 1)).getY() - top);
+                if (ln.header())
+                {
+                    // titre de type sur toute la largeur : nom coloré, nombre, filet
+                    const auto ir = itemRect (jmin (k, kListRows - 1)).translated (0.0f, dy).withRight (itemRect (kListRows).getRight());
+                    const auto col = FxCat::colour (ln.kind);
+                    const auto f = font (tfBold, 13.5f).withExtraKerningFactor (0.14f);
+                    const String t = String (FxCat::label (ln.kind)).toUpperCase();
+                    g.setFont (f);
+                    g.setColour (col);
+                    const float tw = unitsOf (f, t);
+                    g.drawText (t, S (Rectangle<float> (ir.getX() + 2.0f, ir.getY() + 4.0f, tw + 6.0f, ir.getHeight() - 4.0f)), Justification::centredLeft, false);
+                    g.setColour (kDim.withAlpha (0.7f));
+                    g.drawText (String (ln.count), S (Rectangle<float> (ir.getX() + tw + 12.0f, ir.getY() + 4.0f, 30.0f, ir.getHeight() - 4.0f)), Justification::centredLeft, false);
+                    g.setColour (Colour (0xff232933));
+                    g.fillRect (S (Rectangle<float> (ir.getX() + tw + 40.0f, ir.getCentreY() + 2.0f, ir.getRight() - (ir.getX() + tw + 40.0f), 1.0f)));
+                    continue;
+                }
+                for (int c = 0; c < 2; ++c)
+                {
+                    const int i = c == 0 ? ln.a : ln.b;
+                    if (i < 0) continue;
+                    const int v = k < kListRows && frac < 0.01f ? k + c * kListRows : -1;      // case visible (survol), hors glissement
+                    drawBrowserItem (g, items.getReference (i), itemRect (jmin (k, kListRows - 1) + c * kListRows).translated (0.0f, dy), v);
+                }
             }
         }
-        // ce qui reste plus bas : nombre de plugins (A-Z) ou types (TYPE)
-        const int units = browserUnits ((int) rows.size()), firstRow = browserFirstRow();
-        const int lastRow = firstRow + kListRows * 2;
-        int remaining = 0;
-        StringArray kinds;
-        for (int r = lastRow; r < (int) rows.size(); ++r)
+        // compteur « a - b of N » et flèche s'il reste des lignes plus bas
+        int before = 0, shown = 0;
+        for (int l = 0; l < (int) lines.size(); ++l)
         {
-            if (rows[(size_t) r].item >= 0) ++remaining;
-            const int kd = rows[(size_t) r].kind;
-            if (kd >= 0 && kinds.size() < 4) kinds.addIfNotAlreadyThere (String (FxCat::label (kd)).toUpperCase());
+            const int n = (lines[(size_t) l].a >= 0 ? 1 : 0) + (lines[(size_t) l].b >= 0 ? 1 : 0);
+            if (l < listScroll) before += n; else if (l < listScroll + kListRows) shown += n;
         }
-        if (browserByType && lastRow < (int) rows.size() && rows[(size_t) lastRow - 1].kind >= 0)        // type commencé plus haut : il continue
-            kinds.removeString (String (FxCat::label (rows[(size_t) lastRow - 1].kind)).toUpperCase());
-        const String more = browserByType && kinds.size() > 0 ? "MORE : " + kinds.joinIntoString (", ") : String (remaining) + " MORE";
-        int shownCount = 0;
-        for (int r = firstRow; r < jmin ((int) rows.size(), lastRow); ++r) if (rows[(size_t) r].item >= 0) ++shownCount;
-        int before = 0;
-        for (int r = 0; r < firstRow && r < (int) rows.size(); ++r) if (rows[(size_t) r].item >= 0) ++before;
-        drawListCues (g, units, browserVisible(), listScroll, before + 1, before + shownCount, items.size(), "plug-ins", more);
-        juce::ignoreUnused (firstShown, lastShown);
+        drawListCues (g, (int) lines.size(), kListRows, listPos, before + 1, before + shown, items.size(), "plug-ins");
+    }
+
+    void drawBrowserItem (Graphics& g, const InstalledFx& f, Rectangle<float> unitRect, int v)
+    {
+        const auto ir = S (unitRect);
+        const bool hov = v >= 0 && hoverItem == v;
+        const int order = pickedIndex (f);
+        g.setColour (order >= 0 ? kAccent.withAlpha (0.20f) : (hov ? kScrPanel2.brighter (0.12f) : kScrPanel));
+        g.fillRoundedRectangle (ir, S (6.0f));
+        if (order >= 0)
+        {
+            g.setColour (kAccent);
+            g.drawRoundedRectangle (ir.reduced (S (0.6f)), S (6.0f), S (1.4f));
+            const auto badge = Rectangle<float> (S (24.0f), S (24.0f)).withCentre ({ ir.getRight() - S (216.0f), ir.getCentreY() });
+            g.fillEllipse (badge);
+            g.setFont (font (tfBold, 14.0f));
+            g.setColour (kScrBg);
+            g.drawText (String (order + 1), badge, Justification::centred);
+        }
+        const int kind = FxCat::classify (f.name);
+        g.setColour (FxCat::colour (kind));
+        g.fillRoundedRectangle (ir.withWidth (S (5.0f)), S (2.5f));
+        FxCat::drawIcon (g, kind, Rectangle<float> (S (22.0f), S (22.0f)).withCentre ({ ir.getX() + S (24.0f), ir.getCentreY() }), FxCat::colour (kind).brighter (0.3f), S (1.8f), FxCat::iconOf (f.name));
+        g.setFont (font (tfMedium, 17.0f));
+        g.setColour (kText);
+        g.drawText (FxCat::shortName (f.name), ir.withTrimmedLeft (S (44.0f)).withTrimmedRight (S (234.0f)), Justification::centredLeft, true);
+        g.setFont (font (tfRegular, 13.5f));
+        g.setColour (kDim);
+        const auto vend = FxCat::vendor (f.name);
+        g.drawText (FxCat::typeOf (f.name) + (vend.isNotEmpty() ? "  " + vend : String()), ir.withTrimmedRight (S (40.0f)).removeFromRight (S (166.0f)),
+                    Justification::centredRight, true);
+        const auto star = starPath (S (starRect (unitRect).withSizeKeepingCentre (17.0f, 17.0f)));   // étoile des favoris
+        if (favs.contains (f.name)) { g.setColour (Colour (0xffffd23f)); g.fillPath (star); }
+        else { g.setColour (kDim.withAlpha (0.8f)); g.strokePath (star, PathStrokeType (S (1.2f), PathStrokeType::curved)); }
     }
 
     void addFromBrowser (const InstalledFx& f)
@@ -2882,7 +2874,7 @@ private:
         }
         const int rows = (presetTotal() + kListRows - 1) / kListRows;
         const int shownTo = jmin (presetTotal(), (presetScroll + 2) * kListRows);
-        drawListCues (g, rows, 2, presetScroll, presetScroll * kListRows + 1, shownTo, presetTotal(), "presets", String (presetTotal() - shownTo) + " MORE");
+        drawListCues (g, rows, 2, (float) presetScroll, presetScroll * kListRows + 1, shownTo, presetTotal(), "presets");
     }
 
     void setParamFromX (int k, float x)
@@ -3490,6 +3482,10 @@ private:
             const int hd = drumItemAt (toLocal (e.position));
             if (hd != hoverDrum) { hoverDrum = hd; askRepaint (screenPx()); }
         }
+        {
+            const bool hm2 = overlay == Overlay::browser && morePill.contains (toLocal (e.position));
+            if (hm2 != hoverMore) { hoverMore = hm2; askRepaint (screenPx()); }
+        }
         if (modeOpen)
         {
             const int hm = modeItemAt (toLocal (e.position));
@@ -3589,7 +3585,7 @@ private:
         {
             // clic : choisir / retirer (numérotés dans l'ordre) ; double-clic : ajouter tout de suite ; clic droit : rien
             if (e.mods.isPopupMenu()) return;
-            if (morePill.contains (p)) { listScroll = jlimit (0, browserMaxScroll(), listScroll + (browserRowMajor() ? kListRows - 2 : 2)); askRepaint (screenPx()); return; }
+            if (morePill.contains (p)) { listScroll = jlimit (0, browserMaxScroll(), listScroll + kListRows - 2); askRepaint (screenPx()); return; }
             for (int v = 0; v < kListRows * 2; ++v)
                 if (itemRect (v).contains (p))
                 {
@@ -3861,7 +3857,7 @@ private:
             case bSave:       saveMenu(); break;
             case bBanks:      if (overlay == Overlay::banks) closeOverlay(); else openBanks(); break;
             case bClose:      closeOverlay(); break;
-            case bReload:     eng.installedList (true); listScroll = 0; break;
+            case bReload:     eng.installedList (true); listScroll = 0; listPos = 0.0f; break;
             case bParamOnOff: { const int i = paramFxIndex(); if (i >= 0) eng.toggle (i); break; }
             case bParamWindow:{ const int i = paramFxIndex(); if (const auto* f = paramFx()) eng.openWindow (i, ! f->open); break; }
             case bPagePrev:   if (presetMode) stepPluginPreset (-1); else { paramPage = jmax (0, paramPage - 1); pollParams (true); } break;
@@ -3884,7 +3880,7 @@ private:
             case bPc:         eng.setProgramChange (! eng.programChange); break;
             default:
                 if (b >= bChip && b < bChip + kNumChips) setChip (b - bChip);
-                if (b == bSortAZ || b == bSortType) { browserByType = b == bSortType; listScroll = 0; OctoSettings::setGlowOf ("browserByType", browserByType ? 1 : 0); askRepaint (screenPx()); }
+                if (b == bSortAZ || b == bSortType) { browserByType = b == bSortType; listScroll = 0; listPos = 0.0f; OctoSettings::setGlowOf ("browserByType", browserByType ? 1 : 0); askRepaint (screenPx()); }
                 else if (b == bFsColour + OctopusEngine::kFs) tunerColourMenu (S (colourBtnRect (OctopusEngine::kFs)));
                 else if (b >= bFsColour && b < bFsColour + OctopusEngine::kFs) colourMenu (b - bFsColour);
                 else if (b >= bBank && b < bBank + OctopusEngine::kBanks) eng.setBank (b - bBank);
@@ -4713,8 +4709,8 @@ void OctopusEditor::showScreen (int which, int arg)
         case 8: view->openBanks(); view->tunerColourMenu (view->S (PedalView::colourBtnRect (OctopusEngine::kFs))); break;
         case 9: view->openSemiDrum(); break;                                      // tambour de Semitones
         case 10: view->semiTarget = jlimit (0, semi::kCount - 1, view->semiTarget + arg); break;   // molette
-        case 17: view->browserByType = arg != 0; view->listScroll = 0; view->askRepaint (view->screenPx()); break;   // rendus : tri du navigateur
-        case 18: view->listScroll = jlimit (0, view->browserMaxScroll(), arg); view->askRepaint (view->screenPx()); break;   // rendus : défilement du navigateur
+        case 17: view->browserByType = arg != 0; view->listScroll = 0; view->listPos = 0.0f; view->askRepaint (view->screenPx()); break;   // rendus : tri du navigateur
+        case 18: view->listScroll = jlimit (0, view->browserMaxScroll(), arg); view->listPos = (float) view->listScroll; view->askRepaint (view->screenPx()); break;   // rendus : défilement du navigateur
         case 15: view->openMixer (arg); break;   // rendus : mixeur d'un groupe (-1 : fermé)
         case 13: view->recGlowPc = arg; view->askRepaint (view->screenPx()); break;   // rendus : glow de l'effet record
         case 14: view->recColourMenu(); break;
