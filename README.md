@@ -138,3 +138,4 @@ v1.12.0 : voies parallèles (split / merge) : 2 ou 3 voies côte à côte (empil
 v1.12.1 : mini CHROMA : chevron rouge à sa gauche, vers le bas sous la note affichée, vers le haut au-dessus ; il disparaît quand la note est juste ou sans son.
 v1.12.2 : mini CHROMA : chevrons dans la case, à droite de l'anneau : un chevron quand la note est un peu fausse, deux à partir de 10 cents (vers le bas : trop bas, vers le haut : trop haut).
 v1.13.0 : en-tête redessiné, sans cadres (badge carré, mini CHROMA et Semitones posés sur le fond ; séparateurs fins, ‹ BANK 01 ›, PRESET / STOMP soulignés, SAVE et BANKS avec icône) ; footswitch « A / B » d'un groupe de voies parallèles : chaque appui ne laisse sonner qu'une voie (fondu de 10 ms).
+v1.13.1 : bandeau du haut moins haut (environ 10 px), la chaîne de blocs remonte d'autant.
