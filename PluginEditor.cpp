@@ -22,10 +22,10 @@ namespace
 
     // ---- écran : repère local (unités), origine = coin haut gauche de la vitre (1064 x 624)
     constexpr float kSW = 1064.0f, kSH = L::kScreenH;
-    constexpr float kHeaderH = 74.0f;
+    constexpr float kHeaderH = 62.0f;                      // en-tête (v1.13.1 : 12 plus bas -> 62)
     // 3 rangées visibles ; même espace entre les carrés horizontalement et verticalement (pas de 140 = carré 70 + 70)
     constexpr int kRows = 3, kCols = 7;
-    constexpr float kGridTop = 106.0f, kRowPitch = 140.0f, kColPitch = 140.0f, kColX0 = (kSW - kColPitch * (float) (kCols - 1)) * 0.5f;   // grille centrée
+    constexpr float kGridTop = 94.0f, kRowPitch = 140.0f, kColPitch = 140.0f, kColX0 = (kSW - kColPitch * (float) (kCols - 1)) * 0.5f;   // grille centrée
     constexpr float kTile = 70.0f, kTileDy = 40.0f;              // carré du bloc, centre à rowTop + kTileDy
     // cases des footswitchs : même écart entre elles et avec les bords de l'écran, décollées du bas
     constexpr float kFooterGap = 14.0f, kFooterH = 58.0f, kFooterY = kSH - kFooterH - kFooterGap, kFooterSplit = 0.0f, kFooterW = (kSW - 7.0f * kFooterGap - kFooterSplit) / 6.0f;   // A-F : même écart entre les cases et avec les bords de l'écran (côtés et bas)
@@ -492,7 +492,7 @@ private:
     }
 
     // ---- nom du preset chargé : clic sur le nom en haut de l'écran pour le changer
-    Rectangle<float> headerNameRect() const { return { kNameX, 9.0f, jmax (120.0f, chromaLeft() - kHG - kNameX), 34.0f }; }
+    Rectangle<float> headerNameRect() const { return { kNameX, 3.0f, jmax (120.0f, chromaLeft() - kHG - kNameX), 34.0f }; }
     static Rectangle<float> badgeRect() { return { kHdrGap, (kHeaderH - kBadge) * 0.5f, kBadge, kBadge }; }
     void startHeaderRename()
     {
@@ -1235,11 +1235,11 @@ private:
         const auto& p = semi::get (proc.semitonesPreset());
         const float tw = jmax (unitsOf (font (tfBold, 16.0f), p.name), unitsOf (semiLabelFont(), "SEMITONES"));
         const float w = jlimit (80.0f, 160.0f, 26.0f + 8.0f + tw + 2.0f);
-        return { kSep1X - kHG - w, 19.0f, w, 36.0f };
+        return { kSep1X - kHG - w, 13.0f, w, 36.0f };
     }
     // mini CHROMA : anneau à gauche de la case, chevrons rouges à droite (trop bas : vers le bas, trop haut : vers le haut ;
     // deux chevrons à partir de 10 cents d'écart) pendant que la note sonne
-    Rectangle<float> chromaRect() const { return { semiRect().getX() - kHG - 42.0f, 19.0f, 42.0f, 36.0f }; }
+    Rectangle<float> chromaRect() const { return { semiRect().getX() - kHG - 42.0f, 13.0f, 42.0f, 36.0f }; }
     float chromaLeft() const { return chromaRect().getX(); }
 
     // anneau lumineux : halo (opacité glowPc %) puis trait net
@@ -1577,12 +1577,12 @@ private:
     {
         std::vector<Btn> v;
         // de droite à gauche, même écart (kHdrGap = marge du bord de l'écran) entre tous les éléments de l'en-tête
-        v.push_back ({ { kBankPrevX, 19.0f, 24.0f, 36.0f }, bBankPrev, "<" });
-        v.push_back ({ { kBankNextX, 19.0f, 24.0f, 36.0f }, bBankNext, ">" });
-        v.push_back ({ { kPresetX, 19.0f, 72.0f, 36.0f }, bModePreset, "PRESET", eng.mode() == OctopusEngine::presetMode });
-        v.push_back ({ { kStompX, 19.0f, 64.0f, 36.0f }, bModeStomp, "STOMP", eng.mode() == OctopusEngine::stompMode });
-        v.push_back ({ { kSaveX, 19.0f, 70.0f, 36.0f }, bSave, "SAVE", false, eng.isReady() });
-        v.push_back ({ { kBanksX, 19.0f, 82.0f, 36.0f }, bBanks, "BANKS", overlay == Overlay::banks });
+        v.push_back ({ { kBankPrevX, 13.0f, 24.0f, 36.0f }, bBankPrev, "<" });
+        v.push_back ({ { kBankNextX, 13.0f, 24.0f, 36.0f }, bBankNext, ">" });
+        v.push_back ({ { kPresetX, 13.0f, 72.0f, 36.0f }, bModePreset, "PRESET", eng.mode() == OctopusEngine::presetMode });
+        v.push_back ({ { kStompX, 13.0f, 64.0f, 36.0f }, bModeStomp, "STOMP", eng.mode() == OctopusEngine::stompMode });
+        v.push_back ({ { kSaveX, 13.0f, 70.0f, 36.0f }, bSave, "SAVE", false, eng.isReady() });
+        v.push_back ({ { kBanksX, 13.0f, 82.0f, 36.0f }, bBanks, "BANKS", overlay == Overlay::banks });
         return v;
     }
 
@@ -1769,19 +1769,19 @@ private:
         if (msg.isNotEmpty()) sub = msg;
         g.setFont (font (tfRegular, 15.0f));
         g.setColour (msg.isNotEmpty() ? kAccent : kDim);
-        g.drawText (sub, S (Rectangle<float> (kNameX, 41.0f, headerNameRect().getWidth(), 20.0f)), Justification::centredLeft, true);
+        g.drawText (sub, S (Rectangle<float> (kNameX, 35.0f, headerNameRect().getWidth(), 20.0f)), Justification::centredLeft, true);
 
         // séparateurs fins
         for (float x : { kSep1X, kSep2X, kSep3X })
         {
             g.setColour (Colour (0xff232933));
-            g.fillRect (S (Rectangle<float> (x, 20.0f, 1.0f, 34.0f)));
+            g.fillRect (S (Rectangle<float> (x, 14.0f, 1.0f, 34.0f)));
         }
 
         // bank affichée : ‹ BANK 01 ›
         g.setFont (font (tfBold, 18.2f).withExtraKerningFactor (0.08f));
         g.setColour (kText);
-        g.drawText ("BANK " + String (eng.bank() + 1).paddedLeft ('0', 2), S (Rectangle<float> (kBankTextX, 19.0f, 82.0f, 36.0f)), Justification::centred);
+        g.drawText ("BANK " + String (eng.bank() + 1).paddedLeft ('0', 2), S (Rectangle<float> (kBankTextX, 13.0f, 82.0f, 36.0f)), Justification::centred);
         for (auto& b : headerButtons()) drawHeaderItem (g, b);
         drawMiniChroma (g);
         drawSemiButton (g);
