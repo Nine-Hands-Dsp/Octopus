@@ -3787,7 +3787,7 @@ private:
         // voies parallèles : mixeur ouvert, points Y / M, case « + » d'une voie vide, groupe replié
         if (mixGroup >= 0)
         {
-            if (mixerRect().contains (p)) { mixerDown (p); return; }
+            if (mixerRect().contains (p)) { mixerDown (p, e.getNumberOfClicks() >= 2); return; }
             mixGroup = -1; askRepaint (screenPx());
             bool m0 = false;
             if (nodeAt (p, m0) >= 0 && m0) return;              // clic sur M : le mixeur se ferme seulement
@@ -4332,12 +4332,15 @@ private:
         }
         askRepaint (screenPx());
     }
-    void mixerDown (Point<float> p)
+    void mixerDown (Point<float> p, bool dbl = false)
     {
         if (mixZone (-1, 5).expanded (4.0f).contains (p)) { mixGroup = -1; askRepaint (screenPx()); return; }
         const int n = isPositiveAndBelow (mixGroup, (int) eng.groups().size()) ? (int) eng.groups()[(size_t) mixGroup].lanes.size() : 0;
         for (int l = 0; l < n; ++l)
         {
+            // double clic sur le curseur : niveau à 0 dB (gain unité), pan au centre
+            if (dbl && mixZone (l, 0).expanded (6.0f, 8.0f).contains (p)) { mixDragLane = -1; eng.setMix (mixGroup, l, Routing::mixLevel, 0.0); askRepaint (screenPx()); return; }
+            if (dbl && mixZone (l, 1).expanded (4.0f, 8.0f).contains (p)) { mixDragLane = -1; eng.setMix (mixGroup, l, Routing::mixPan, 0.0); askRepaint (screenPx()); return; }
             if (mixZone (l, 0).expanded (6.0f, 8.0f).contains (p)) { mixDragLane = l; mixDragWhat = 0; mixerSet (p); return; }
             if (mixZone (l, 1).expanded (4.0f, 8.0f).contains (p)) { mixDragLane = l; mixDragWhat = 1; mixerSet (p); return; }
             if (mixZone (l, 4).contains (p)) { eng.setMix (mixGroup, l, Routing::mixLevel, 0.0); askRepaint (screenPx()); return; }
