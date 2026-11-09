@@ -1389,7 +1389,7 @@ private:
     }
 
     // ---- tambour : presets sur un cylindre vertical, le preset choisi dans la bande du milieu
-    static constexpr float kDrumMidY = 198.9f, kDrumR = 112.9f, kDrumStep = 16.0f;
+    static constexpr float kDrumMidY = 166.0f, kDrumR = 104.0f, kDrumStep = 16.0f;   // v1.18.2 : plus près du bouton
     // tambour aligné sur le bouton SEMITONES : la bande de sélection commence au bord gauche du bouton
     // colonne valeurs + noms centrée sous le bouton SEMITONES ; la bande de sélection l'entoure (12 de marge)
     float drumNamesW() const
@@ -1398,9 +1398,11 @@ private:
         for (int i = 0; i < semi::kCount; ++i) w = jmax (w, unitsOf (font (tfBold, 18.3f), semi::get (i).name));
         return w;
     }
-    float drumCx() const { return semiRect().getCentreX(); }
-    float drumContentW() const { return 33.0f + 9.5f + drumNamesW(); }
-    float drumX() const { return drumCx() - drumContentW() * 0.5f; }      // début de la colonne des valeurs
+    // aligné sur le bouton : valeurs centrées sous le rond, noms alignés sur « SEMITONES / Standard »
+    static constexpr float kDrumNumW = 33.0f, kDrumNameDX = 37.5f;
+    float drumX() const { return semiRect().getX() + 13.0f - kDrumNumW * 0.5f; }   // début de la colonne des valeurs
+    float drumContentW() const { return kDrumNameDX + drumNamesW(); }
+    float drumCx() const { return drumX() + drumContentW() * 0.5f; }
     Rectangle<float> drumBand() const { return { drumX() - 12.0f, kDrumMidY - 14.85f, drumContentW() + 24.0f, 29.7f }; }
     void openSemiDrum()
     {
@@ -1479,25 +1481,26 @@ private:
             const float x0 = S (Point<float> (drumX(), 0.0f)).x;      // S (Point) : avec l'origine de l'écran
             g.setFont (font (tfBold, 15.8f));
             g.setColour (col.withAlpha (op * 0.35f));
-            g.drawText (semiValue2 (p.semis), Rectangle<float> (x0, cy.y - rowH * 0.5f, S (33.0f), rowH).expanded (S (0.6f), 0.0f), Justification::centredRight);
+            g.drawText (semiValue2 (p.semis), Rectangle<float> (x0, cy.y - rowH * 0.5f, S (kDrumNumW), rowH).expanded (S (0.6f), 0.0f), Justification::centred);
             g.setColour (col.withAlpha (op));
-            g.drawText (semiValue2 (p.semis), Rectangle<float> (x0, cy.y - rowH * 0.5f, S (33.0f), rowH), Justification::centredRight);
+            g.drawText (semiValue2 (p.semis), Rectangle<float> (x0, cy.y - rowH * 0.5f, S (kDrumNumW), rowH), Justification::centred);
             g.setFont (sel ? font (tfBold, 18.3f) : font (tfMedium, 16.7f));
             g.setColour ((sel ? Colours::white : kText).withAlpha (op));
-            g.drawText (p.name, Rectangle<float> (x0 + S (33.0f + 9.5f), cy.y - rowH * 0.5f, S (namesW + 4.0f), rowH), Justification::centredLeft, true);
+            g.drawText (p.name, Rectangle<float> (x0 + S (kDrumNameDX), cy.y - rowH * 0.5f, S (namesW + 4.0f), rowH), Justification::centredLeft, true);
         }
         // aide : souris + texte
         const auto hintF = font (tfBold, 11.6f).withExtraKerningFactor (0.14f);
         const String hintT = CharPointer_UTF8 ("SCROLL  \xc2\xb7  CLICK TO CHOOSE");
         const float hx = drumCx() - (13.0f + 6.0f + unitsOf (hintF, hintT)) * 0.5f;      // aide centrée sous le bouton
-        const auto mr = S (Rectangle<float> (hx, 336.0f, 13.0f, 19.0f));
+        const float hy = kDrumMidY + kDrumR + 33.0f;
+        const auto mr = S (Rectangle<float> (hx, hy, 13.0f, 19.0f));
         g.setColour (Colour (0xff9aa4b4));
         g.drawRoundedRectangle (mr, mr.getWidth() * 0.5f, S (1.2f));
         g.setColour (col);
-        g.fillRoundedRectangle (S (Rectangle<float> (hx + 5.3f, 339.6f, 2.4f, 5.4f)), S (1.2f));
+        g.fillRoundedRectangle (S (Rectangle<float> (hx + 5.3f, hy + 3.6f, 2.4f, 5.4f)), S (1.2f));
         g.setFont (hintF);
         g.setColour (Colour (0xff9aa4b4));
-        g.drawText (hintT, S (Rectangle<float> (hx + 19.0f, 336.0f, 220.0f, 19.0f)), Justification::centredLeft);
+        g.drawText (hintT, S (Rectangle<float> (hx + 19.0f, hy, 220.0f, 19.0f)), Justification::centredLeft);
     }
 
     // clic droit sur Semitones : lien avec le preset chargé, couleur et halo
@@ -2326,12 +2329,12 @@ private:
         v.push_back ({ bl.size(), "At the end of the chain" });
         return v;
     }
-    static constexpr float kInsMidY = 330.0f, kInsR = 150.0f, kInsStep = 15.0f;
+    static constexpr float kInsMidY = 262.0f, kInsR = 128.0f, kInsStep = 15.0f;   // juste sous la pastille
     float insY (float d) const { return kInsMidY + kInsR * std::sin (jlimit (-5.5f, 5.5f, d) * kInsStep * MathConstants<float>::pi / 180.0f); }
     float insNamesW() const { float w = 0.0f; for (auto& c : insertChoices()) w = jmax (w, unitsOf (font (tfBold, 17.5f), c.second)); return w; }
     Rectangle<float> insBand() const
     {
-        const float w = insNamesW() + 48.0f, cx = jlimit (16.0f + w * 0.5f, kSW - 16.0f - w * 0.5f, insertWhereRect().getCentreX());
+        const float w = insNamesW() + 48.0f, cx = jlimit (16.0f + w * 0.5f, kSW - 16.0f - w * 0.5f, insertWhereRect().getX() + w * 0.5f);   // aligné à gauche sur la pastille
         return { cx - w * 0.5f, kInsMidY - 16.0f, w, 32.0f };
     }
     void openInsertDrum()
@@ -3283,7 +3286,7 @@ private:
 
     // ---- tambour du mode de CHROMA (MONO / POLY / STROBE), comme celui de Semitones, sous le mode
     bool modeOpen = false; int modeTarget = 0, hoverMode = -1, hoverTunerTop = 0; float modePos = 0.0f;
-    static constexpr float kModeMidY = 170.0f, kModeR = 92.0f, kModeStep = 30.0f;
+    static constexpr float kModeMidY = 148.0f, kModeR = 78.0f, kModeStep = 30.0f;   // juste sous le mode
     float modeY (float d) const { return kModeMidY + kModeR * std::sin (jlimit (-2.8f, 2.8f, d) * kModeStep * MathConstants<float>::pi / 180.0f); }
     Rectangle<float> modeBand() const { const float cx = tunerTop().mode.getCentreX(); return { cx - 95.0f, kModeMidY - 16.0f, 190.0f, 32.0f }; }
     void openModeDrum() { modeTarget = jlimit (0, 2, proc.chroma().mode); modePos = (float) modeTarget; hoverMode = -1; modeOpen = true; askRepaint (screenPx()); }

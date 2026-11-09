@@ -239,7 +239,7 @@ namespace MenuStyle
     {
         struct Tile { String key, name; int kind = -1, icon = FxCat::iconFamily; bool group = false; };
         OctopusEngine& eng; Fonts f; int fs; std::function<void()> changed;
-        static constexpr int kCols = 3, kTileH = 62, kGap = 7, kPad = 10, kHead = 26, kFoot = 34, kW = 312;
+        static constexpr int kCols = 3, kTileH = 50, kGap = 5, kPad = 8, kHead = 24, kFoot = 32, kW = 282;   // v1.18.2 : cases plus petites, texte et icône inchangés
         int hover = -1; bool hoverClear = false;
 
         BlockGrid (OctopusEngine& e, Fonts fo, int f0, std::function<void()> onChange)
@@ -298,10 +298,10 @@ namespace MenuStyle
                 sel += on ? 1 : 0;
                 const auto c = t[(size_t) i].kind >= 0 ? FxCat::colour (t[(size_t) i].kind) : kAccent;
                 g.setColour (on ? c.withAlpha (0.15f) : (hover == i ? Colour (0xff151a21) : kTileBg));
-                g.fillRoundedRectangle (r, 9.0f);
+                g.fillRoundedRectangle (r, 8.0f);
                 g.setColour (on ? c : (hover == i ? kFaint.brighter (0.2f) : kTileLine));
-                g.drawRoundedRectangle (r.reduced (0.75f), 9.0f, 1.5f);
-                const auto ic = Rectangle<float> (24.0f, 24.0f).withCentre ({ r.getCentreX(), r.getY() + 22.0f });
+                g.drawRoundedRectangle (r.reduced (0.75f), 8.0f, 1.4f);
+                const auto ic = Rectangle<float> (24.0f, 24.0f).withCentre ({ r.getCentreX(), r.getY() + 17.0f });
                 if (t[(size_t) i].group)                                                // groupe : deux voies entre deux points
                 {
                     drawGroupIcon (g, ic, c, 2.0f);
@@ -310,10 +310,10 @@ namespace MenuStyle
                 g.setFont (fnt (f.med, 12.5f));
                 g.setColour (on ? Colours::white : kDim);
                 g.drawFittedText (t[(size_t) i].name + (t[(size_t) i].group ? String (CharPointer_UTF8 ("  \xe2\x87\x84")) : String()),
-                                  r.withTrimmedTop (38.0f).withTrimmedBottom (6.0f).reduced (4.0f, 0.0f).toNearestInt(), Justification::centred, 1, 0.8f);
+                                  r.withTrimmedTop (31.0f).withTrimmedBottom (3.0f).reduced (3.0f, 0.0f).toNearestInt(), Justification::centred, 1, 0.8f);
                 if (on)                                                                  // pastille cochée
                 {
-                    const auto bd = Rectangle<float> (15.0f, 15.0f).withPosition (r.getRight() - 20.0f, r.getY() + 5.0f);
+                    const auto bd = Rectangle<float> (13.0f, 13.0f).withPosition (r.getRight() - 17.0f, r.getY() + 4.0f);
                     g.setColour (c);
                     g.fillEllipse (bd);
                     drawCheck (g, bd.reduced (2.5f), Colour (0xff06121a), 1.8f);
