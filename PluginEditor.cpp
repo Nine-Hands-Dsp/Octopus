@@ -1400,11 +1400,11 @@ private:
         for (int i = 0; i < semi::kCount; ++i) w = jmax (w, unitsOf (font (tfBold, 18.3f), semi::get (i).name));
         return w;
     }
-    // aligné sur le bouton : valeurs centrées sous le rond, noms alignés sur « SEMITONES / Standard »
+    // centré sous le bouton (règle des tambours : toujours centrés sur leur bouton)
     static constexpr float kDrumNumW = 33.0f, kDrumNameDX = 37.5f;
-    float drumX() const { return semiRect().getX() + 13.0f - kDrumNumW * 0.5f; }   // début de la colonne des valeurs
+    float drumCx() const { return semiRect().getCentreX(); }
     float drumContentW() const { return kDrumNameDX + drumNamesW(); }
-    float drumCx() const { return drumX() + drumContentW() * 0.5f; }
+    float drumX() const { return drumCx() - drumContentW() * 0.5f; }      // début de la colonne des valeurs
     Rectangle<float> drumBand() const { return { drumX() - 12.0f, kDrumMidY - 14.85f, drumContentW() + 24.0f, 29.7f }; }
     void openSemiDrum()
     {
@@ -1446,11 +1446,9 @@ private:
     {
         const auto col = semiColour();
         // voile sur l'écran (sous l'en-tête) + zone sombre derrière le tambour
-        g.setColour (Colour (0xff05070b).withAlpha (0.8f));
+        g.setColour (Colour (0xff05070b).withAlpha (0.985f));                 // fond presque opaque + halo (lisibilité)
         g.fillRect (S (kOverlay));
-        const auto lc = S (Point<float> (drumCx(), kDrumMidY - 6.0f));
-        g.setGradientFill (ColourGradient (Colour (0xff04060a).withAlpha (0.8f), lc, Colour (0xff04060a).withAlpha (0.0f), lc + Point<float> (S (150.0f), 0.0f), true));
-        g.fillEllipse (Rectangle<float> (S (300.0f), S (290.0f)).withCentre (lc));
+        drumHalo (g, drumBand(), kDrumR, col);
         // bande du milieu
         const auto band = S (drumBand());
         const float namesW = drumNamesW();
@@ -2318,7 +2316,14 @@ private:
         return { x, kRowY, w, kRowH };
     }
     // ---- tambour de l'emplacement (comme celui de Semitones) : au début, avant chaque bloc (un groupe compte pour un), à la fin
-    int drumBgStyle = 0;                                           // rendus : 0 actuel, 1 panneau, 2 halo (essais de lisibilité)
+    int drumBgStyle = 2;                                           // fond des tambours : 2 = presque opaque + halo (choisi, v1.18.2) ; 0 / 1 : essais
+    // tous les tambours : fond presque opaque et léger halo de couleur derrière la bande du milieu (lisibilité)
+    void drumHalo (Graphics& g, Rectangle<float> bandUnits, float radius, Colour col)
+    {
+        const auto c = S (bandUnits.getCentre());
+        g.setGradientFill (ColourGradient (col.withAlpha (0.10f), c, col.withAlpha (0.0f), c + Point<float> (S (bandUnits.getWidth() * 0.8f), 0.0f), true));
+        g.fillEllipse (Rectangle<float> (S (bandUnits.getWidth() * 1.6f), S (radius * 2.2f)).withCentre (c));
+    }
     bool insertOpen = false; int insertTarget = 0, hoverInsert = -1; float insertDrumPos = 0.0f;
     std::vector<std::pair<int, String>> insertChoices() const
     {
@@ -2339,7 +2344,7 @@ private:
     float insNamesW() const { float w = 0.0f; for (auto& c : insertChoices()) w = jmax (w, unitsOf (font (tfBold, 17.5f), c.second)); return w; }
     Rectangle<float> insBand() const
     {
-        const float w = insNamesW() + 48.0f, cx = jlimit (16.0f + w * 0.5f, kSW - 16.0f - w * 0.5f, insertWhereRect().getX() + w * 0.5f);   // aligné à gauche sur la pastille
+        const float w = insNamesW() + 48.0f, cx = jlimit (16.0f + w * 0.5f, kSW - 16.0f - w * 0.5f, insertWhereRect().getCentreX());   // centré sur la pastille
         return { cx - w * 0.5f, kInsMidY - 16.0f, w, 32.0f };
     }
     void openInsertDrum()
@@ -2392,12 +2397,7 @@ private:
                 g.setColour (kFaint);
                 g.drawRoundedRectangle (S (pr).reduced (S (0.6f)), S (12.0f), S (1.2f));
             }
-            else if (drumBgStyle == 2)                                  // B : halo sombre et léger reflet bleu derrière la bande
-            {
-                const auto c = S (bd.getCentre());
-                g.setGradientFill (ColourGradient (kAccent.withAlpha (0.10f), c, kAccent.withAlpha (0.0f), c + Point<float> (S (bd.getWidth() * 0.8f), 0.0f), true));
-                g.fillEllipse (Rectangle<float> (S (bd.getWidth() * 1.6f), S (kInsR * 2.2f)).withCentre (c));
-            }
+            else if (drumBgStyle == 2) drumHalo (g, bd, kInsR, kAccent);   // B : halo léger derrière la bande
         }
         const auto band = S (insBand());
         for (int l = 3; l >= 1; --l)
@@ -3340,8 +3340,9 @@ private:
     {
         static const char* names[3] = { "MONO", "POLY", "STROBE" };
         const auto col = TC::amber();
-        g.setColour (Colour (0xff05070b).withAlpha (0.82f));
+        g.setColour (Colour (0xff05070b).withAlpha (0.985f));                 // fond presque opaque + halo (lisibilité)
         g.fillRect (S (Rectangle<float> (0.0f, 72.0f, kSW, kSH - 72.0f)));
+        drumHalo (g, modeBand(), kModeR, col);
         const auto band = S (modeBand());
         for (int l = 3; l >= 1; --l)
         {
