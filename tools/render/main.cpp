@@ -173,6 +173,8 @@ int main (int argc, char** argv)
         e.save (14);
         ed->showScreen (1, 3); pump (3); ed->showScreen (20, 1); pump (8);
         shot ("octopus_add_insert_drum");
+        for (int st = 1; st <= 2; ++st) { ed->showScreen (22, st); pump (2); shot (st == 1 ? "octopus_add_insert_drum_a" : "octopus_add_insert_drum_b"); }
+        ed->showScreen (22, 0);
         ed->showScreen (20, 0); ed->showScreen (0); pump (2);
         shot ("octopus_split");
         ed->showScreen (21, 1); pump (4);

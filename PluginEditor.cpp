@@ -2318,6 +2318,7 @@ private:
         return { x, kRowY, w, kRowH };
     }
     // ---- tambour de l'emplacement (comme celui de Semitones) : au début, avant chaque bloc (un groupe compte pour un), à la fin
+    int drumBgStyle = 0;                                           // rendus : 0 actuel, 1 panneau, 2 halo (essais de lisibilité)
     bool insertOpen = false; int insertTarget = 0, hoverInsert = -1; float insertDrumPos = 0.0f;
     std::vector<std::pair<int, String>> insertChoices() const
     {
@@ -2377,8 +2378,27 @@ private:
     {
         const auto col = kAccent;
         const auto ch = insertChoices();
-        g.setColour (Colour (0xff05070b).withAlpha (0.94f));
-        g.fillRect (S (Rectangle<float> (0.0f, kRowY + kRowH + 6.0f, kSW, kSH - (kRowY + kRowH + 6.0f))));   // tout sous la ligne du titre
+        const float vy = kRowY + kRowH + 6.0f;
+        g.setColour (Colour (0xff05070b).withAlpha (drumBgStyle == 0 ? 0.94f : 0.985f));
+        g.fillRect (S (Rectangle<float> (0.0f, vy, kSW, kSH - vy)));   // tout sous la ligne du titre
+        {
+            const auto bd = insBand();
+            const float top = jmax (vy + 6.0f, insY (-4.6f) - 14.0f), bot = kInsMidY + kInsR + 50.0f;
+            if (drumBgStyle == 1)                                       // A : panneau sombre derrière la colonne
+            {
+                const auto pr = Rectangle<float> (bd.getX() - 26.0f, top, bd.getWidth() + 52.0f, bot - top);
+                g.setColour (Colour (0xff0d1015));
+                g.fillRoundedRectangle (S (pr), S (12.0f));
+                g.setColour (kFaint);
+                g.drawRoundedRectangle (S (pr).reduced (S (0.6f)), S (12.0f), S (1.2f));
+            }
+            else if (drumBgStyle == 2)                                  // B : halo sombre et léger reflet bleu derrière la bande
+            {
+                const auto c = S (bd.getCentre());
+                g.setGradientFill (ColourGradient (kAccent.withAlpha (0.10f), c, kAccent.withAlpha (0.0f), c + Point<float> (S (bd.getWidth() * 0.8f), 0.0f), true));
+                g.fillEllipse (Rectangle<float> (S (bd.getWidth() * 1.6f), S (kInsR * 2.2f)).withCentre (c));
+            }
+        }
         const auto band = S (insBand());
         for (int l = 3; l >= 1; --l)
         {
@@ -4836,6 +4856,7 @@ void OctopusEditor::showScreen (int which, int arg)
         case 13: view->recGlowPc = arg; view->askRepaint (view->screenPx()); break;   // rendus : glow de l'effet record
         case 14: view->recColourMenu(); break;
         case 21: if (arg != 0) view->startHeaderRename(); else view->headerNameEd.setVisible (false); break;   // rendus : renommer le preset (en-tête)
+        case 22: view->drumBgStyle = arg; view->askRepaint (view->screenPx()); break;   // rendus : fond du tambour (essais)
         case 20: if (arg != 0) view->openInsertDrum(); else view->closeInsertDrum(); break;   // rendus : tambour de l'emplacement
         case 19: if (arg != 0) view->openModeDrum(); else view->closeModeDrum(); break;   // rendus : tambour du mode de CHROMA
         case 12: view->recPreview = arg == 0 ? -1 : (arg == 1 ? 1 : 2); view->recBlinkOn = arg != 2; view->askRepaint (view->screenPx()); break;   // rendus : 1 = armée (REC fixe), 2 = enregistrement (REC éteint), 3 = enregistrement (REC allumé)
