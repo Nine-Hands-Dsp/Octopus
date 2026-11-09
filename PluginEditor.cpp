@@ -1391,7 +1391,9 @@ private:
     }
 
     // ---- tambour : presets sur un cylindre vertical, le preset choisi dans la bande du milieu
-    static constexpr float kDrumMidY = 128.0f, kDrumR = 96.0f, kDrumStep = 16.0f;    // v1.18.2 : tout près du bouton (le haut du cylindre passe sous l'en-tête)
+    // tous les tambours (v1.18.3) : même cylindre que Semitones, bande de sélection toujours à kDrumGap sous le bas de son bouton
+    static constexpr float kDrumGap = 66.6f, kDrumBandH = 29.7f;
+    static constexpr float kDrumMidY = (kHdrY + 36.0f + kDrumGap + kDrumBandH * 0.5f), kDrumR = 96.0f, kDrumStep = 16.0f;    // v1.18.2 : tout près du bouton (le haut du cylindre passe sous l'en-tête)
     // tambour aligné sur le bouton SEMITONES : la bande de sélection commence au bord gauche du bouton
     // colonne valeurs + noms centrée sous le bouton SEMITONES ; la bande de sélection l'entoure (12 de marge)
     float drumNamesW() const
@@ -1405,7 +1407,7 @@ private:
     float drumCx() const { return semiRect().getCentreX(); }
     float drumContentW() const { return kDrumNameDX + drumNamesW(); }
     float drumX() const { return drumCx() - drumContentW() * 0.5f; }      // début de la colonne des valeurs
-    Rectangle<float> drumBand() const { return { drumX() - 12.0f, kDrumMidY - 14.85f, drumContentW() + 24.0f, 29.7f }; }
+    Rectangle<float> drumBand() const { return { drumX() - 12.0f, kDrumMidY - kDrumBandH * 0.5f, drumContentW() + 24.0f, kDrumBandH }; }
     void openSemiDrum()
     {
         semiTarget = proc.semitonesPreset(); semiPos = (float) semiTarget; hoverDrum = -1;
@@ -2339,13 +2341,13 @@ private:
         v.push_back ({ bl.size(), "At the end of the chain" });
         return v;
     }
-    static constexpr float kInsMidY = 212.0f, kInsR = 110.0f, kInsStep = 15.0f;   // tout près de la pastille (le haut est coupé sous la ligne du titre)
+    static constexpr float kInsMidY = (kRowY + kRowH + kDrumGap + kDrumBandH * 0.5f), kInsR = kDrumR, kInsStep = kDrumStep;   // comme Semitones, même écart sous la pastille
     float insY (float d) const { return kInsMidY + kInsR * std::sin (jlimit (-5.5f, 5.5f, d) * kInsStep * MathConstants<float>::pi / 180.0f); }
-    float insNamesW() const { float w = 0.0f; for (auto& c : insertChoices()) w = jmax (w, unitsOf (font (tfBold, 17.5f), c.second)); return w; }
+    float insNamesW() const { float w = 0.0f; for (auto& c : insertChoices()) w = jmax (w, unitsOf (font (tfBold, 18.3f), c.second)); return w; }
     Rectangle<float> insBand() const
     {
         const float w = insNamesW() + 48.0f, cx = jlimit (16.0f + w * 0.5f, kSW - 16.0f - w * 0.5f, insertWhereRect().getCentreX());   // centré sur la pastille
-        return { cx - w * 0.5f, kInsMidY - 16.0f, w, 32.0f };
+        return { cx - w * 0.5f, kInsMidY - kDrumBandH * 0.5f, w, kDrumBandH };
     }
     void openInsertDrum()
     {
@@ -2370,14 +2372,16 @@ private:
         const auto band = insBand();
         if (p.x < band.getX() || p.x > band.getRight()) return -1;
         const int n = (int) insertChoices().size();
+        int best = -1; float bd = 1.0e9f;                               // comme Semitones : la ligne la plus proche
         for (int i = 0; i < n; ++i)
         {
             const float d = (float) i - insertDrumPos;
             if (std::abs (d) > 4.3f) continue;
             const float h = 13.5f * std::cos (d * kInsStep * MathConstants<float>::pi / 180.0f);
-            if (std::abs (p.y - insY (d)) <= h) return i;
+            const float dy = std::abs (p.y - insY (d));
+            if (dy <= h && dy < bd) { bd = dy; best = i; }
         }
-        return -1;
+        return best;
     }
     void drawInsertDrum (Graphics& g)
     {
@@ -2411,25 +2415,25 @@ private:
         g.drawRoundedRectangle (band, S (6.0f), S (0.9f));
         const float cx = insBand().getCentreX();
         Graphics::ScopedSaveState clipTop (g);
-        g.reduceClipRegion (S (Rectangle<float> (0.0f, kRowY + kRowH + 8.0f, kSW, kSH)).toNearestInt());
+        g.reduceClipRegion (S (Rectangle<float> (0.0f, kRowY + kRowH + 4.0f, kSW, kSH)).toNearestInt());
         for (int i = 0; i < (int) ch.size(); ++i)
         {
             const float d = (float) i - insertDrumPos, ad = std::abs (d);
             if (ad > 4.6f) continue;
             const float a = d * kInsStep * MathConstants<float>::pi / 180.0f;
-            float op = jmax (0.06f, 1.0f - ad * 0.22f);
+            float op = jmax (0.06f, 1.0f - ad * 0.24f);
             if (i == hoverInsert && ad > 0.5f) op = jmin (1.0f, op + 0.25f);
             const bool sel = ad < 0.5f;
             const auto cy = S (Point<float> (cx, insY (d)));
             Graphics::ScopedSaveState ss (g);
-            g.addTransform (AffineTransform::scale (1.0f - ad * 0.06f, (1.0f - ad * 0.06f) * std::cos (a), cy.x, cy.y));
-            g.setFont (sel ? font (tfBold, 17.5f) : font (tfMedium, 16.5f));
+            g.addTransform (AffineTransform::scale (1.0f - ad * 0.08f, (1.0f - ad * 0.08f) * std::cos (a), cy.x, cy.y));
+            g.setFont (sel ? font (tfBold, 18.3f) : font (tfMedium, 16.7f));
             g.setColour ((sel ? Colours::white : kText).withAlpha (op));
-            g.drawText (ch[(size_t) i].second, Rectangle<float> (cy.x - S (insNamesW() * 0.5f + 20.0f), cy.y - S (14.0f), S (insNamesW() + 40.0f), S (28.0f)), Justification::centred, false);
+            g.drawText (ch[(size_t) i].second, Rectangle<float> (cy.x - S (insNamesW() * 0.5f + 20.0f), cy.y - S (13.65f), S (insNamesW() + 40.0f), S (27.3f)), Justification::centred, false);
         }
         const auto hintF = font (tfBold, 11.6f).withExtraKerningFactor (0.14f);
         const String hintT = CharPointer_UTF8 ("SCROLL  \xc2\xb7  CLICK TO CHOOSE");
-        const float hx = cx - (13.0f + 6.0f + unitsOf (hintF, hintT)) * 0.5f, hy = kInsMidY + kInsR + 22.0f;
+        const float hx = cx - (13.0f + 6.0f + unitsOf (hintF, hintT)) * 0.5f, hy = kInsMidY + kInsR + 33.0f;
         const auto mr = S (Rectangle<float> (hx, hy, 13.0f, 19.0f));
         g.setColour (Colour (0xff9aa4b4));
         g.drawRoundedRectangle (mr, mr.getWidth() * 0.5f, S (1.2f));
@@ -3313,9 +3317,10 @@ private:
 
     // ---- tambour du mode de CHROMA (MONO / POLY / STROBE), comme celui de Semitones, sous le mode
     bool modeOpen = false; int modeTarget = 0, hoverMode = -1, hoverTunerTop = 0; float modePos = 0.0f;
-    static constexpr float kModeMidY = 126.0f, kModeR = 70.0f, kModeStep = 30.0f;   // tout près du mode
-    float modeY (float d) const { return kModeMidY + kModeR * std::sin (jlimit (-2.8f, 2.8f, d) * kModeStep * MathConstants<float>::pi / 180.0f); }
-    Rectangle<float> modeBand() const { const float cx = tunerTop().mode.getCentreX(); return { cx - 95.0f, kModeMidY - 16.0f, 190.0f, 32.0f }; }
+    static constexpr float kModeTopBottom = 38.0f + 26.0f;                       // bas de la ligne MODE · ACCORDAGE (tunerTop)
+    static constexpr float kModeMidY = (kModeTopBottom + kDrumGap + kDrumBandH * 0.5f), kModeR = kDrumR, kModeStep = kDrumStep;   // comme Semitones, même écart sous le mode
+    float modeY (float d) const { return kModeMidY + kModeR * std::sin (jlimit (-5.5f, 5.5f, d) * kModeStep * MathConstants<float>::pi / 180.0f); }
+    Rectangle<float> modeBand() const { const float cx = tunerTop().mode.getCentreX(); return { cx - 95.0f, kModeMidY - kDrumBandH * 0.5f, 190.0f, kDrumBandH }; }
     void openModeDrum() { modeTarget = jlimit (0, 2, proc.chroma().mode); modePos = (float) modeTarget; hoverMode = -1; modeOpen = true; askRepaint (screenPx()); }
     void closeModeDrum() { if (! modeOpen) return; modeOpen = false; hoverMode = -1; askRepaint (screenPx()); }
     void chooseMode (int m)
@@ -3328,13 +3333,15 @@ private:
     {
         const auto band = modeBand();
         if (p.x < band.getX() || p.x > band.getRight()) return -1;
+        int best = -1; float bd = 1.0e9f;                               // comme Semitones : la ligne la plus proche
         for (int i = 0; i < 3; ++i)
         {
             const float d = (float) i - modePos;
-            const float h = 15.0f * std::cos (d * kModeStep * MathConstants<float>::pi / 180.0f);
-            if (std::abs (p.y - modeY (d)) <= h) return i;
+            const float h = 13.5f * std::cos (d * kModeStep * MathConstants<float>::pi / 180.0f);
+            const float dy = std::abs (p.y - modeY (d));
+            if (dy <= h && dy < bd) { bd = dy; best = i; }
         }
-        return -1;
+        return best;
     }
     void drawModeDrum (Graphics& g)
     {
@@ -3355,25 +3362,25 @@ private:
         g.drawRoundedRectangle (band, S (6.0f), S (0.9f));
         const float cx = modeBand().getCentreX();
         Graphics::ScopedSaveState clipTop (g);
-        g.reduceClipRegion (S (Rectangle<float> (0.0f, 70.0f, kSW, kSH)).toNearestInt());
+        g.reduceClipRegion (S (Rectangle<float> (0.0f, kModeTopBottom + 4.0f, kSW, kSH)).toNearestInt());
         for (int i = 0; i < 3; ++i)
         {
             const float d = (float) i - modePos, ad = std::abs (d);
             const float a = d * kModeStep * MathConstants<float>::pi / 180.0f;
-            float op = jmax (0.08f, 1.0f - ad * 0.32f);
-            if (i == hoverMode && ad > 0.5f) op = jmin (1.0f, op + 0.3f);
+            float op = jmax (0.06f, 1.0f - ad * 0.24f);
+            if (i == hoverMode && ad > 0.5f) op = jmin (1.0f, op + 0.25f);
             const bool sel = ad < 0.5f;
             const auto cy = S (Point<float> (cx, modeY (d)));
             Graphics::ScopedSaveState ss (g);
             g.addTransform (AffineTransform::scale (1.0f - ad * 0.08f, (1.0f - ad * 0.08f) * std::cos (a), cy.x, cy.y));
-            g.setFont (monoS (sel ? 21.0f : 19.0f).withExtraKerningFactor (0.22f));
+            g.setFont (monoS (sel ? 19.0f : 17.5f).withExtraKerningFactor (0.22f));
             g.setColour ((sel ? col : Colour (0xffc7cdd6)).withAlpha (op));
-            g.drawText (names[i], Rectangle<float> (cy.x - S (95.0f), cy.y - S (14.0f), S (190.0f), S (28.0f)), Justification::centred);
+            g.drawText (names[i], Rectangle<float> (cy.x - S (95.0f), cy.y - S (13.65f), S (190.0f), S (27.3f)), Justification::centred);
         }
         // aide : souris + texte, comme le tambour de Semitones
         const auto hintF = font (tfBold, 11.6f).withExtraKerningFactor (0.14f);
         const String hintT = CharPointer_UTF8 ("SCROLL  \xc2\xb7  CLICK TO CHOOSE");
-        const float hx = cx - (13.0f + 6.0f + unitsOf (hintF, hintT)) * 0.5f, hy = kModeMidY + kModeR + 26.0f;
+        const float hx = cx - (13.0f + 6.0f + unitsOf (hintF, hintT)) * 0.5f, hy = kModeMidY + kModeR + 33.0f;
         const auto mr = S (Rectangle<float> (hx, hy, 13.0f, 19.0f));
         g.setColour (Colour (0xff9aa4b4));
         g.drawRoundedRectangle (mr, mr.getWidth() * 0.5f, S (1.2f));
@@ -3429,7 +3436,9 @@ private:
     {
         const int n = jmax (1, sn.numStrings);
         const float pitch = jmin (68.7f, 412.0f / (float) n), hh = jmin (27.1f, pitch * 0.4f);
-        const float y0 = 292.0f - pitch * (float) n * 0.5f;
+        // bloc centré : même écart entre la ligne du haut (MODE · ACCORDAGE) et le haut des cordes qu'entre -50 / 0 / +50 et le bas de l'écran
+        const float topLine = 38.0f + 26.0f, labelsGap = 22.0f, labelsH = 18.0f;
+        const float y0 = (topLine + kSH - pitch * ((float) n + 0.5f) + hh * 0.5f - labelsGap - labelsH) * 0.5f;
         for (int row = 0; row < n; ++row)
         {
             const int idx = n - 1 - row;   // corde la plus aiguë en haut
@@ -3439,9 +3448,15 @@ private:
             if (st.measured) alpha = st.active ? 1.0f : jmap (jlimit (0.4f, 6.0f, st.age), 0.4f, 6.0f, 1.0f, 0.45f);
             const bool inTune = st.measured && std::abs (st.cents) <= (float) tuna::TunerEngine::kPolyInTune;
             const auto col = st.measured ? (inTune ? TC::green() : TC::amber()).withAlpha (alpha) : Colour (0xff4a5060);
-            g.setFont (font (tfBold, jmin (38.0f, pitch * 0.55f)));
-            g.setColour (col);
-            g.drawText (String (tuna::noteName (st.midi)), S (Rectangle<float> (72.3f, cy - pitch * 0.5f, 95.0f, pitch)), Justification::centredLeft);
+            {   // nom de la corde : police et taille de la ligne du haut (IBM Plex Mono 21), en gras (contour ajouté)
+                const auto nf = tunerTopFont();
+                GlyphArrangement ga;
+                ga.addLineOfText (nf, String (tuna::noteName (st.midi)), S (Point<float> (72.3f, 0.0f)).x, S (Point<float> (0.0f, cy)).y + nf.getAscent() * 0.36f);
+                Path np; ga.createPath (np);
+                g.setColour (col);
+                g.fillPath (np);
+                g.strokePath (np, PathStrokeType (S (0.9f), PathStrokeType::curved, PathStrokeType::rounded));
+            }
             fineMeter (g, cy - hh * 0.5f, hh, false, st.measured, st.measured, st.cents, inTune ? TC::green() : TC::amber(), alpha);
             if (st.measured)
             {
@@ -3452,7 +3467,7 @@ private:
         }
         g.setFont (monoS (15.3f));
         g.setColour (Colour (0xff9aa3b2));
-        const float ly = y0 + pitch * (float) n + 22.0f;
+        const float ly = y0 + pitch * (float) n + labelsGap;
         g.drawText ("-50", S (Rectangle<float> (kTx0 - 30.0f, ly, 60.0f, 18.0f)), Justification::centred);
         g.drawText ("0", S (Rectangle<float> (kTx0 + kTw * 0.5f - 30.0f, ly, 60.0f, 18.0f)), Justification::centred);
         g.drawText ("+50", S (Rectangle<float> (kTx0 + kTw - 30.0f, ly, 60.0f, 18.0f)), Justification::centred);
