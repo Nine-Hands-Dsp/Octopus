@@ -124,6 +124,7 @@ public:
         for (auto& l : ledLevel) l = 0.0f;
 
         styleEditor (search, "Search plug-ins...");
+        search.getProperties().remove ("roundBg");
         search.setColour (TextEditor::backgroundColourId, Colours::transparentBlack);   // fond, cadre arrondi et loupe dessinés par l'écran
         search.setColour (TextEditor::outlineColourId, Colours::transparentBlack);
         search.setColour (TextEditor::focusedOutlineColourId, Colours::transparentBlack);
@@ -473,7 +474,8 @@ private:
 
     void styleEditor (TextEditor& ed, const String& hint)
     {
-        ed.setColour (TextEditor::backgroundColourId, kScrPanel2);
+        ed.setColour (TextEditor::backgroundColourId, Colours::transparentBlack);   // fond et cadre arrondis dessinés par menuLnf
+        ed.getProperties().set ("roundBg", (int) kScrPanel2.getARGB());
         ed.setColour (TextEditor::outlineColourId, kFaint);
         ed.setColour (TextEditor::focusedOutlineColourId, kAccent);
         ed.setColour (TextEditor::textColourId, kText);
@@ -4826,6 +4828,7 @@ void OctopusEditor::showScreen (int which, int arg)
         case 15: view->openMixer (arg); break;   // rendus : mixeur d'un groupe (-1 : fermé)
         case 13: view->recGlowPc = arg; view->askRepaint (view->screenPx()); break;   // rendus : glow de l'effet record
         case 14: view->recColourMenu(); break;
+        case 21: if (arg != 0) view->startHeaderRename(); else view->headerNameEd.setVisible (false); break;   // rendus : renommer le preset (en-tête)
         case 20: if (arg != 0) view->openInsertDrum(); else view->closeInsertDrum(); break;   // rendus : tambour de l'emplacement
         case 19: if (arg != 0) view->openModeDrum(); else view->closeModeDrum(); break;   // rendus : tambour du mode de CHROMA
         case 12: view->recPreview = arg == 0 ? -1 : (arg == 1 ? 1 : 2); view->recBlinkOn = arg != 2; view->askRepaint (view->screenPx()); break;   // rendus : 1 = armée (REC fixe), 2 = enregistrement (REC éteint), 3 = enregistrement (REC allumé)

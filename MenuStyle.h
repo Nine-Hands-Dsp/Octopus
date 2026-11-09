@@ -114,6 +114,23 @@ namespace MenuStyle
             setColour (PopupMenu::highlightedTextColourId, Colours::white);
         }
         Font getPopupMenuFont() override { return fnt (f.med, 15.0f); }
+        // champs de texte d'Octopus : fond et cadre aux coins arrondis, comme le reste de l'interface
+        void fillTextEditorBackground (Graphics& g, int w, int h, TextEditor& ed) override
+        {
+            const auto bg = ed.getProperties()["roundBg"];
+            if (bg.isVoid()) { LookAndFeel_V4::fillTextEditorBackground (g, w, h, ed); return; }
+            g.setColour (Colour ((uint32) (int) bg));
+            g.fillRoundedRectangle (Rectangle<float> ((float) w, (float) h), jmin (10.0f, (float) h * 0.2f));
+        }
+        void drawTextEditorOutline (Graphics& g, int w, int h, TextEditor& ed) override
+        {
+            if (ed.getProperties()["roundBg"].isVoid()) { LookAndFeel_V4::drawTextEditorOutline (g, w, h, ed); return; }
+            if (! ed.isEnabled()) return;
+            const bool foc = ed.hasKeyboardFocus (true) && ! ed.isReadOnly();
+            const float t = foc ? 1.6f : 1.1f;
+            g.setColour (ed.findColour (foc ? TextEditor::focusedOutlineColourId : TextEditor::outlineColourId));
+            g.drawRoundedRectangle (Rectangle<float> ((float) w, (float) h).reduced (t * 0.5f), jmin (10.0f, (float) h * 0.2f), t);
+        }
         int getPopupMenuBorderSize() override { return 7; }
         void drawPopupMenuBackground (Graphics& g, int w, int h) override
         {

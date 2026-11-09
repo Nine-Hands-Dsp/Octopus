@@ -175,6 +175,9 @@ int main (int argc, char** argv)
         shot ("octopus_add_insert_drum");
         ed->showScreen (20, 0); ed->showScreen (0); pump (2);
         shot ("octopus_split");
+        ed->showScreen (21, 1); pump (4);
+        shot ("octopus_header_rename");
+        ed->showScreen (21, 0); pump (2);
         {   // menu clic droit du footswitch A : grille des blocs (A <-> B du groupe + Holyverb cochés)
             e.toggleAssign (0, e.swapKeyOf (0));
             e.toggleAssign (0, e.chain().getReference (idxOf ("Holyverb")).guid);
