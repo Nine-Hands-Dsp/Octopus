@@ -4,6 +4,13 @@ Plugin VST3 (Windows / macOS) **pour REAPER** : un écran façon multi-effet (in
 la chaîne d'effets de la piste où il est inséré. Pédale sans jacks qui occupe toute la fenêtre (tailles 50 %, 60 %, 75 %,
 100 % ; taille par défaut au choix dans le menu, 60 % au départ), écran sur presque toute la façade, 4 footswitchs hexagonaux inox surmontés de leur lettre A-D rétroéclairée.
 
+<p align="center">
+  <a href="https://github.com/Nine-Hands-Dsp/Octopus/releases/latest/download/Octopus-VST3-Windows.zip"><img alt="Télécharger pour Windows" src="https://img.shields.io/badge/%E2%AC%87%20T%C3%A9l%C3%A9charger-Windows-0078D6?style=for-the-badge"></a>
+  <a href="https://github.com/Nine-Hands-Dsp/Octopus/releases/latest/download/Octopus-VST3-macOS.zip"><img alt="Télécharger pour macOS" src="https://img.shields.io/badge/%E2%AC%87%20T%C3%A9l%C3%A9charger-macOS-111111?style=for-the-badge&logo=apple&logoColor=white"></a>
+  <br>
+  <a href="https://github.com/Nine-Hands-Dsp/Octopus/releases/latest"><img alt="Dernière version" src="https://img.shields.io/github/v/release/Nine-Hands-Dsp/Octopus?label=derni%C3%A8re%20version&color=919496"></a>
+</p>
+
 ## Ce que fait Octopus
 - **L'écran montre la chaîne de la piste** (tous les effets sauf Octopus), en blocs colorés par famille
   (accordeur, ampli, baffle, drive, dynamique, EQ, wah / filtre, delay, reverb, modulation, pitch, spécial, utilitaire en blanc),
