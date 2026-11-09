@@ -154,3 +154,4 @@ v1.18.0 : CHROMA : barre du bas retirée, ligne du haut MODE · ACCORDAGE · A 4
 v1.18.1 : fenêtre d'ajout : tant que le tambour de l'emplacement est ouvert, plus de survol des lignes ni de bulle de description.
 v1.18.2 : tambours (Semitones, mode de CHROMA, emplacement) plus près de leur bouton, centrés dessus, fond presque opaque et léger halo pour la lisibilité ; grille STOMP en cases plus petites (texte et icône inchangés) ; champs de texte aux coins arrondis.
 v1.18.3 : tambours du mode de CHROMA et de l'emplacement avec le même cylindre et le même fonctionnement que Semitones, bande de sélection toujours à la même distance de son bouton ; accordeur POLY centré (même écart en haut et en bas), noms de cordes en IBM Plex Mono gras.
+v1.18.4 : mixeur d'un groupe : double clic sur le rond du niveau = 0 dB (gain unité), sur le pan = centre.
