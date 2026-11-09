@@ -1391,7 +1391,7 @@ private:
     }
 
     // ---- tambour : presets sur un cylindre vertical, le preset choisi dans la bande du milieu
-    static constexpr float kDrumMidY = 166.0f, kDrumR = 104.0f, kDrumStep = 16.0f;   // v1.18.2 : plus près du bouton
+    static constexpr float kDrumMidY = 128.0f, kDrumR = 96.0f, kDrumStep = 16.0f;    // v1.18.2 : tout près du bouton (le haut du cylindre passe sous l'en-tête)
     // tambour aligné sur le bouton SEMITONES : la bande de sélection commence au bord gauche du bouton
     // colonne valeurs + noms centrée sous le bouton SEMITONES ; la bande de sélection l'entoure (12 de marge)
     float drumNamesW() const
@@ -1464,7 +1464,9 @@ private:
         g.fillRoundedRectangle (band, S (6.0f));
         g.setColour (col.withAlpha (0.55f));
         g.drawRoundedRectangle (band, S (6.0f), S (0.9f));
-        // presets
+        // presets (coupés sous l'en-tête)
+        Graphics::ScopedSaveState clipTop (g);
+        g.reduceClipRegion (S (Rectangle<float> (0.0f, kHeaderH + 4.0f, kSW, kSH)).toNearestInt());
         for (int i = 0; i < semi::kCount; ++i)
         {
             const float d = (float) i - semiPos;
@@ -1971,7 +1973,6 @@ private:
             g.setColour (Colour (0xff1c2129));
             g.fillRect (S (Rectangle<float> (16.0f, kTabsY + kTabsH, kSW - 32.0f, 1.0f)));
             drawBrowserList (g);
-            if (insertOpen) drawInsertDrum (g);
         }
         else if (overlay == Overlay::params) drawParams (g);
         else if (overlay == Overlay::banks)  drawBanks (g);
@@ -2107,6 +2108,7 @@ private:
             }
         }
         drawFxTooltip (g);                                         // survol d'un plugin NINE HANDS | DSP : sa description
+        if (insertOpen && overlay == Overlay::browser) drawInsertDrum (g);   // par-dessus les onglets et les boutons
         if (overlay == Overlay::banks) drawBankDots (g);
         if (overlay == Overlay::banks)
         {
@@ -2331,7 +2333,7 @@ private:
         v.push_back ({ bl.size(), "At the end of the chain" });
         return v;
     }
-    static constexpr float kInsMidY = 262.0f, kInsR = 128.0f, kInsStep = 15.0f;   // juste sous la pastille
+    static constexpr float kInsMidY = 212.0f, kInsR = 110.0f, kInsStep = 15.0f;   // tout près de la pastille (le haut est coupé sous la ligne du titre)
     float insY (float d) const { return kInsMidY + kInsR * std::sin (jlimit (-5.5f, 5.5f, d) * kInsStep * MathConstants<float>::pi / 180.0f); }
     float insNamesW() const { float w = 0.0f; for (auto& c : insertChoices()) w = jmax (w, unitsOf (font (tfBold, 17.5f), c.second)); return w; }
     Rectangle<float> insBand() const
@@ -2346,9 +2348,10 @@ private:
         insertTarget = (int) ch.size() - 1;
         for (int i = (int) ch.size() - 1; i >= 0; --i) if (ch[(size_t) i].first <= jmin (insertPos, eng.blocks().size())) { insertTarget = i; break; }   // dans un groupe : avant le groupe
         insertDrumPos = (float) insertTarget; hoverInsert = -1; insertOpen = true;
+        search.setVisible (false);                                   // le champ (composant) passerait par-dessus le tambour
         askRepaint (screenPx());
     }
-    void closeInsertDrum() { if (! insertOpen) return; insertOpen = false; hoverInsert = -1; askRepaint (screenPx()); }
+    void closeInsertDrum() { if (! insertOpen) return; insertOpen = false; hoverInsert = -1; search.setVisible (overlay == Overlay::browser); askRepaint (screenPx()); }
     void chooseInsert (int i)
     {
         const auto ch = insertChoices();
@@ -2375,7 +2378,7 @@ private:
         const auto col = kAccent;
         const auto ch = insertChoices();
         g.setColour (Colour (0xff05070b).withAlpha (0.94f));
-        g.fillRect (S (Rectangle<float> (0.0f, 122.0f, kSW, kSH - 122.0f)));
+        g.fillRect (S (Rectangle<float> (0.0f, kRowY + kRowH + 6.0f, kSW, kSH - (kRowY + kRowH + 6.0f))));   // tout sous la ligne du titre
         const auto band = S (insBand());
         for (int l = 3; l >= 1; --l)
         {
@@ -2387,6 +2390,8 @@ private:
         g.setColour (col.withAlpha (0.55f));
         g.drawRoundedRectangle (band, S (6.0f), S (0.9f));
         const float cx = insBand().getCentreX();
+        Graphics::ScopedSaveState clipTop (g);
+        g.reduceClipRegion (S (Rectangle<float> (0.0f, kRowY + kRowH + 8.0f, kSW, kSH)).toNearestInt());
         for (int i = 0; i < (int) ch.size(); ++i)
         {
             const float d = (float) i - insertDrumPos, ad = std::abs (d);
@@ -3288,7 +3293,7 @@ private:
 
     // ---- tambour du mode de CHROMA (MONO / POLY / STROBE), comme celui de Semitones, sous le mode
     bool modeOpen = false; int modeTarget = 0, hoverMode = -1, hoverTunerTop = 0; float modePos = 0.0f;
-    static constexpr float kModeMidY = 148.0f, kModeR = 78.0f, kModeStep = 30.0f;   // juste sous le mode
+    static constexpr float kModeMidY = 126.0f, kModeR = 70.0f, kModeStep = 30.0f;   // tout près du mode
     float modeY (float d) const { return kModeMidY + kModeR * std::sin (jlimit (-2.8f, 2.8f, d) * kModeStep * MathConstants<float>::pi / 180.0f); }
     Rectangle<float> modeBand() const { const float cx = tunerTop().mode.getCentreX(); return { cx - 95.0f, kModeMidY - 16.0f, 190.0f, 32.0f }; }
     void openModeDrum() { modeTarget = jlimit (0, 2, proc.chroma().mode); modePos = (float) modeTarget; hoverMode = -1; modeOpen = true; askRepaint (screenPx()); }
@@ -3328,6 +3333,8 @@ private:
         g.setColour (col.withAlpha (0.55f));
         g.drawRoundedRectangle (band, S (6.0f), S (0.9f));
         const float cx = modeBand().getCentreX();
+        Graphics::ScopedSaveState clipTop (g);
+        g.reduceClipRegion (S (Rectangle<float> (0.0f, 70.0f, kSW, kSH)).toNearestInt());
         for (int i = 0; i < 3; ++i)
         {
             const float d = (float) i - modePos, ad = std::abs (d);
