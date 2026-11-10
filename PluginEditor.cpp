@@ -2215,7 +2215,7 @@ private:
             { "eight echo",   "Digital delay in the spirit of the Boss DD-8: 11 modes (analog, tape, shimmer, reverse, glitch...), 40 s looper, tap tempo, DAW sync, 7 memories." },
             { "holyverb",     "Reverb in the spirit of the TC Electronic Hall of Fame: 8 modes from room to church, shimmer and spring, PRE DELAY and TAILS switches, expression pedal." },
             { "freeze",       "Infinite sustain (freeze) and shimmer reverb in the spirit of the EHX Freeze and Pico Shimmer." },
-            { "textural",     "Granular effect in the spirit of the MXR Textures: turns your playing into clouds and textures." },
+            { "textural",     "Granular engine in the spirit of the MXR Textures: Delay, Auto Freeze and Layers modes, REVERSE, grain PITCH, 9 presets." },
             { "arc",          "EBow simulation: endless sustain and violin-like swells on every note." },
             { "freakout",     "Controlled feedback in the spirit of the DigiTech FreqOut: natural guitar feedback at any volume." },
             { "fantomine",    "Theremin voice played from your guitar: gliding, ghostly melodies." },
