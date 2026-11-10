@@ -2187,7 +2187,7 @@ private:
             { "fog z",        "Polyphonic octave generator in the spirit of the EHX POG2: sub and upper octaves mixed with your guitar." },
             { "semitones",    "Transposition in the spirit of the Solar CHUG Capo: play in another key without retuning." },
             { "pipeline",     "Pitch vibrato in the spirit of the EarthQuaker Aqueduct, with several modulation shapes." },
-            { "small tone",   "Chorus in the spirit of the EHX Small Clone: lush, watery chorus with a single knob." },
+            { "small tone",   "Analog chorus in the spirit of the EHX Small Clone: RATE and DIN. / DEPTH, lush watery swirl, tempo sync on the STATUS LED." },
             { "flangerus",    "Chorus and flanger in the spirit of the Ibanez CF7." },
             { "wack",         "Chorus and flanger in the spirit of the Ibanez CF7." },
             { "phase",        "Phaser inspired by the MXR Phase 90: one SPEED knob, with tempo sync." },
