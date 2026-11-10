@@ -89,12 +89,18 @@ jobs:
           pack dist/win "Octopus-VST3-Windows.zip" ""
           pack dist/mac "Octopus-VST3-macOS.zip" ""
           ls -l *.zip
+      - name: Notice
+        run: |
+          # derniere notice du dossier docs/ (hors guide MIDI), publiee sous un nom fixe
+          N=$(ls docs/*.pdf 2>/dev/null | grep -vi midi | sort -V | tail -1 || true)
+          if [ -n "$N" ]; then cp "$N" Octopus-Notice.pdf; echo "notice : $N"; else echo "pas de notice"; fi
       - name: Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="v${{ steps.v.outputs.version }}"
           FILES="Octopus-VST3-Windows.zip Octopus-VST3-macOS.zip"
+          [ -f Octopus-Notice.pdf ] && FILES="$FILES Octopus-Notice.pdf"
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" $FILES --clobber
           else
