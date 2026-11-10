@@ -4368,16 +4368,7 @@ private:
         PopupMenu m, assign, moveM;
         menuHeader (m, fxBadge (i), FxCat::shortName (f.name), String (FxCat::label (eng.blockKind (i))) + String (CharPointer_UTF8 (" \xc2\xb7 ")) + (f.enabled ? "ON" : "OFF"));
         m.addItem (1, f.enabled ? "Bypass (OFF)" : "Enable (ON)");
-        m.addItem (2, "Parameters on screen");
-        m.addItem (3, f.open ? "Close plug-in window" : "Open plug-in window");
-        m.addSeparator();
-        for (int k = 0; k < OctopusEngine::kKeys; ++k)
-        {
-            if (k == 4) assign.addSeparator();
-            assign.addItem (10 + k, "Footswitch " + fsLetter (k) + (k == 4 ? "  (A+B)" : k == 5 ? "  (C+D)" : ""), true, eng.isAssigned (k, f.guid));
-        }
-        m.addSubMenu ("Assign to footswitch (STOMP)", assign);
-        {
+        {   // mode de bypass juste sous Bypass, puis un séparateur
             bool inv = false;
             const bool hasPedal = eng.pedalBypassParam (i, inv) >= 0;
             const bool pedal = eng.usesPedalBypass (i);
@@ -4386,6 +4377,17 @@ private:
             bm.addItem (31, "REAPER bypass (plug-in stops, saves CPU)", true, ! pedal);
             m.addSubMenu ("Bypass mode", bm);
         }
+        m.addSeparator();
+        m.addItem (2, "Parameters on screen");
+        m.addItem (3, f.open ? "Close plug-in window" : "Open plug-in window");
+        m.addItem (24, "Focus plug-in window");                       // la fenêtre du VST au premier plan
+        m.addSeparator();
+        for (int k = 0; k < OctopusEngine::kKeys; ++k)
+        {
+            if (k == 4) assign.addSeparator();
+            assign.addItem (10 + k, "Footswitch " + fsLetter (k) + (k == 4 ? "  (A+B)" : k == 5 ? "  (C+D)" : ""), true, eng.isAssigned (k, f.guid));
+        }
+        m.addSubMenu ("Assign to footswitch (STOMP)", assign);
         const int gOf = eng.groupAt (i);
         if (gOf < 0) m.addItem (4, "Split here (parallel paths)");
         else
@@ -4420,6 +4422,7 @@ private:
                 case 1: e.toggle (idx); break;
                 case 2: sp->openParams (idx); break;
                 case 3: e.openWindow (idx, ! e.chain().getReference (idx).open); break;
+                case 24: e.focusWindow (idx); break;
                 case 4: e.split (idx); break;
                 case 8: if (e.groupAt (idx) >= 0) { sp->mixGroup = e.groupAt (idx); sp->askRepaint (sp->screenPx()); } break;
                 case 9: if (e.groupAt (idx) >= 0) e.removePath (e.groupAt (idx), jmax (0, e.laneAt (idx))); break;

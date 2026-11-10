@@ -334,6 +334,11 @@ void OctopusEngine::openWindow (int i, bool show)
     if (ready && juce::isPositiveAndBelow (i, fx.size())) { host.showWindow (i, show); refreshNow(); }
 }
 
+void OctopusEngine::focusWindow (int i)
+{
+    if (ready && juce::isPositiveAndBelow (i, fx.size())) { host.focusWindow (i); refreshNow(); }
+}
+
 void OctopusEngine::setParallel (int i, bool on)
 {
     if (! ready || ! juce::isPositiveAndBelow (i, fx.size())) return;

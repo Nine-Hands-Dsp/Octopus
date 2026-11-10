@@ -74,6 +74,7 @@ public:
     virtual bool remove (int index) = 0;
     virtual void move (int from, int to) = 0;                          // to = indice final voulu
     virtual void showWindow (int index, bool show) = 0;
+    virtual void focusWindow (int index) { showWindow (index, true); }   // fenêtre du plugin au premier plan (ouverte si fermée)
     virtual void beginUndo() = 0;
     virtual void endUndo (const juce::String& what) = 0;
 
