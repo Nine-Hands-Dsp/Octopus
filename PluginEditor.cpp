@@ -2193,7 +2193,7 @@ private:
             { "phase",        "Phaser inspired by the MXR Phase 90: one SPEED knob, with tempo sync." },
             { "ring think",   "Ring modulator in the spirit of the EHX Ring Thing: metallic, bell-like and robotic tones, with pitch shift." },
             { "echoflex",     "Tape echo in the spirit of the Dunlop Echoplex EP103: warm tape repeats, AGE for worn tape, tap tempo and DAW sync." },
-            { "eight echo",   "Digital delay in the spirit of the Boss DD-8: several delay modes, tap tempo." },
+            { "eight echo",   "Digital delay in the spirit of the Boss DD-8: 11 modes (analog, tape, shimmer, reverse, glitch...), 40 s looper, tap tempo, DAW sync, 7 memories." },
             { "holyverb",     "Reverb in the spirit of the TC Electronic Hall of Fame: 8 modes from room to church, shimmer and spring, PRE DELAY and TAILS switches, expression pedal." },
             { "freeze",       "Infinite sustain (freeze) and shimmer reverb in the spirit of the EHX Freeze and Pico Shimmer." },
             { "textural",     "Granular effect in the spirit of the MXR Textures: turns your playing into clouds and textures." },

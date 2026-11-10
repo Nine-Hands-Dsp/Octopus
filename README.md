@@ -161,3 +161,4 @@ v1.18.5 : grille STOMP en cases carrées ; menu d'un bloc : Focus plug-in window
 v1.18.6 : Echoflex v2.0.0 reconnu sous son nom actuel « Echoflex » (chaîne de démonstration, tests) ; bulle de description mise à jour (AGE, tap tempo, synchro DAW).
 v1.18.7 : Ngate v2.0.0 reconnu sous son nom actuel « Ngate » (chaîne de démonstration, tests) ; bulle de description mise à jour (LEARN, SOFT / HARD, BASS).
 v1.18.8 : Holyverb v1.6.0 (nouvelle pédale graphite à la cathédrale dorée) ; bulle de description mise à jour (8 modes, PRE DELAY, TAILS, pédale d'expression).
+v1.18.9 : Eight Echo v2.0.1 (nouveau visuel plein cadre, barre de presets) ; bulle de description mise à jour (11 modes, looper 40 s, synchro DAW, 7 mémoires).
