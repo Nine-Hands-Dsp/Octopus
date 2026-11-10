@@ -37,6 +37,7 @@ public:
     bool remove (int index) override;
     void move (int from, int to) override;
     void showWindow (int index, bool show) override;
+    void focusWindow (int index) override;
     void beginUndo() override;
     void endUndo (const juce::String& what) override;
     int numParams (int index) override;

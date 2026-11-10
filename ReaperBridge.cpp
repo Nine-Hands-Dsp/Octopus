@@ -1,4 +1,13 @@
 #include "ReaperBridge.h"
+#if JUCE_WINDOWS
+ #ifndef NOMINMAX
+  #define NOMINMAX
+ #endif
+ #ifndef WIN32_LEAN_AND_MEAN
+  #define WIN32_LEAN_AND_MEAN
+ #endif
+ #include <windows.h>
+#endif
 
 #if defined (__clang__) || defined (__GNUC__)
  #pragma GCC diagnostic push
@@ -65,6 +74,7 @@ struct ReaperBridge::Api
     bool  (*TrackFX_Delete) (void* track, int fx) = nullptr;
     void  (*TrackFX_CopyToTrack) (void* src, int srcFx, void* dest, int destFx, bool isMove) = nullptr;
     void  (*TrackFX_Show) (void* track, int index, int showFlag) = nullptr;
+    void* (*TrackFX_GetFloatingWindow) (void* track, int index) = nullptr;
     void  (*guidToString) (const void* guid, char* destNeed64) = nullptr;
     bool  (*GetTrackName) (void* track, char* buf, int sz) = nullptr;
     bool  (*ValidatePtr2) (void* proj, void* ptr, const char* type) = nullptr;
@@ -156,6 +166,7 @@ void ReaperBridge::resolve()
     getApi (reaper, a.TrackFX_Delete, "TrackFX_Delete");
     getApi (reaper, a.TrackFX_CopyToTrack, "TrackFX_CopyToTrack");
     getApi (reaper, a.TrackFX_Show, "TrackFX_Show");
+    getApi (reaper, a.TrackFX_GetFloatingWindow, "TrackFX_GetFloatingWindow");   // facultatif (premier plan)
     getApi (reaper, a.guidToString, "guidToString");
     getApi (reaper, a.GetTrackName, "GetTrackName");
     getApi (reaper, a.ValidatePtr2, "ValidatePtr2");
@@ -387,6 +398,26 @@ void ReaperBridge::move (int from, int to)
 void ReaperBridge::showWindow (int i, bool show)
 {
     if (validIndex (i)) api->TrackFX_Show (track, i | chainFlag, show ? 3 : 2);
+}
+
+// fenêtre du plugin au premier plan : ouverte (flottante) si besoin, puis ramenée devant les autres fenêtres
+void ReaperBridge::focusWindow (int i)
+{
+    if (! validIndex (i)) return;
+    void* w = api->TrackFX_GetFloatingWindow != nullptr ? api->TrackFX_GetFloatingWindow (track, i | chainFlag) : nullptr;
+   #if JUCE_WINDOWS
+    if (w == nullptr) { api->TrackFX_Show (track, i | chainFlag, 3); w = api->TrackFX_GetFloatingWindow != nullptr ? api->TrackFX_GetFloatingWindow (track, i | chainFlag) : nullptr; }
+    if (auto h = (HWND) w)
+    {
+        if (IsIconic (h)) ShowWindow (h, SW_RESTORE);
+        SetWindowPos (h, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+        SetForegroundWindow (h);
+        BringWindowToTop (h);
+    }
+   #else
+    if (w != nullptr) api->TrackFX_Show (track, i | chainFlag, 2);   // macOS : refermer puis rouvrir la ramène devant
+    api->TrackFX_Show (track, i | chainFlag, 3);
+   #endif
 }
 
 void ReaperBridge::beginUndo()

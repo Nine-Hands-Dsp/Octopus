@@ -60,6 +60,7 @@ public:
     int  chromaIndex() const;                                               // bloc CHROMA allumé (accordeur), -1 sinon
     static bool isChroma (const FxInfo& f);
     void openWindow (int chainIndex, bool show);
+    void focusWindow (int chainIndex);                       // fenêtre du plugin au premier plan
     void setParallel (int chainIndex, bool on);
 
     // ---- voies parallèles (split / merge, voir Routing.h) : les voies sont les tronçons de la chaîne entre les repères
