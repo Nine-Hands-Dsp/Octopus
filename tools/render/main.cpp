@@ -157,7 +157,7 @@ int main (int argc, char** argv)
     // voies parallèles (split / merge)
     {
         e.load (14);                                                       // preset vide
-        for (auto* n : { "VST3: NGATE (NINE HANDS | DSP)", "VST3: Darkbass (NINE HANDS | DSP)", "VST3: Ampire (NINE HANDS | DSP)",
+        for (auto* n : { "VST3: Ngate (NINE HANDS | DSP)", "VST3: Darkbass (NINE HANDS | DSP)", "VST3: Ampire (NINE HANDS | DSP)",
                          "VST3: Impulse (NINE HANDS | DSP)", "VST3: Holyverb (NINE HANDS | DSP)", "VST3: Echoflex (NINE HANDS | DSP)",
                          "VST3: Small Tone (NINE HANDS | DSP)", "VST3: ReaEQ (Cockos)", "VST3: Wharry (NINE HANDS | DSP)", "VST3: Crycat (NINE HANDS | DSP)" })
             e.addFx ({ n, n }, e.blocks().size());

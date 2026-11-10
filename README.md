@@ -159,3 +159,4 @@ v1.18.3 : tambours du mode de CHROMA et de l'emplacement avec le même cylindre 
 v1.18.4 : mixeur d'un groupe : double clic sur le rond du niveau = 0 dB (gain unité), sur le pan = centre.
 v1.18.5 : grille STOMP en cases carrées ; menu d'un bloc : Focus plug-in window (fenêtre du VST au premier plan), Bypass mode sous Bypass, séparateurs revus.
 v1.18.6 : Echoflex v2.0.0 reconnu sous son nom actuel « Echoflex » (chaîne de démonstration, tests) ; bulle de description mise à jour (AGE, tap tempo, synchro DAW).
+v1.18.7 : Ngate v2.0.0 reconnu sous son nom actuel « Ngate » (chaîne de démonstration, tests) ; bulle de description mise à jour (LEARN, SOFT / HARD, BASS).
