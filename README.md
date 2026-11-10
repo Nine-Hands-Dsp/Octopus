@@ -165,3 +165,4 @@ v1.18.9 : Eight Echo v2.0.1 (nouveau visuel plein cadre, barre de presets) ; bul
 v1.18.10 : Small Tone v2.0.0 (pédale entièrement refaite, réglage Glow) ; bulle de description mise à jour (RATE, DIN. / DEPTH, synchro tempo sur la LED STATUS).
 v1.18.11 : voies parallèles : un clic sur la petite lettre A / B / C d'une voie agit comme le footswitch A <-> B (cette voie seule ; sur la voie qui sonne, la suivante).
 v1.18.12 : Textural v2.0.0 (pédale refaite NINE HANDS | DSP, potards animés, barre de presets, réglage Glow) ; bulle de description mise à jour (modes Delay, Auto Freeze, Layers, REVERSE, PITCH).
+v1.18.13 : Wack'd v2.0.0 (pédale refaite NINE HANDS | DSP, potards animés, menus Octopus, réglage Glow) ; bulle de description mise à jour (MODE, KRAZY Wack'd).
