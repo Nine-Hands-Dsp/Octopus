@@ -122,7 +122,7 @@ public:
         for (auto* n : { "VST3: CHROMA (NINE HANDS | DSP)", "VST3: NGATE (NINE HANDS | DSP)", "VST3: Crycat (NINE HANDS | DSP)",
                          "VST3: Doorn (NINE HANDS | DSP)", "VST3: Wharry (NINE HANDS | DSP)", "VST3: Small Tone (NINE HANDS | DSP)",
                          "VST3: Ampire (NINE HANDS | DSP)", "VST3: ReaEQ (Cockos)",
-                         "VST3: ECHOFLEX (NINE HANDS | DSP)", "VST3: Holyverb (NINE HANDS | DSP)" })
+                         "VST3: Echoflex (NINE HANDS | DSP)", "VST3: Holyverb (NINE HANDS | DSP)" })
             chain.add (make (n, true, false));
         chain.getReference (1).enabled = false;
         chain.getReference (3).enabled = false;
@@ -287,7 +287,7 @@ public:
     juce::Array<InstalledFx> installed() override
     {
         juce::Array<InstalledFx> a;
-        for (auto* n : { "VST3: Holyverb (NINE HANDS | DSP)", "VST3: ECHOFLEX (NINE HANDS | DSP)", "VST3: Eight Echo (NINE HANDS | DSP)",
+        for (auto* n : { "VST3: Holyverb (NINE HANDS | DSP)", "VST3: Echoflex (NINE HANDS | DSP)", "VST3: Eight Echo (NINE HANDS | DSP)",
                          "VST3: Doorn (NINE HANDS | DSP)", "VST3: Peachy (NINE HANDS | DSP)", "VST3: Wharry (NINE HANDS | DSP)",
                          "VST3: FOG Z (NINE HANDS | DSP)", "VST3: Ring Think (NINE HANDS | DSP)", "VST3: Textural (NINE HANDS | DSP)",
                          "VST3: Pipeline (NINE HANDS | DSP)", "VST3: Small Tone (NINE HANDS | DSP)", "VST3: CHROMA (NINE HANDS | DSP)",

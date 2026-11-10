@@ -2192,7 +2192,7 @@ private:
             { "wack",         "Chorus and flanger in the spirit of the Ibanez CF7." },
             { "phase",        "Phaser inspired by the MXR Phase 90: one SPEED knob, with tempo sync." },
             { "ring think",   "Ring modulator in the spirit of the EHX Ring Thing: metallic, bell-like and robotic tones, with pitch shift." },
-            { "echoflex",     "Tape echo in the spirit of the Dunlop Echoplex EP103: warm repeats with tape colour." },
+            { "echoflex",     "Tape echo in the spirit of the Dunlop Echoplex EP103: warm tape repeats, AGE for worn tape, tap tempo and DAW sync." },
             { "eight echo",   "Digital delay in the spirit of the Boss DD-8: several delay modes, tap tempo." },
             { "holyverb",     "Reverb in the spirit of the TC Electronic Hall of Fame: from small rooms to huge halls." },
             { "freeze",       "Infinite sustain (freeze) and shimmer reverb in the spirit of the EHX Freeze and Pico Shimmer." },

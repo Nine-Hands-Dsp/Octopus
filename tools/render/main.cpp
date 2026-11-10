@@ -94,7 +94,7 @@ int main (int argc, char** argv)
         int ec = -1, cc = -1;
         for (int i = 0; i < e.chain().size(); ++i)
         {
-            if (e.chain().getReference (i).name.contains ("ECHOFLEX")) ec = i;
+            if (e.chain().getReference (i).name.contains ("Echoflex")) ec = i;
             if (OctopusEngine::isChroma (e.chain().getReference (i))) cc = i;
         }
         bool inv = false;
@@ -109,7 +109,7 @@ int main (int argc, char** argv)
         check (h.getParam (ec, 9) > 0.5 && e.chain().getReference (ec).enabled, "ON par la pédale");
         e.load (12);
         int ec2 = -1;
-        for (int i = 0; i < e.chain().size(); ++i) if (e.chain().getReference (i).name.contains ("ECHOFLEX")) ec2 = i;
+        for (int i = 0; i < e.chain().size(); ++i) if (e.chain().getReference (i).name.contains ("Echoflex")) ec2 = i;
         check (ec2 >= 0 && e.chain().getReference (ec2).guid == g && h.getParam (ec2, 9) < 0.5 && h.info (ec2).enabled,
                "rappel du preset : interrupteur de la pédale remis sur OFF sans recharger le plugin");
         e.setBypassPref (e.chain().getReference (ec2).original, OctopusEngine::bypassReaper);
@@ -158,7 +158,7 @@ int main (int argc, char** argv)
     {
         e.load (14);                                                       // preset vide
         for (auto* n : { "VST3: NGATE (NINE HANDS | DSP)", "VST3: Darkbass (NINE HANDS | DSP)", "VST3: Ampire (NINE HANDS | DSP)",
-                         "VST3: Impulse (NINE HANDS | DSP)", "VST3: Holyverb (NINE HANDS | DSP)", "VST3: ECHOFLEX (NINE HANDS | DSP)",
+                         "VST3: Impulse (NINE HANDS | DSP)", "VST3: Holyverb (NINE HANDS | DSP)", "VST3: Echoflex (NINE HANDS | DSP)",
                          "VST3: Small Tone (NINE HANDS | DSP)", "VST3: ReaEQ (Cockos)", "VST3: Wharry (NINE HANDS | DSP)", "VST3: Crycat (NINE HANDS | DSP)" })
             e.addFx ({ n, n }, e.blocks().size());
         auto idxOf = [&] (const String& s, int nth = 0) { for (int i = 0; i < e.chain().size(); ++i) if (e.chain().getReference (i).name.contains (s) && nth-- == 0) return i; return -1; };
