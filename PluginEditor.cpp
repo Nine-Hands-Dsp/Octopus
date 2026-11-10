@@ -4388,6 +4388,7 @@ private:
             assign.addItem (10 + k, "Footswitch " + fsLetter (k) + (k == 4 ? "  (A+B)" : k == 5 ? "  (C+D)" : ""), true, eng.isAssigned (k, f.guid));
         }
         m.addSubMenu ("Assign to footswitch (STOMP)", assign);
+        m.addSeparator();                                                      // séparateur au-dessus de Split here
         const int gOf = eng.groupAt (i);
         if (gOf < 0) m.addItem (4, "Split here (parallel paths)");
         else
@@ -4396,7 +4397,6 @@ private:
             m.addItem (8, "Mix the paths...");
             m.addItem (9, "Remove path " + String::charToString ((juce_wchar) ('A' + jmax (0, ln))) + " (and its effects)");
         }
-        m.addSeparator();
         moveM.addItem (20, "Move left", slot > 0);
         moveM.addItem (21, "Move right", slot < eng.blocks().size() - 1);
         moveM.addItem (22, "Move to start", slot > 0);
