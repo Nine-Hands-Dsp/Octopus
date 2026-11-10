@@ -92,6 +92,7 @@ public:
     juce::String swapKeyOf (int g) const;
     int soloLane (int g) const;                       // la seule voie qui sonne, -1 si plusieurs (ou aucune)
     void nextLane (int g);
+    void selectLane (int g, int lane);                // cette voie seule (comme le footswitch A <-> B qui y arrive)
     void toggleFold (int g);
 
     const juce::Array<InstalledFx>& installedList (bool reload = false);

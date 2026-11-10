@@ -601,6 +601,11 @@ int main()
         const bool soloB = eng.soloLane (0) == 1;
         eng.press (1);
         check (soloA && soloB && eng.soloLane (0) == 0, "footswitch B : A -> B -> A (voie C vide sautée, voies coupées dans Merge)");
+        eng.selectLane (0, 1);
+        const bool selB = eng.soloLane (0) == 1;
+        eng.selectLane (0, 2);                                           // voie C vide : ignorée
+        check (selB && eng.soloLane (0) == 1, "lettre B cliquée : voie B seule (voie vide ignorée)");
+        eng.selectLane (0, 0);
         eng.setMode (OctopusEngine::presetMode);
         eng.save (20);
         eng.unsplit (0);

@@ -854,6 +854,24 @@ private:
         return -1;
     }
 
+    // petites lettres A / B / C des voies : un clic agit comme le footswitch A <-> B
+    Rectangle<float> laneLetterRect (const GGroup& gg, int l) const
+    {
+        const auto y0 = nodeY (gg);
+        return { y0.x + 13.0f, y0.y + kLanePitch * (float) l - 22.0f, 15.0f, 14.0f };
+    }
+    bool laneLetterAt (Point<float> p, int& g, int& lane) const
+    {
+        buildGrid();
+        for (auto& gg : gGroups)
+        {
+            if (gg.folded || ! rowVisible (gg.row)) continue;
+            for (int l = 0; l < gg.lanes; ++l)
+                if (laneLetterRect (gg, l).expanded (4.0f, 3.0f).contains (p)) { g = gg.group; lane = l; return true; }
+        }
+        return false;
+    }
+
     // position d'insertion pendant un glisser (0 .. nombre de blocs) et repère à dessiner ; sous un bloc : split (ou voie de plus)
     int dropAt (Point<float> p) const
     {
@@ -1175,9 +1193,10 @@ private:
             const auto y0 = nodeY (gg);
             for (int l = 0; l < gg.lanes; ++l)
             {
-                const auto pr = S (Rectangle<float> (y0.x + 13.0f, y0.y + kLanePitch * (float) l - 22.0f, 15.0f, 14.0f));
+                const auto pr = S (laneLetterRect (gg, l));
                 const bool live = on && eng.mixValue (gg.group, l, Routing::mixMute) < 0.5;
-                g.setColour ((live ? kAmber : kDim).withAlpha (0.16f));
+                const bool hovL = hoverNodeKey == 1000 + gg.group * 4 + l;
+                g.setColour ((live ? kAmber : kDim).withAlpha (hovL ? 0.34f : 0.16f));
                 g.fillRoundedRectangle (pr, S (3.0f));
                 g.setColour (live ? kAmber : kDim);
                 g.setFont (font (tfBold, 11.0f));
@@ -3590,6 +3609,8 @@ private:
             hla = laneAddAt (p);
             bool m = false; const int ng = nodeAt (p, m);
             hnk = ng >= 0 ? ng * 2 + (m ? 1 : 0) : -1;
+            int lg = -1, ll = -1;
+            if (hnk < 0 && laneLetterAt (p, lg, ll)) hnk = 1000 + lg * 4 + ll;   // survol d'une lettre de voie
         }
         if (hla != hoverLaneAdd || hnk != hoverNodeKey) { hoverLaneAdd = hla; hoverNodeKey = hnk; askRepaint (screenPx()); }
         if (hb != hoverBtn || hs != hoverSlot || hi != hoverItem || hf != hoverFooter || hp != hoverParam)
@@ -3793,6 +3814,13 @@ private:
             if (nodeAt (p, m0) >= 0 && m0) return;              // clic sur M : le mixeur se ferme seulement
         }
         {
+            int lg = -1, ll = -1;                                // lettre d'une voie : comme le footswitch A <-> B
+            if (! e.mods.isPopupMenu() && laneLetterAt (p, lg, ll))
+            {
+                if (eng.soloLane (lg) == ll) eng.nextLane (lg); else eng.selectLane (lg, ll);
+                askRepaint (screenPx());
+                return;
+            }
             bool isM = false;
             const int ng = nodeAt (p, isM);
             if (ng >= 0)
