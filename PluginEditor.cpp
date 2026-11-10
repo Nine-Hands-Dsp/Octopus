@@ -2209,7 +2209,7 @@ private:
             { "small tone",   "Analog chorus in the spirit of the EHX Small Clone: RATE and DIN. / DEPTH, lush watery swirl, tempo sync on the STATUS LED." },
             { "flangerus",    "Chorus and flanger in the spirit of the Ibanez CF7: SPEED, DEPTH, DELAY TIME, REGEN., MODE chorus / flanger and KRAZY Wack'd for vibrato and wild chirps." },
             { "wack",         "Chorus and flanger in the spirit of the Ibanez CF7: SPEED, DEPTH, DELAY TIME, REGEN., MODE chorus / flanger and KRAZY Wack'd for vibrato and wild chirps." },
-            { "phase",        "Phaser inspired by the MXR Phase 90: one SPEED knob, with tempo sync." },
+            { "phase",        "Phaser in the spirit of the MXR Phase 90: one SPEED knob, SCRIPT / BLOCK on the PHASE badge, tempo sync on the SYNC LED." },
             { "ring think",   "Ring modulator in the spirit of the EHX Ring Thing: metallic, bell-like and robotic tones, with pitch shift." },
             { "echoflex",     "Tape echo in the spirit of the Dunlop Echoplex EP103: warm tape repeats, AGE for worn tape, tap tempo and DAW sync." },
             { "eight echo",   "Digital delay in the spirit of the Boss DD-8: 11 modes (analog, tape, shimmer, reverse, glitch...), 40 s looper, tap tempo, DAW sync, 7 memories." },
