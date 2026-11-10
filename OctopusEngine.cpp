@@ -628,6 +628,20 @@ void OctopusEngine::nextLane (int g)
     refreshNow();
 }
 
+void OctopusEngine::selectLane (int g, int lane)
+{
+    if (! ready || ! juce::isPositiveAndBelow (g, (int) grp.size())) return;
+    const auto G = grp[(size_t) g];
+    if (! juce::isPositiveAndBelow (lane, (int) G.lanes.size()) || G.lanes[(size_t) lane].isEmpty()) return;
+    for (int l = 0; l < (int) G.lanes.size(); ++l)
+        host.setParam (G.merge, Routing::laneParam (l, Routing::mixMute), l == lane ? 0.0 : 1.0);
+    if (! G.on) host.setParam (G.merge, Routing::pGroupOn, 1.0);
+    ++gen;
+    say ("Path " + juce::String::charToString ((juce::juce_wchar) ('A' + lane)) + " : "
+         + FxCat::shortName (fx.getReference (G.lanes[(size_t) lane][0]).name));
+    refreshNow();
+}
+
 bool OctopusEngine::isFolded (int g) const { return juce::isPositiveAndBelow (g, (int) grp.size()) && folded.contains (grp[(size_t) g].guid); }
 
 void OctopusEngine::toggleFold (int g)
