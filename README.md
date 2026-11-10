@@ -167,3 +167,4 @@ v1.18.11 : voies parallèles : un clic sur la petite lettre A / B / C d'une voie
 v1.18.12 : Textural v2.0.0 (pédale refaite NINE HANDS | DSP, potards animés, barre de presets, réglage Glow) ; bulle de description mise à jour (modes Delay, Auto Freeze, Layers, REVERSE, PITCH).
 v1.18.13 : Wack'd v2.0.0 (pédale refaite NINE HANDS | DSP, potards animés, menus Octopus, réglage Glow) ; bulle de description mise à jour (MODE, KRAZY Wack'd).
 v1.18.14 : Phase 90 v2.0.0 (pédale refaite NINE HANDS | DSP, potard animé, LED SYNC, réglage Glow) ; bulle de description mise à jour (SCRIPT / BLOCK, synchro tempo sur la LED SYNC).
+v1.18.15 : Freeze Shimmer v1.4.0 (pédale refaite NINE HANDS | DSP, givre réaliste, potards animés sur deux pages, menus Octopus, réglage Glow) ; bulle de description mise à jour (freeze au footswitch, shimmer, scènes, page B).
