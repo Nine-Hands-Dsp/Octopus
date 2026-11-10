@@ -160,3 +160,4 @@ v1.18.4 : mixeur d'un groupe : double clic sur le rond du niveau = 0 dB (gain un
 v1.18.5 : grille STOMP en cases carrées ; menu d'un bloc : Focus plug-in window (fenêtre du VST au premier plan), Bypass mode sous Bypass, séparateurs revus.
 v1.18.6 : Echoflex v2.0.0 reconnu sous son nom actuel « Echoflex » (chaîne de démonstration, tests) ; bulle de description mise à jour (AGE, tap tempo, synchro DAW).
 v1.18.7 : Ngate v2.0.0 reconnu sous son nom actuel « Ngate » (chaîne de démonstration, tests) ; bulle de description mise à jour (LEARN, SOFT / HARD, BASS).
+v1.18.8 : Holyverb v1.6.0 (nouvelle pédale graphite à la cathédrale dorée) ; bulle de description mise à jour (8 modes, PRE DELAY, TAILS, pédale d'expression).
