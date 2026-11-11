@@ -152,6 +152,7 @@ v1.14.0 : fenêtre d'ajout : tri A-Z ou par type (titres colorés), nombre de pl
 v1.15.0 : fenêtre d'ajout : nombres des filtres sans pastille ; en A-Z la liste défile vers le bas ligne à ligne (molette, MORE) comme en TYPE ; descriptions au survol pour Ampire, Anode, Darkbass, Impulse et Screamer.
 v1.16.0 : fenêtre d'ajout redessinée : emplacement cliquable à côté du titre (au début, avant un bloc, à la fin), tri A-Z / TYPE en interrupteur, « N selected ✕ » pour vider la sélection, ADD plein, rescan en icône, recherche pleine largeur avec loupe, filtres en onglets soulignés ; cases de même hauteur et même écart.
 v1.17.0 : menus clic droit redessinés (fond sombre arrondi, icônes, en-tête à pastille sur tous les menus) ; STOMP d'un footswitch en grille de blocs qui reste ouverte (plusieurs blocs cochés d'affilée, groupe en une tuile A <-> B, « N selected » + CLEAR) ; bandeau 5 plus bas, textes recentrés, BANK et flèches à la taille des autres, PRESET bleu / STOMP orange sans soulignement, badge plus petit ; REC seul en rouge sous IN (fixe quand la piste est armée, clignote pendant l'enregistrement) ; écran noir uni.
+v1.18.43 : Small Tone v2.0.1 (chorus plus présent) pris en compte.
 v1.18.42 : Darkbass v1.1.5 (footswitch BYPASS lu dans le bon sens : la tuile suit la pédale).
 v1.18.41 : ARC v3.1.1.
 v1.18.40 : FM-9 v1.3.3 (potards sans point indicateur) pris en compte.
