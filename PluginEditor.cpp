@@ -2203,7 +2203,7 @@ private:
             { "peachy",       "Preamp and fuzz in the spirit of the KoRn Indigo Ranch pedal: two sounds in one double pedal." },
             { "strong pickle","Fuzz in the spirit of the Way Huge Swollen Pickle: huge, thick and sustaining fuzz." },
             { "wharry",       "Pitch shifter in the spirit of the DigiTech Whammy 5: octaves, harmonies and dives with the pedal." },
-            { "fog z",        "Polyphonic octave generator in the spirit of the EHX POG2: sub and upper octaves mixed with your guitar." },
+            { "fog z",        "Polyphonic octave generator in the spirit of the EHX POG2: -2/-1/+1/+2 octaves on every string, Attack swell, resonant LP filter, Detune, 8 presets on the knob." },
             { "semitones",    "Transposition in the spirit of the Solar CHUG Capo: play in another key without retuning." },
             { "pipeline",     "Pitch vibrato in the spirit of the EarthQuaker Aqueduct, with several modulation shapes." },
             { "small tone",   "Analog chorus in the spirit of the EHX Small Clone: RATE and DIN. / DEPTH, lush watery swirl, tempo sync on the STATUS LED." },
