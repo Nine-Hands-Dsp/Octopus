@@ -169,6 +169,7 @@ v1.18.13 : Wack'd v2.0.0 (pédale refaite NINE HANDS | DSP, potards animés, men
 v1.18.14 : Phase 90 v2.0.0 (pédale refaite NINE HANDS | DSP, potard animé, LED SYNC, réglage Glow) ; bulle de description mise à jour (SCRIPT / BLOCK, synchro tempo sur la LED SYNC).
 v1.18.15 : Freeze Shimmer v1.4.0 (pédale refaite NINE HANDS | DSP, givre réaliste, potards animés sur deux pages, menus Octopus, réglage Glow) ; bulle de description mise à jour (freeze au footswitch, shimmer, scènes, page B).
 v1.18.16 : Freeze Shimmer v1.4.1 (LED centrale = effet actif / bypass, halo du footswitch = freeze).
+v1.18.21 : Ring Think v3.0.2 (nouveaux footswitchs).
 v1.18.20 : Ring Think v3.0.1 (visuel haute définition, net jusqu'à la taille maximale).
 v1.18.19 : Ring Think v3.0.0 (pédale refaite NINE HANDS | DSP au format double 2350 x 1800, potards animés, LED et réglage Glow, pastille presets / ligne d'état, menus Octopus) ; bulle de description mise à jour.
 v1.18.18 : Fantomine v2.0.0 (pédale refaite NINE HANDS | DSP au format double haute résolution, néon, potards animés, barre de presets, menus Octopus, réglage Glow) ; bulle de description mise à jour.
