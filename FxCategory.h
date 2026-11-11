@@ -97,7 +97,7 @@ namespace FxCat
                   "bias fx", "amplitube", "mesa", "marshall", "fortin", "nameless", "helix", "anode" })
             || word ({ "amp", "nam", "head", "stack" }))                                                     return amp;
         if (has ({ "ring think", "textur", "freeze", "ebow", "fantomine", "theremin", "granular", "synth",
-                  "sitar", "jawari", "freakout", "freqout", "feedback", "infinite" }) || word ({ "arc", "ring" })) return special;
+                  "sitar", "jawari", "freakout", "freqout", "feedback", "infinite", "fm-9" }) || word ({ "arc", "ring" })) return special;
         if (has ({ "whammy", "wharry", "octav", "pitch", "semitone", "harmoni", "capo", "transpos", "fog z", "pog" })
             || word ({ "fog" }))                                                                              return pitch;
         if (has ({ "crycat", "wah", "envelope", "filter", "autowah", "talk" }) || word ({ "cry" }))         return filter;
