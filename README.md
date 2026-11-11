@@ -170,6 +170,7 @@ v1.18.14 : Phase 90 v2.0.0 (pédale refaite NINE HANDS | DSP, potard animé, LED
 v1.18.15 : Freeze Shimmer v1.4.0 (pédale refaite NINE HANDS | DSP, givre réaliste, potards animés sur deux pages, menus Octopus, réglage Glow) ; bulle de description mise à jour (freeze au footswitch, shimmer, scènes, page B).
 v1.18.16 : Freeze Shimmer v1.4.1 (LED centrale = effet actif / bypass, halo du footswitch = freeze).
 v1.18.24 : ARC v3.0.0 (pédale entièrement refaite, format double) : bulle de description mise à jour.
+v1.18.25 : Crycat v2.0.0 (nouvelle façade NINE HANDS | DSP) : bulle de description mise à jour.
 v1.18.23 : Wharry v2.0.0 (nouvelle façade NINE HANDS | DSP) : bulle de description mise à jour.
 v1.18.22 : Ring Think v3.0.3 (image 2350 x 1800).
 v1.18.21 : Ring Think v3.0.2 (nouveaux footswitchs).

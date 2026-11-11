@@ -2198,7 +2198,7 @@ private:
             { "octopus",      "FX chain controller for REAPER: the track's effects on a floor-modeler screen, 96 presets, 6 footswitches and MIDI." },
             { "chroma",       "Tuner for guitar and bass: MONO, POLY (all strings at once) and STROBE modes, down to very low tunings." },
             { "ngate",        "Noise gate for guitar and bass: cuts hum and hiss between notes, keeps the attack; LEARN sets the threshold, SOFT / HARD and BASS modes." },
-            { "crycat",       "Wah in the spirit of the Dunlop Cry Baby, played with an expression pedal, the mouse or MIDI." },
+            { "crycat",       "Wah in the spirit of the Dunlop Cry Baby GCB95: 6 sweep ranges, Q, PURR (inductor grit), BOOST, MAN / AUTO auto-engage, expression pedal that tilts on screen." },
             { "doorn",        "Distortion in the spirit of the Lichtlaerm Thorn: from crunch to thick, saturated high gain." },
             { "peachy",       "Preamp and fuzz in the spirit of the KoRn Indigo Ranch pedal: two sounds in one double pedal." },
             { "strong pickle","Fuzz in the spirit of the Way Huge Swollen Pickle: huge, thick and sustaining fuzz." },
