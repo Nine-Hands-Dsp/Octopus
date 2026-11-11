@@ -291,7 +291,7 @@ public:
                          "VST3: Doorn (NINE HANDS | DSP)", "VST3: Peachy (NINE HANDS | DSP)", "VST3: Wharry (NINE HANDS | DSP)",
                          "VST3: Fog Z (NINE HANDS | DSP)", "VST3: Ring Think (NINE HANDS | DSP)", "VST3: Textural (NINE HANDS | DSP)",
                          "VST3: Pipeline (NINE HANDS | DSP)", "VST3: Small Tone (NINE HANDS | DSP)", "VST3: CHROMA (NINE HANDS | DSP)",
-                         "VST3: Crycat (NINE HANDS | DSP)", "VST3: Ngate (NINE HANDS | DSP)", "VST3: Fantomine (NINE HANDS | DSP)", "VST3: Anode (NINE HANDS | DSP)",
+                         "VST3: Crycat (NINE HANDS | DSP)", "VST3: Ngate (NINE HANDS | DSP)", "VST3: Fantomine (NINE HANDS | DSP)", "VST3: Synthetika (NINE HANDS | DSP)", "VST3: Anode (NINE HANDS | DSP)",
                          "VST3: Ampire (NINE HANDS | DSP)", "VST3: Impulse (NINE HANDS | DSP)", "VST3: ReaEQ (Cockos)", "VST3: ReaComp (Cockos)",
                          "VST3: ReaDelay (Cockos)", "VST3: ReaVerbate (Cockos)", "VST3: ReaGate (Cockos)",
                          "VST: ReaPitch (Cockos)", "JS: 3-Band EQ", "JS: Chorus", "JS: Volume Adjustment",
