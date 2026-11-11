@@ -2202,7 +2202,7 @@ private:
             { "doorn",        "Distortion in the spirit of the Lichtlaerm Thorn: from crunch to thick, saturated high gain." },
             { "peachy",       "Preamp and fuzz in the spirit of the KoRn Indigo Ranch pedal: two sounds in one double pedal." },
             { "strong pickle","Fuzz in the spirit of the Way Huge Swollen Pickle: huge, thick and sustaining fuzz." },
-            { "wharry",       "Pitch shifter in the spirit of the DigiTech Whammy 5: octaves, harmonies and dives with the pedal." },
+            { "wharry",       "Pitch shifter in the spirit of the DigiTech Whammy 5: 21 programs (Whammy, Detune, Harmony), CLASSIC / CHORDS, expression pedal that tilts on screen, GLIDE, TONE, MIX." },
             { "fog z",        "Polyphonic octave generator in the spirit of the EHX POG2: -2/-1/+1/+2 octaves on every string, Attack swell, resonant LP filter, Detune, 8 presets on the knob." },
             { "semitones",    "Transposition in the spirit of the Solar CHUG Capo: play in another key without retuning." },
             { "pipeline",     "Pitch vibrato in the spirit of the EarthQuaker Aqueduct, with several modulation shapes." },
