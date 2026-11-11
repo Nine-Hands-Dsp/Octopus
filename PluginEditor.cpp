@@ -2218,7 +2218,7 @@ private:
             { "textural",     "Granular engine in the spirit of the MXR Textures: Delay, Auto Freeze and Layers modes, REVERSE, grain PITCH, 9 presets." },
             { "arc",          "EBow simulation: endless sustain and violin-like swells on every note." },
             { "freakout",     "Controlled feedback in the spirit of the DigiTech FreqOut: natural guitar feedback at any volume." },
-            { "fantomine",    "Theremin voice played from your guitar: gliding, ghostly melodies." },
+            { "fantomine",    "Theremin voice played from your guitar: gliding ghost voice, pitch pedal, octave whammy, HOLD on the footswitch." },
             { "jawari",       "Sitar sound for guitar: the buzzing, resonant voice of the Indian sitar." },
             { "ampire",       "Neural Amp Modeler loader for guitar and bass: plays NAM captures of real amps and pedals (A1 and A2)." },
             { "anode",        "Tube power amp stage for guitar and bass: 6L6, EL34, EL84 or KT88, single-ended or push-pull." },
