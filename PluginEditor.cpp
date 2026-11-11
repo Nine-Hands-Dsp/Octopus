@@ -2200,7 +2200,7 @@ private:
             { "ngate",        "Noise gate for guitar and bass: cuts hum and hiss between notes, keeps the attack; LEARN sets the threshold, SOFT / HARD and BASS modes." },
             { "crycat",       "Wah in the spirit of the Dunlop Cry Baby GCB95: 6 sweep ranges, Q, PURR (inductor grit), BOOST, MAN / AUTO auto-engage, expression pedal that tilts on screen." },
             { "doorn",        "Distortion in the spirit of the Lichtlaerm Thorn: from crunch to thick, saturated high gain, with a lighting boost knob and three voicings." },
-            { "peachy",       "Preamp and fuzz in the spirit of the KoRn Indigo Ranch pedal: two sounds in one double pedal." },
+            { "peachy",       "Preamp and fuzz in the spirit of the KoRn Indigo Ranch pedal: tube-style preamp, NAM-captured fuzz and Semitones octave doubler in one double pedal." },
             { "strong pickle","Fuzz in the spirit of the Way Huge Swollen Pickle: huge, thick and sustaining fuzz." },
             { "wharry",       "Pitch shifter in the spirit of the DigiTech Whammy 5: 21 programs (Whammy, Detune, Harmony), CLASSIC / CHORDS, expression pedal that tilts on screen, GLIDE, TONE, MIX." },
             { "fog z",        "Polyphonic octave generator in the spirit of the EHX POG2: -2/-1/+1/+2 octaves on every string, Attack swell, resonant LP filter, Detune, 8 presets on the knob." },
