@@ -2218,7 +2218,7 @@ private:
             { "textural",     "Granular engine in the spirit of the MXR Textures: Delay, Auto Freeze and Layers modes, REVERSE, grain PITCH, 9 presets." },
             { "arc",          "EBow simulation: endless sustain and violin-like swells, NORMAL / HARM / HARM+ voices, bow-flow string display, BOW and HOLD footswitches." },
             { "freakout",     "Controlled feedback in the spirit of the DigiTech FreqOut: natural guitar feedback at any volume." },
-            { "synthetika",   "Guitar synth in the spirit of the Audio Hertz Soklo GS-5: 5 engines (Deep, Vintage, Solo, Strings, Harmony) tracking single notes, Distortion, Modulation, Ring Mod, Bitcrush and Gated Reverb in a reorderable chain." },
+            { "synthetika",   "Guitar synth in the spirit of the Audio Hertz Soklo GS-5: 5 engines (Deep, Vintage, Solo, Strings, Harmony) tracking single notes, bends and slides from 28 Hz (bass, 7 and 8 strings), Distortion, Modulation, Ring Mod, Bitcrush and Gated Reverb in a reorderable chain." },
             { "fantomine",    "Theremin voice played from your guitar: gliding ghost voice, pitch pedal, octave whammy, HOLD on the footswitch." },
             { "jawari",       "Sitar sound for guitar: the buzzing, resonant voice of the Indian sitar." },
             { "ampire",       "Neural Amp Modeler loader for guitar and bass: plays NAM captures of real amps and pedals (A1 and A2)." },
