@@ -2216,7 +2216,7 @@ private:
             { "holyverb",     "Reverb in the spirit of the TC Electronic Hall of Fame: 8 modes from room to church, shimmer and spring, PRE DELAY and TAILS switches, expression pedal." },
             { "freeze",       "Freeze and shimmer reverb in the spirit of the EHX Freeze and Pico Shimmer: infinite sustain on the footswitch, shimmer pitch, scenes, two pages of knobs (MODE LED), 11 presets." },
             { "textural",     "Granular engine in the spirit of the MXR Textures: Delay, Auto Freeze and Layers modes, REVERSE, grain PITCH, 9 presets." },
-            { "arc",          "EBow simulation: endless sustain and violin-like swells on every note." },
+            { "arc",          "EBow simulation: endless sustain and violin-like swells, NORMAL / HARM / HARM+ voices, string display, BOW and HOLD footswitches." },
             { "freakout",     "Controlled feedback in the spirit of the DigiTech FreqOut: natural guitar feedback at any volume." },
             { "fantomine",    "Theremin voice played from your guitar: gliding ghost voice, pitch pedal, octave whammy, HOLD on the footswitch." },
             { "jawari",       "Sitar sound for guitar: the buzzing, resonant voice of the Indian sitar." },
