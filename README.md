@@ -152,6 +152,7 @@ v1.14.0 : fenêtre d'ajout : tri A-Z ou par type (titres colorés), nombre de pl
 v1.15.0 : fenêtre d'ajout : nombres des filtres sans pastille ; en A-Z la liste défile vers le bas ligne à ligne (molette, MORE) comme en TYPE ; descriptions au survol pour Ampire, Anode, Darkbass, Impulse et Screamer.
 v1.16.0 : fenêtre d'ajout redessinée : emplacement cliquable à côté du titre (au début, avant un bloc, à la fin), tri A-Z / TYPE en interrupteur, « N selected ✕ » pour vider la sélection, ADD plein, rescan en icône, recherche pleine largeur avec loupe, filtres en onglets soulignés ; cases de même hauteur et même écart.
 v1.17.0 : menus clic droit redessinés (fond sombre arrondi, icônes, en-tête à pastille sur tous les menus) ; STOMP d'un footswitch en grille de blocs qui reste ouverte (plusieurs blocs cochés d'affilée, groupe en une tuile A <-> B, « N selected » + CLEAR) ; bandeau 5 plus bas, textes recentrés, BANK et flèches à la taille des autres, PRESET bleu / STOMP orange sans soulignement, badge plus petit ; REC seul en rouge sous IN (fixe quand la piste est armée, clignote pendant l'enregistrement) ; écran noir uni.
+v1.18.52 : FM-9 v1.3.8 pris en compte.
 v1.18.51 : recherche de la fenêtre d'ajout : revenir dans le champ ne sélectionne plus tout le texte (la touche suivante l'effaçait), écran redessiné quand la recherche prend ou perd le clavier.
 v1.18.50 : FM-9 v1.3.7 pris en compte.
 v1.18.49 : Peachy v2.0.1 (halo des LED corrigé) pris en compte.
