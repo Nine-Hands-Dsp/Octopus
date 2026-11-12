@@ -27,11 +27,12 @@ namespace
     constexpr float kHdrY = (kHeaderH - 36.0f) * 0.5f;     // éléments de l'en-tête (36 de haut) centrés
     // 3 rangées visibles ; même espace entre les carrés horizontalement et verticalement (pas de 140 = carré 70 + 70)
     constexpr int kRows = 3, kCols = 7;
-    constexpr float kGridTop = 89.0f, kRowPitch = 140.0f, kColPitch = 140.0f, kColX0 = (kSW - kColPitch * (float) (kCols - 1)) * 0.5f;   // grille centrée
+    constexpr float kGridTop = 121.55f,   /* v1.18.71 : maquette, 1re rangée centrée à 161.55 */ kRowPitch = 140.0f, kColPitch = 140.0f, kColX0 = (kSW - kColPitch * (float) (kCols - 1)) * 0.5f;   // grille centrée
     constexpr float kTile = 70.0f, kTileDy = 40.0f;              // carré du bloc, centre à rowTop + kTileDy
     // cases des footswitchs : même écart entre elles et avec les bords de l'écran, décollées du bas
     constexpr float kFooterGap = 14.0f, kFooterH = 58.0f, kFooterY = kSH - kFooterH - kFooterGap, kFooterSplit = 0.0f, kFooterW = (kSW - 7.0f * kFooterGap - kFooterSplit) / 6.0f;   // A-F : même écart entre les cases et avec les bords de l'écran (côtés et bas)
-    constexpr float kFooterLine = kFooterY - 19.0f;                                       // trait au-dessus des cases
+    constexpr float kFooterLine = kFooterY - kFooterGap - 0.5f;                          // trait au-dessus des cases (même écart que sous les cases, maquette)
+    constexpr float kMoreArrowY = 548.0f;                                                  // flèche bleue « encore des rangées » (maquette)
     const Rectangle<float> kOverlay (0.0f, kHeaderH, kSW, kSH - kHeaderH);
 
     Image loadPng (const void* d, int n) { return ImageFileFormat::loadFrom (d, (size_t) n).convertedToFormat (Image::ARGB); }
@@ -711,7 +712,7 @@ private:
     // ------------------------------------------------------------ grille de blocs
     // 7 colonnes ; un groupe de voies parallèles (Routing.h) occupe autant de colonnes que sa voie la plus longue,
     // ne se coupe jamais entre deux rangées, et sa rangée grandit d'un écart de voie par voie en plus (blocs de même taille).
-    static constexpr float kLanePitch = 124.0f;
+    static constexpr float kLanePitch = 140.0f;   // voie B : un pas de rangée sous la voie A (maquette v1.18.71)
     enum CellKind { cBlock = 0, cAdd, cLaneAdd, cFolded };
     struct GCell { int slot = -1, kind = cBlock, group = -1, lane = 0, col = 0, row = 0; };
     struct GGroup { int group = -1, row = 0, col0 = 0, width = 1, lanes = 2; bool folded = false; };
@@ -785,6 +786,24 @@ private:
     int rowLanes (int row) const { buildGrid(); return isPositiveAndBelow (row, (int) gRows.size()) ? gRows[(size_t) row].lanes : 1; }
     float rowCy (int row) const { return rowTop (row) + kTileDy; }
     bool rowFits (int row) const { return rowCy (row) + kLanePitch * (float) (rowLanes (row) - 1) + kTile * 0.5f + 26.0f <= kFooterLine + 4.0f; }
+    void drawMoreArrows (Graphics& g)
+    {
+        if (overlay == Overlay::none && maxFirstRow() > 0)                                   // flèches bleues seules, sous / au-dessus du point OUT (maquette)
+        {
+            auto tri = [&] (Point<float> c, bool down)
+            {
+                Path t;
+                const float hw = 5.37f, hh = 3.66f, d = down ? 1.0f : -1.0f;
+                t.addTriangle (S (Point<float> (c.x - hw, c.y - hh * d)), S (Point<float> (c.x + hw, c.y - hh * d)), S (Point<float> (c.x, c.y + hh * d)));
+                g.setColour (kPresetLed);
+                g.fillPath (t);
+            };
+            if (firstRow > 0) tri (moreUpArrow().getCentre(), false);
+            if (firstRow < maxFirstRow()) tri (moreDownArrow().getCentre(), true);
+        }
+    }
+    Rectangle<float> moreDownArrow() const { return Rectangle<float> (24.0f, 18.0f).withCentre ({ connXR(), kMoreArrowY }); }
+    Rectangle<float> moreUpArrow() const   { return Rectangle<float> (24.0f, 18.0f).withCentre ({ connXR(), kGridTop - 14.0f }); }
     bool rowVisible (int row) const { return row >= firstRow && row < totalRows() && rowFits (row); }
     int visibleRows() const { int n = 0; for (int r = firstRow; r < totalRows() && rowVisible (r); ++r) ++n; return jmax (1, n); }
     int maxFirstRow() const
@@ -964,21 +983,24 @@ private:
     {
         buildGrid();
         Path path;
-        // lignes de retour : même débord à gauche et à droite des carrés (un demi-écart)
-        const float xL = kColX0 - kColPitch * 0.5f;
-        const float xR = kColX0 + kColPitch * ((float) kCols - 0.5f);
+        // lignes de retour sur la verticale des points IN / OUT (maquette v1.18.71), retour 70 sous la rangée (sous sa dernière voie)
+        const float xL = connXL(), xR = connXR();
         auto P = [this] (float x, float y) { return S (Point<float> (x, y)); };
         const int rows = totalRows();
         for (int r = 0; r < rows; ++r)
         {
             const float cy = rowCy (r);
             const bool lastRow = r == rows - 1;
-            path.startNewSubPath (P (r == 0 ? xL - 6.0f : xL, cy));
-            path.lineTo (P (lastRow ? xR + 6.0f : xR, cy));
+            path.startNewSubPath (P (xL, cy));
+            path.lineTo (P (xR, cy));
             if (! lastRow)
             {
-                // retour sous la rangée (sous sa dernière voie), puis descente vers la rangée suivante
-                const float ry = cy + kLanePitch * (float) (rowLanes (r) - 1) + 75.0f;
+                if (rowVisible (r) && ! rowVisible (r + 1) && r + 1 > firstRow)
+                {
+                    path.lineTo (P (xR, kMoreArrowY - 14.0f));      // rangée suivante cachée : la ligne descend jusqu'à la flèche bleue
+                    continue;
+                }
+                const float ry = cy + kLanePitch * (float) (rowLanes (r) - 1) + kTile;
                 path.lineTo (P (xR, ry)); path.lineTo (P (xL, ry)); path.lineTo (P (xL, rowCy (r + 1)));
             }
         }
@@ -1136,7 +1158,9 @@ private:
         const auto& blocks = eng.blocks();
         const auto& fx = eng.chain();
         Graphics::ScopedSaveState ss (g);
-        g.reduceClipRegion (S (Rectangle<float> (0.0f, kGridTop - 8.0f, kSW, kFooterLine - kGridTop + 6.0f)).toNearestInt());
+        // quand il reste des rangées plus bas, la ligne de chaîne s'arrête au-dessus de la flèche bleue
+        const float clipBottom = firstRow < maxFirstRow() ? kMoreArrowY - 14.0f : kFooterLine - 2.0f;
+        g.reduceClipRegion (S (Rectangle<float> (0.0f, kGridTop - 8.0f, kSW, clipBottom - (kGridTop - 8.0f))).toNearestInt());
 
         drawConnections (g);
 
@@ -1237,15 +1261,6 @@ private:
         }
 
         // défilement
-        if (maxFirstRow() > 0)
-        {
-            g.setFont (font (tfBold, 14.0f));
-            g.setColour (kDim);
-            const String t = String (firstRow + 1) + "-" + String (jmin (totalRows(), firstRow + visibleRows())) + " / " + String (totalRows());
-            g.drawText (t, S (Rectangle<float> (kSW - 120.0f, kFooterLine - 20.0f, 112.0f, 18.0f)), Justification::centredRight);
-            if (firstRow > 0) g.drawText (CharPointer_UTF8 ("\xe2\x96\xb2"), S (Rectangle<float> (kSW - 30.0f, kGridTop - 6.0f, 24.0f, 18.0f)), Justification::centred);
-            if (firstRow < maxFirstRow()) g.drawText (CharPointer_UTF8 ("\xe2\x96\xbc"), S (Rectangle<float> (kSW - 30.0f, kFooterLine - 38.0f, 24.0f, 18.0f)), Justification::centred);
-        }
 
         if (mixGroup >= 0) drawMixer (g);
     }
@@ -1786,6 +1801,7 @@ private:
             else
             {
                 drawGrid (g);
+                drawMoreArrows (g);                           // hors du découpage de la grille
                 drawFooter (g);
             }
             if (overlay != Overlay::none) drawOverlay (g);
@@ -3804,6 +3820,11 @@ private:
         }
         if (headerNameRect().contains (p) && ! e.mods.isPopupMenu() && eng.isReady()) { startHeaderRename(); return; }
         if (badgeRect().contains (p) && eng.current() >= 0) { presetColourMenu (eng.current()); return; }
+        if (overlay == Overlay::none && ! e.mods.isPopupMenu() && maxFirstRow() > 0)          // flèches bleues : une rangée plus bas / plus haut
+        {
+            if (firstRow < maxFirstRow() && moreDownArrow().expanded (6.0f).contains (p)) { ++firstRow; askRepaint (screenPx()); return; }
+            if (firstRow > 0 && moreUpArrow().expanded (6.0f).contains (p)) { --firstRow; askRepaint (screenPx()); return; }
+        }
         if (overlay == Overlay::none && e.mods.isPopupMenu() && eng.isReady() && recMarkAt (p)) { recColourMenu(); return; }   // effet record : couleur & glow
 
         if (overlay == Overlay::browser)

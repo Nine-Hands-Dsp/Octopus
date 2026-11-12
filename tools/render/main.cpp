@@ -650,7 +650,7 @@ int main (int argc, char** argv)
     }
 
     ed->setScaleIndex (0);
-    check (ed->getWidth() == 828 && ed->getHeight() == 619, "taille 50 % : " + String (ed->getWidth()) + " x " + String (ed->getHeight()));
+    check (ed->getWidth() == 993 && ed->getHeight() == 743, "taille 50 % ramenée au minimum 60 % (v1.18.67) : " + String (ed->getWidth()) + " x " + String (ed->getHeight()));
     shot ("octopus_50pc");
     ed->setScaleIndex (-1);
     check (ed->getWidth() == 993, "taille par défaut (60 % sans réglage) : " + String (ed->getWidth()));
