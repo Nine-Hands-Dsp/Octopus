@@ -2502,6 +2502,47 @@ private:
         return tw + (cnt > 0 ? 6.0f + unitsOf (font (tfMedium, 12.0f), String (cnt)) : 0.0f);   // onglet : texte + nombre
     }
 
+    // barre de défilement des listes (plug-ins, presets) : on peut l'attraper et la faire glisser à la souris
+    int sbUnits = 0, sbVisible = 0; bool sbDragging = false, sbHover = false; float sbGrab = 0.0f;
+    float sbTop() const    { return itemRect (0).getY(); }
+    float sbHeight() const { return itemRect (kListRows - 1).getBottom() - sbTop(); }
+    Rectangle<float> sbTrackHit() const { return { kSW - 18.0f, sbTop() - 4.0f, 18.0f, sbHeight() + 8.0f }; }
+    Rectangle<float> sbThumb (float scroll) const
+    {
+        const float th = sbHeight();
+        const float thumb = jmax (24.0f, th * (float) sbVisible / (float) jmax (1, sbUnits));
+        const float y = sbTop() + (th - thumb) * jlimit (0.0f, 1.0f, scroll / (float) jmax (1, sbUnits - sbVisible));
+        return { kSW - 9.0f, y, 4.0f, thumb };
+    }
+    bool sbActive() const { return (overlay == Overlay::browser && ! insertOpen) || (overlay == Overlay::params && presetMode); }
+    float sbScrollNow() const { return overlay == Overlay::browser ? listPos : (float) presetScroll; }
+    // position de la souris -> première ligne visible (en gardant l'endroit où le pouce a été attrapé)
+    void sbDragTo (float y)
+    {
+        const float th = sbHeight(), thumb = sbThumb (0.0f).getHeight();
+        const float frac = jlimit (0.0f, 1.0f, (y - sbGrab - sbTop()) / jmax (1.0f, th - thumb));
+        const float target = frac * (float) jmax (0, sbUnits - sbVisible);
+        if (overlay == Overlay::browser)
+        {
+            listScroll = jlimit (0, browserMaxScroll(), roundToInt (target));
+            listPos = jlimit (0.0f, (float) browserMaxScroll(), target);         // la liste suit la souris sans à-coups
+        }
+        else presetScroll = jlimit (0, jmax (0, sbUnits - sbVisible), roundToInt (target));
+        askRepaint (screenPx());
+    }
+    bool sbMouseDown (Point<float> p)
+    {
+        if (! sbActive() || ! sbTrackHit().contains (p)) return false;
+        if (overlay == Overlay::browser) { sbUnits = (int) browserLines (filtered()).size(); sbVisible = kListRows; }   // à jour même sans dessin
+        else { sbUnits = (presetTotal() + kListRows - 1) / kListRows; sbVisible = 2; }
+        if (sbUnits <= sbVisible) return false;
+        const auto th = sbThumb (sbScrollNow());
+        sbGrab = (p.y >= th.getY() - 4.0f && p.y <= th.getBottom() + 4.0f) ? p.y - th.getY() : th.getHeight() * 0.5f;   // hors du pouce : il saute sous la souris
+        sbDragging = true;
+        sbDragTo (p.y);
+        return true;
+    }
+
     // indices de défilement d'une liste à 2 colonnes : fondu, pastille « ▼ MORE », barre à droite, « 1 - 24 of 27 »
     Rectangle<float> morePill;
     // units : colonnes (ou lignes) en tout, visible : combien on en voit, scroll : la première visible
@@ -2509,14 +2550,16 @@ private:
     {
         morePill = {};
         const float top = itemRect (0).getY(), bottom = itemRect (kListRows - 1).getBottom();
+        sbUnits = units; sbVisible = visible;                              // pour attraper la barre à la souris
         if (units > visible)
         {
             const float tx = kSW - 9.0f, th = bottom - top;
+            const bool act = sbDragging || sbHover;
             g.setColour (Colour (0xff161a21));
-            g.fillRoundedRectangle (S (Rectangle<float> (tx, top, 4.0f, th)), S (2.0f));
-            const float thumb = jmax (24.0f, th * (float) visible / (float) units), y = top + (th - thumb) * jlimit (0.0f, 1.0f, scroll / (float) jmax (1, units - visible));
-            g.setColour (Colour (0xff4a5363));
-            g.fillRoundedRectangle (S (Rectangle<float> (tx, y, 4.0f, thumb)), S (2.0f));
+            g.fillRoundedRectangle (S (Rectangle<float> (tx - (act ? 1.0f : 0.0f), top, act ? 6.0f : 4.0f, th)), S (3.0f));
+            const auto tr = sbThumb (scroll);
+            g.setColour (sbDragging ? kAccent : sbHover ? Colour (0xff6b7586) : Colour (0xff4a5363));
+            g.fillRoundedRectangle (S (tr.withX (tx - (act ? 1.0f : 0.0f)).withWidth (act ? 6.0f : 4.0f)), S (3.0f));
         }
         const float cueY = jmax (598.0f, bottom + 6.0f);
         if ((float) units > scroll + (float) visible + 0.01f)          // encore des lignes plus bas : flèche bleue seule (cliquable)
@@ -3649,6 +3692,8 @@ private:
         {
             const bool hm2 = overlay == Overlay::browser && morePill.contains (toLocal (e.position));
             if (hm2 != hoverMore) { hoverMore = hm2; askRepaint (screenPx()); }
+            const bool hsb = sbActive() && sbUnits > sbVisible && sbTrackHit().contains (toLocal (e.position));   // survol de la barre de défilement
+            if (hsb != sbHover) { sbHover = hsb; askRepaint (screenPx()); }
         }
         if (insertOpen)
         {
@@ -3765,6 +3810,7 @@ private:
         {
             // clic : choisir / retirer (numérotés dans l'ordre) ; double-clic : ajouter tout de suite ; clic droit : rien
             if (e.mods.isPopupMenu()) return;
+            if (sbMouseDown (p)) return;
             if (morePill.contains (p)) { listScroll = jlimit (0, browserMaxScroll(), listScroll + kListRows - 2); askRepaint (screenPx()); return; }
             for (int v = 0; v < kListRows * 2; ++v)
                 if (itemRect (v).contains (p))
@@ -3782,6 +3828,7 @@ private:
         }
         if (overlay == Overlay::params && presetMode)
         {
+            if (! e.mods.isPopupMenu() && sbMouseDown (p)) return;
             if (morePill.contains (p)) { presetScroll = jlimit (0, jmax (0, (presetTotal() + kListRows - 1) / kListRows - 2), presetScroll + 2); askRepaint (screenPx()); return; }
             for (int v = 0; v < kListRows * 2; ++v)
                 if (itemRect (v).contains (p))
@@ -3932,6 +3979,7 @@ private:
     void mouseDrag (const MouseEvent& e) override
     {
         const auto p = toLocal (e.position);
+        if (sbDragging) { if (sbActive()) sbDragTo (p.y); return; }
         if (overlay == Overlay::params && paramDrag >= 0) { setParamFromX (paramDrag, p.x); return; }
         if (mixGroup >= 0 && mixDragLane >= 0) { mixerDrag (p); return; }
         if (downSlot < 0) return;
@@ -3949,6 +3997,7 @@ private:
 
     void mouseUp (const MouseEvent&) override
     {
+        if (sbDragging) { sbDragging = false; askRepaint (screenPx()); }
         if (pressedFs >= 0)
         {
             const int f = pressedFs;
@@ -4979,6 +5028,14 @@ bool OctopusEditor::testBlockClicks (int slot, const Array<double>& downUp, doub
     return view->doubleClicks != before;               // double-clic reconnu (il ouvre la fenetre du plugin)
 }
 void OctopusEditor::screenHover (Point<float> unitPos) { view->simulateHover (unitPos); }
+int OctopusEditor::screenScrollbarDrag (float fromY, float toY, bool release)
+{
+    auto& v = *view;
+    if (! v.sbMouseDown ({ kSW - 9.0f, fromY })) return -1;
+    v.sbDragTo (toY);
+    if (release) v.sbDragging = false;
+    return v.overlay == PedalView::Overlay::browser ? v.listScroll : v.presetScroll;
+}
 
 int OctopusEditor::screenUserPreset (int op, const String& arg)
 {
