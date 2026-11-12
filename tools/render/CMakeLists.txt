@@ -8,7 +8,7 @@ juce_add_binary_data(OctopusAssets SOURCES
   ${W}/background.png ${W}/fs_off.png ${W}/fs_on.png ${W}/design/logo_octopus_blanc.png
   ${W}/fonts/Poppins-Regular.ttf ${W}/fonts/Poppins-Medium.ttf ${W}/fonts/Poppins-Bold.ttf ${W}/fonts/IBMPlexMono-SemiBold.ttf)
 juce_add_console_app(OctopusRender PRODUCT_NAME "OctopusRender")
-target_sources(OctopusRender PRIVATE main.cpp ${W}/PluginProcessor.cpp ${W}/PluginEditor.cpp ${W}/OctopusEngine.cpp)
+target_sources(OctopusRender PRIVATE main.cpp ${W}/PluginProcessor.cpp ${W}/PluginEditor.cpp ${W}/OctopusEngine.cpp ${W}/WindowMinSize.cpp)
 target_include_directories(OctopusRender PRIVATE ${W})
 target_compile_definitions(OctopusRender PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_ALSA=0 JUCE_JACK=0
   JUCE_USE_XRANDR=0 JUCE_USE_XINERAMA=0 JUCE_USE_XCURSOR=0 JucePlugin_Name="Octopus" JucePlugin_Build_VST3=0
