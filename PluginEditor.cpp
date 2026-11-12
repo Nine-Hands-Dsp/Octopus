@@ -2231,7 +2231,7 @@ private:
             { "ampire",       "Neural Amp Modeler loader for guitar and bass: plays NAM captures of real amps and pedals (A1 and A2)." },
             { "anode",        "Tube power amp stage for guitar and bass: 6L6, EL34, EL84 or KT88, single-ended or push-pull." },
             { "darkbass",     "Bass preamp and overdrive in the spirit of the Darkglass Microtubes B7K Ultra: grit, blend and EQ." },
-            { "impulse",      "Dual cabinet IR loader for guitar and bass: two impulse responses A and B with a MIX knob." },
+            { "impulse",      "Dual cabinet IR loader for guitar and bass: two impulse responses A and B with a MIX knob, and an IR library with TONE3000 sync." },
             { "screamer",     "Overdrive in the spirit of the Ibanez TS9 Tube Screamer: smooth mid-hump drive and boost." },
             { "stereo width", "Stereo width: from mono to wide stereo." } };
         const auto n = shortName.toLowerCase();
