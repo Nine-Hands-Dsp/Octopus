@@ -129,6 +129,7 @@ public:
         search.setColour (TextEditor::outlineColourId, Colours::transparentBlack);
         search.setColour (TextEditor::focusedOutlineColourId, Colours::transparentBlack);
         search.onFocusLost = [this] { askRepaint (screenPx()); };
+        search.setSelectAllWhenFocused (false);   // revenir dans la recherche ne sélectionne plus tout le texte (la touche suivante l'effaçait)
         search.onTextChange = [this] { listScroll = 0; listPos = 0.0f; askRepaint (screenPx()); };
         search.onEscapeKey = [this] { closeOverlay(); };
         search.onReturnKey = [this]
@@ -404,7 +405,8 @@ private:
     TextEditor search, renameEd, presetNameEd, headerNameEd;
     bool headerRenaming = false;           // nom du preset chargé en cours de saisie (clic sur le nom en haut)
     int chip = 0, listScroll = 0, insertPos = 0;
-    float listPos = 0.0f;                                          // défilement affiché (glisse vers listScroll)
+    float listPos = 0.0f;
+    bool searchHadFocus = false;                                          // défilement affiché (glisse vers listScroll)
     // paramètres
     String paramGuid;
     int paramPage = 0, paramDrag = -1;
@@ -1588,6 +1590,10 @@ private:
         if (semiOpen && (tunerShown() || ! eng.isReady())) closeSemiDrum();
         if (modeOpen && ! tunerShown()) closeModeDrum();
         if (insertOpen && overlay != Overlay::browser) closeInsertDrum();
+        {   // recherche : prise / perte du clavier (REAPER peut la reprendre) -> cadre, liste et message redessinés
+            const bool foc = search.isVisible() && search.hasKeyboardFocus (true);
+            if (foc != searchHadFocus) { searchHadFocus = foc; askRepaint (screenPx()); }
+        }
         if (insertOpen && std::abs (insertDrumPos - (float) insertTarget) > 0.001f)
         {
             insertDrumPos += ((float) insertTarget - insertDrumPos) * 0.35f;
