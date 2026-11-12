@@ -800,6 +800,11 @@ private:
             };
             if (firstRow > 0) tri (moreUpArrow().getCentre(), false);
             if (firstRow < maxFirstRow()) tri (moreDownArrow().getCentre(), true);
+            // nombre de pages, discret, à gauche de la flèche du bas (variante B validée)
+            g.setFont (font (tfBold, 15.0f));
+            g.setColour (kDim);
+            g.drawText (String (firstRow + 1) + " / " + String (maxFirstRow() + 1),
+                        S (Rectangle<float> (connXR() - 14.0f - 120.0f, kMoreArrowY - 10.0f, 120.0f, 20.0f)), Justification::centredRight);
         }
     }
     Rectangle<float> moreDownArrow() const { return Rectangle<float> (24.0f, 18.0f).withCentre ({ connXR(), kMoreArrowY }); }
