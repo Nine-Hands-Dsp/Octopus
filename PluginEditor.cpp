@@ -2558,7 +2558,7 @@ private:
             g.setColour (Colour (0xff161a21));
             g.fillRoundedRectangle (S (Rectangle<float> (tx - (act ? 1.0f : 0.0f), top, act ? 6.0f : 4.0f, th)), S (3.0f));
             const auto tr = sbThumb (scroll);
-            g.setColour (sbDragging ? kAccent : sbHover ? Colour (0xff6b7586) : Colour (0xff4a5363));
+            g.setColour (act ? Colour (0xff6b7586) : Colour (0xff4a5363));                   // reste grise (plus claire au survol / glisser)
             g.fillRoundedRectangle (S (tr.withX (tx - (act ? 1.0f : 0.0f)).withWidth (act ? 6.0f : 4.0f)), S (3.0f));
         }
         const float cueY = jmax (598.0f, bottom + 6.0f);
