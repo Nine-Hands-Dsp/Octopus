@@ -259,6 +259,13 @@ int main (int argc, char** argv)
     Thread::sleep (850);
     shot ("octopus_add_hover");                                              // au bout de 0,8 s : la bulle
     ed->screenHover ({ 2.0f, 2.0f });
+    ed->screenSearch ({}, 0);                                                    // barre de défilement attrapée à la souris
+    {
+        const int r1 = ed->screenScrollbarDrag (220.0f, 420.0f, false);
+        shot ("octopus_add_scrollbar_drag");
+        const int r2 = ed->screenScrollbarDrag (420.0f, 215.0f, true);
+        check (r1 > 0 && r2 == 0, "barre de défilement glissée à la souris : la liste suit, puis revient en haut");
+    }
     ed->screenSearch ("feffefe", 0); shot ("octopus_add_nomatch");          // recherche sans résultat
     ed->screenSearch ("rea", 0);
     shot ("octopus_add_search");

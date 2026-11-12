@@ -24,6 +24,7 @@ public:
     void screenParamsMidi();
     bool testBlockClicks (int slot, const juce::Array<double>& downUpMs, double waitMs);
     void screenHover (juce::Point<float> screenUnits);
+    int screenScrollbarDrag (float fromY, float toY, bool release);   // tests : glisser la barre de défilement (renvoie la 1re ligne visible)
     // presets utilisateur du plugin affiché (0 = saisie du nom, 1 = enregistrer sous ce nom, 2 = charger le n-ième, 3 = tout effacer) ; renvoie leur nombre
     int  screenUserPreset (int op, const juce::String& arg);
     void screenTuningMenu();             // ouvre le menu des accordages de CHROMA
