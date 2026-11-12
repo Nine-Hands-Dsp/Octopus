@@ -419,6 +419,9 @@ private:
     // et la bascule ON / OFF d'un clic simple est annulée si le double-clic arrive après elle
     String lastClickGuid, toggledGuid;
     double lastClickMs = 0.0, toggledAtMs = 0.0;
+public:
+    int doubleClicks = 0;                       // nombre de double-clics reconnus (outil de test)
+private:
     Point<float> lastClickPos;
     Array<ParamView> params;
     int paramCount = 0, pollTick = 0;
@@ -3875,7 +3878,8 @@ public:
             // double-clic détecté par Octopus (pas par le système) : même bloc, moins de 650 ms, souris presque immobile
             if (guid == lastClickGuid && now - lastClickMs < 650.0 && p.getDistanceFrom (lastClickPos) < 16.0f)
             {
-                pendingToggle = -1;                         // double-clic : paramètres, jamais de bascule
+                pendingToggle = -1;                         // double-clic : fenêtre du plugin, jamais de bascule
+                ++doubleClicks;
                 if (toggledGuid == guid && now - toggledAtMs < 900.0)
                 {
                     // double-clic lent : la bascule du premier clic est déjà passée -> on la défait
@@ -3885,7 +3889,7 @@ public:
                 toggledGuid = {}; lastClickGuid = {};
                 downSlot = -1;
                 const int b = eng.blockOf (guid);
-                if (b >= 0) openParams (eng.blocks()[b]);
+                if (b >= 0) eng.focusWindow (eng.blocks()[b]);   // ouvre la fenêtre du plugin (ou la ramène au premier plan)
                 return;
             }
             lastClickGuid = guid; lastClickMs = now; lastClickPos = p;
@@ -4934,10 +4938,11 @@ void OctopusEditor::screenFavourite (int visibleIndex)
 
 void OctopusEditor::screenParamsMidi() { view->toggleMidiView(); }
 
-// test du clic / double-clic : temps en ms (appui, relâchement) pour chaque clic, puis attente ; renvoie true si les paramètres sont ouverts
+// test du clic / double-clic : temps en ms (appui, relâchement) pour chaque clic, puis attente ; renvoie true si un double-clic est reconnu
 bool OctopusEditor::testBlockClicks (int slot, const Array<double>& downUp, double waitMs)
 {
     view->closeAll();
+    const int before = view->doubleClicks;
     const auto c = view->blockCentre (slot);
     static double t0 = 1.0e9;
     t0 += 1.0e5;                       // chaque série de clics bien après la précédente
@@ -4945,11 +4950,11 @@ bool OctopusEditor::testBlockClicks (int slot, const Array<double>& downUp, doub
     {
         view->runPendingToggle (t0 + downUp[k]);
         view->blockDown (slot, c, t0 + downUp[k]);
-        if (view->paramsOpen()) break;
+        if (view->doubleClicks != before) break;
         view->blockUp (slot, t0 + downUp[k + 1]);
     }
     view->runPendingToggle (t0 + downUp.getLast() + waitMs);
-    return view->paramsOpen();
+    return view->doubleClicks != before;               // double-clic reconnu (il ouvre la fenetre du plugin)
 }
 void OctopusEditor::screenHover (Point<float> unitPos) { view->simulateHover (unitPos); }
 

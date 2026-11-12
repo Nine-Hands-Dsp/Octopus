@@ -281,13 +281,13 @@ int main (int argc, char** argv)
         auto on = [&] { return e.chain().getReference (e.blocks()[slot]).enabled; };
         bool before = on();
         bool opened = ed->testBlockClicks (slot, { 0.0, 80.0, 250.0, 320.0 }, 800);
-        check (opened && on() == before, "double-clic rapide : paramètres ouverts, effet inchangé");
+        check (opened && on() == before, "double-clic rapide : fenêtre du plugin ouverte, effet inchangé");
         before = on();
         opened = ed->testBlockClicks (slot, { 0.0, 120.0, 560.0, 640.0 }, 800);
-        check (opened && on() == before, "double-clic lent (après la bascule du 1er clic) : paramètres ouverts, effet rétabli");
+        check (opened && on() == before, "double-clic lent (après la bascule du 1er clic) : fenêtre du plugin ouverte, effet rétabli");
         before = on();
         opened = ed->testBlockClicks (slot, { 0.0, 100.0 }, 600);
-        check (! opened && on() != before, "clic simple : ON / OFF, pas de paramètres");
+        check (! opened && on() != before, "clic simple : ON / OFF, pas de fenêtre");
         before = on();
         opened = ed->testBlockClicks (slot, { 0.0, 100.0, 1000.0, 1100.0 }, 600);
         check (! opened && on() == before, "deux clics espacés d'une seconde : deux bascules");
