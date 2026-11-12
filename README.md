@@ -1,7 +1,7 @@
 # OCTOPUS (NINE HANDS | DSP)
 
 Plugin VST3 (Windows / macOS) **pour REAPER** : un écran façon multi-effet (inspiré du Quad Cortex mini) qui pilote
-la chaîne d'effets de la piste où il est inséré. Pédale sans jacks qui occupe toute la fenêtre (tailles 50 %, 60 %, 75 %,
+la chaîne d'effets de la piste où il est inséré. Pédale sans jacks qui occupe toute la fenêtre (tailles 60 %, 75 %,
 100 % ; taille par défaut au choix dans le menu, 60 % au départ), écran sur presque toute la façade, 4 footswitchs hexagonaux inox surmontés de leur lettre A-D rétroéclairée.
 
 <p align="center">
@@ -152,6 +152,7 @@ v1.14.0 : fenêtre d'ajout : tri A-Z ou par type (titres colorés), nombre de pl
 v1.15.0 : fenêtre d'ajout : nombres des filtres sans pastille ; en A-Z la liste défile vers le bas ligne à ligne (molette, MORE) comme en TYPE ; descriptions au survol pour Ampire, Anode, Darkbass, Impulse et Screamer.
 v1.16.0 : fenêtre d'ajout redessinée : emplacement cliquable à côté du titre (au début, avant un bloc, à la fin), tri A-Z / TYPE en interrupteur, « N selected ✕ » pour vider la sélection, ADD plein, rescan en icône, recherche pleine largeur avec loupe, filtres en onglets soulignés ; cases de même hauteur et même écart.
 v1.17.0 : menus clic droit redessinés (fond sombre arrondi, icônes, en-tête à pastille sur tous les menus) ; STOMP d'un footswitch en grille de blocs qui reste ouverte (plusieurs blocs cochés d'affilée, groupe en une tuile A <-> B, « N selected » + CLEAR) ; bandeau 5 plus bas, textes recentrés, BANK et flèches à la taille des autres, PRESET bleu / STOMP orange sans soulignement, badge plus petit ; REC seul en rouge sous IN (fixe quand la piste est armée, clignote pendant l'enregistrement) ; écran noir uni.
+v1.18.67 : taille minimale 60 % (50 % retiré du menu Plugin size), fenêtre du DAW verrouillée (jamais sous 60 %) ; nouvelles versions des pédales prises en compte (menus clic droit au tronc commun) : Doorn 4.1.0, Peachy 2.1.0, Screamer 1.4.0, Strong Pickle 1.6.0, Darkbass 1.2.0, Anode 2.1.0, Ring Think 3.1.0, Small Tone 2.1.0, Phase 90 2.1.0, Fog Z 2.1.0, Fantomine 2.1.0, FreakOut 1.4.0, Holyverb 1.7.0, Pipeline 1.7.0, Ngate 2.1.0, Wack'd 2.1.0, Echoflex 2.1.0, Eight Echo 2.1.0, Arc 3.2.0, Crycat 2.1.0, Wharry 2.1.0, Semitones 2.1.0, Synthetika 1.3.0, Textural 2.1.0, Freeze Shimmer 1.5.0, FM-9 1.4.0, Ampire 1.2.0, Impulse 1.6.0, Spindeck 1.1.0, Chroma 2.1.0.
 v1.18.66 : FM-9 v1.3.19 pris en compte (description : catégorie Updates et tri du catalogue).
 v1.18.65 : FM-9 v1.3.18 pris en compte (description : horloge jusqu'à 960 MHz, lumières des touches).
 v1.18.63 : FM-9 v1.3.17 pris en compte.

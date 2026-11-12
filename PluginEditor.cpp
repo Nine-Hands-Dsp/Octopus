@@ -4684,7 +4684,7 @@ private:
         const int cur = ed != nullptr ? ed->getScaleIndex() : -1;
         const int def = OctoSettings::defaultSize();
         PopupMenu sub, defM;
-        for (int i = 0; i < L::kNumSizes; ++i)
+        for (int i = 1; i < L::kNumSizes; ++i)            // 60 / 75 / 100 % (50 % retire : minimum 60 %)
         {
             sub.addItem (910 + i, String (L::kSizeNames[i]) + (i == def ? "  (default)" : ""), true, cur == i);
             defM.addItem (920 + i, L::kSizeNames[i], true, i == def);
@@ -4820,10 +4820,12 @@ OctopusEditor::OctopusEditor (OctopusProcessor& p) : AudioProcessorEditor (&p), 
     view = std::make_unique<PedalView> (proc);
     addAndMakeVisible (*view);
     setResizable (true, true);
-    const int minW = L::kMinW;                                                    // jamais plus petit que 50 %
+    const int minW = L::kMinW;                                                    // jamais plus petit que 60 %
     const int maxW = L::kMaxW;
     setResizeLimits (minW, (int) std::lround ((double) minW * kH / kW), maxW, (int) std::lround ((double) maxW * kH / kW));
     getConstrainer()->setFixedAspectRatio ((double) kW / (double) kH);
+    hostLock.setMinimumSize (minW, (int) std::lround ((double) minW * kH / kW));
+    hostLock.setMaximumSize (maxW, (int) std::lround ((double) maxW * kH / kW));
     setOpaque (true);
     setScaleIndex (jlimit (-1, L::kNumSizes - 1, proc.uiScaleIdx.load()));
     view->initCaches();
@@ -4864,6 +4866,24 @@ void OctopusEditor::checkRenderer()
 {
     if ((void*) getPeer() != lastPeer || Time::getMillisecondCounterHiRes() - lastRendererCheckMs > 1000.0)
         useSoftwareRenderer();
+    trackHostWindow();
+}
+
+// verrou de la fenetre du DAW (WindowMinSize) : rattache a chaque nouvelle fenetre hote
+void OctopusEditor::trackHostWindow()
+{
+    if (auto* peer = getPeer())
+    {
+        void* handle = peer->getNativeHandle();
+        if (handle != nullptr && ! hostLock.isAttachedTo (handle))
+        {
+            juce::Component::SafePointer<juce::Component> top (&peer->getComponent());
+            hostLock.attach (handle, [top] { return top != nullptr ? top->getWidth() : 0; });
+            hostLock.enforceNow();
+        }
+        if (getWidth() < L::kMinW - 2) hostLock.enforceNow();
+    }
+    else hostLock.detach();
 }
 
 void OctopusEditor::resetRenderer()
@@ -4874,7 +4894,7 @@ void OctopusEditor::resetRenderer()
 }
 
 void OctopusEditor::paint (Graphics& g) { g.fillAll (Colours::black); }
-void OctopusEditor::parentHierarchyChanged() { useSoftwareRenderer(); }
+void OctopusEditor::parentHierarchyChanged() { useSoftwareRenderer(); trackHostWindow(); }
 void OctopusEditor::visibilityChanged()      { useSoftwareRenderer(); if (isShowing()) repaint(); }
 
 void OctopusEditor::resized()
@@ -4893,9 +4913,11 @@ int OctopusEditor::getScaleIndex() const
 void OctopusEditor::setScaleIndex (int idx)
 {
     idx = jlimit (-1, L::kNumSizes - 1, idx);
+    if (idx == 0) idx = 1;                                  // ancien 50 % : minimum 60 %
     proc.uiScaleIdx = idx;                                  // -1 : suit la taille par défaut choisie dans le menu
     const int w = L::kWidths[idx < 0 ? OctoSettings::defaultSize() : idx];
     setSize (w, (int) std::lround ((double) w * kH / kW));
+    hostLock.enforceNow();
 }
 
 void OctopusEditor::showScreen (int which, int arg)

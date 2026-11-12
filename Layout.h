@@ -12,7 +12,7 @@ namespace OctoLayout
     constexpr int kNumSizes = 4;
     const int kWidths[kNumSizes] = { 828, 993, 1241, 1655 };
     const char* const kSizeNames[kNumSizes] = { "50 %", "60 %", "75 %", "100 %" };
-    constexpr int kStandardSize = 1, kMinW = 828, kMaxW = 1700;
+    constexpr int kStandardSize = 1, kMinW = 993, kMaxW = 1700;
 
     // écran : repère local de 1064 x 651 unités, affiché dans la vitre du cadre (1177 x 720, plan du 07/11/2026) avec le facteur kG
     constexpr float kScreenH = 651.0f;

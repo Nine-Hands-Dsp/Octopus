@@ -6,7 +6,7 @@ if(APPLE)
   set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "" FORCE)
 endif()
 
-project(WigaOctopus VERSION 1.18.66)
+project(WigaOctopus VERSION 1.18.67)
 
 include(FetchContent)
 FetchContent_Declare(JUCE
@@ -39,6 +39,17 @@ target_sources(Octopus PRIVATE
   OctopusEngine.cpp
   ReaperBridge.cpp)
 
+
+# verrou de taille de la fenetre du DAW (jamais sous 60 %, jamais au-dela de 150 %)
+if(APPLE)
+  target_sources(Octopus PRIVATE WindowMinSize.mm)
+  target_link_libraries(Octopus PRIVATE "-framework Cocoa")
+else()
+  target_sources(Octopus PRIVATE WindowMinSize.cpp)
+endif()
+if(WIN32)
+  target_link_libraries(Octopus PRIVATE comctl32 user32)
+endif()
 # VST3 SDK headers shipped with JUCE (FUnknown, used to query REAPER's interface)
 target_include_directories(Octopus PRIVATE
   ${JUCE_SOURCE_DIR}/modules/juce_audio_processors_headless/format_types/VST3_SDK)

@@ -1,5 +1,6 @@
 #pragma once
 #include "PluginProcessor.h"
+#include "WindowMinSize.h"
 
 class PedalView;
 
@@ -36,6 +37,8 @@ private:
     void resetRenderer();
     void* lastPeer = nullptr;
     double lastRendererCheckMs = 0.0;
+    wiga::WindowMinSize hostLock;        // fenetre du DAW : jamais sous 60 %, jamais au-dela de la taille maximale
+    void trackHostWindow();
     OctopusProcessor& proc;
     std::unique_ptr<PedalView> view;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OctopusEditor)

@@ -31,14 +31,14 @@ namespace OctoSettings
     inline int defaultSize()
     {
         if (auto x = current())
-            return juce::jlimit (0, 3, x->getIntAttribute ("defaultSize", 1));
+            return juce::jlimit (1, 3, x->getIntAttribute ("defaultSize", 1));   // 50 % retire (minimum 60 %)
         return 1;
     }
     inline void setDefaultSize (int idx)
     {
         juce::XmlElement x ("OctopusSettings");
         if (auto old = current()) x = *old;
-        x.setAttribute ("defaultSize", juce::jlimit (0, 3, idx));
+        x.setAttribute ("defaultSize", juce::jlimit (1, 3, idx));
         commit (x);
     }
 
