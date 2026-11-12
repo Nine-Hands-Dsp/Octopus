@@ -1063,6 +1063,8 @@ private:
         // famille utilitaire (blanc) : carreau blanc plein et icône sombre quand il est allumé, pour trancher net avec un bloc éteint
         const bool white = kind == FxCat::utility && on;
 
+        // fond plein sous le carreau : la ligne de chaîne ne se voit jamais derrière un bloc estompé (voie coupée, bloc éteint)
+        if (! ghost) { g.setColour (kScreenBlack); g.fillRoundedRectangle (t, rad); }
         // carreau
         g.setColour (kScrBg.withAlpha (alpha));
         g.fillRoundedRectangle (t, rad);
