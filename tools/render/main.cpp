@@ -259,6 +259,7 @@ int main (int argc, char** argv)
     Thread::sleep (850);
     shot ("octopus_add_hover");                                              // au bout de 0,8 s : la bulle
     ed->screenHover ({ 2.0f, 2.0f });
+    ed->screenSearch ("feffefe", 0); shot ("octopus_add_nomatch");          // recherche sans résultat
     ed->screenSearch ("rea", 0);
     shot ("octopus_add_search");
     ed->screenSearch ({}, 2);
