@@ -81,9 +81,9 @@ namespace wiga
                     mmi->ptMinTrackSize.x = std::max ((LONG) w,  mmi->ptMinTrackSize.x);
                     mmi->ptMinTrackSize.y = std::max ((LONG) hh, mmi->ptMinTrackSize.y);
 
-                    // et pas plus grande que la pédale à 100 %
+                    // et pas plus grande que la pédale à 100 % (sauf fenêtre agrandie : le plugin y prend toute la place)
                     int mw = 0, mh = 0;
-                    if (self->maxW > 0 && self->maxH > 0 && self->computeTrack (self->maxW, self->maxH, mw, mh))
+                    if (! IsZoomed (h) && self->maxW > 0 && self->maxH > 0 && self->computeTrack (self->maxW, self->maxH, mw, mh))
                     {
                         mmi->ptMaxTrackSize.x = std::max ((LONG) mw, mmi->ptMinTrackSize.x);
                         mmi->ptMaxTrackSize.y = std::max ((LONG) mh, mmi->ptMinTrackSize.y);

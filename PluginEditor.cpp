@@ -4998,19 +4998,31 @@ void OctopusEditor::trackHostWindow()
         }
         // plein écran / fenêtre agrandie : l'hôte ne redimensionne pas toujours la vue du plugin (REAPER la laisse
         // en haut à gauche) ; Octopus prend alors toute la place libre et s'y centre à la taille choisie
+        // v1.18.74 : une seule demande par agrandissement, et seulement pour grandir. En réponse, REAPER recale sa
+        // fenêtre (bordures hors écran) et la zone libre rapetisse de quelques pixels : la redemander à chaque tic
+        // faisait rétrécir la fenêtre en boucle (elle « vibrait » jusqu'à une bande de 120 px).
+        const int minH = (int) std::lround ((double) L::kMinW * kH / kW);
         if (hostLock.hostMaximized())
         {
-            int aw = 0, ah = 0;
-            if (hostLock.hostAvailableSize (aw, ah) && aw >= L::kMinW && (std::abs (aw - getWidth()) > 2 || std::abs (ah - getHeight()) > 2))
+            if (! fillTried)
             {
-                fillingHost = true;
-                setSize (aw, ah);
+                fillTried = true;
+                int aw = 0, ah = 0;
+                if (hostLock.hostAvailableSize (aw, ah) && aw >= L::kMinW && ah >= minH && (aw > getWidth() + 2 || ah > getHeight() + 2))
+                {
+                    fillingHost = true;
+                    setSize (jmax (aw, getWidth()), jmax (ah, getHeight()));
+                }
             }
         }
-        else if (fillingHost)
+        else if (fillTried)
         {
-            fillingHost = false;                                   // retour en fenêtre normale : taille choisie
-            setScaleIndex (proc.uiScaleIdx.load());
+            fillTried = false;
+            if (fillingHost)
+            {
+                fillingHost = false;                               // retour en fenêtre normale : taille choisie
+                setScaleIndex (proc.uiScaleIdx.load());
+            }
         }
         if (getWidth() < L::kMinW - 2 || getHeight() < (int) std::lround ((double) L::kMinW * kH / kW) - 2) hostLock.enforceNow();
     }
@@ -5045,9 +5057,10 @@ int OctopusEditor::chosenWidth() const
 
 Rectangle<int> OctopusEditor::pedalArea() const
 {
-    const double fit = jmin ((double) getWidth() / kW, (double) getHeight() / kH, (double) chosenWidth() / kW);
+    const int avH = fillingHost ? getHeight() - 16 : getHeight();   // plein écran : marge pour le bas que l'hôte peut rogner
+    const double fit = jmin ((double) getWidth() / kW, (double) avH / kH, (double) chosenWidth() / kW);
     const int w = jmax (1, (int) std::lround (kW * fit)), h = jmax (1, (int) std::lround (kH * fit));
-    return { (getWidth() - w) / 2, (getHeight() - h) / 2, w, h };
+    return { (getWidth() - w) / 2, (avH - h) / 2, w, h };
 }
 
 int OctopusEditor::getScaleIndex() const
