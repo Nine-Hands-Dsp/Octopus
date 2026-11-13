@@ -254,7 +254,7 @@ public:
             if (L::drawFsSprite) g.drawImage (fsOff.get(), fr);
             if (L::drawFsSprite && ledLevel[f] > 0.003f)       // flanc de l'écrou tourné vers la LED
             {
-                g.setOpacity (jmin (1.0f, ledLevel[f]) * 0.35f);
+                g.setOpacity (jmin (1.0f, ledLevel[f]) * 0.35f * (float) glowPc / 100.0f);   // reflet sur l'écrou, dosé par Glow intensity
                 g.drawImage (fsOn.get(), fr);
                 g.setOpacity (1.0f);
             }
@@ -658,10 +658,12 @@ private:
         const float rx = L::ringRx[f] * s, ry = L::ringRy[f] * s, wdt = L::ringW * s;
         Path ring;
         ring.addEllipse (c.x - rx, c.y - ry, rx * 2.0f, ry * 2.0f);
-        for (float hw = 13.0f; hw > 3.0f; hw -= 1.5f)                    // halo : traits de plus en plus larges et transparents
+        const float gk = (float) glowPc / 100.0f;                         // Glow intensity (25-100 %) : ne dose que le halo
+        const float hk = L::ringRx[f] / 33.2f;                            // halo de la règle des pédales : traits de 20 à 3 x (rayon / 33,2)
+        for (float hw = 20.0f; hw >= 3.0f; hw -= 1.5f)                   // de plus en plus larges et transparents, 0,075 x Glow x niveau
         {
-            g.setColour (col.withAlpha (0.045f * lvl));
-            g.strokePath (ring, PathStrokeType (hw * s));
+            g.setColour (col.withAlpha (0.075f * lvl * gk));
+            g.strokePath (ring, PathStrokeType (hw * hk * s));
         }
         g.setColour (col.withAlpha (0.85f * lvl));
         g.strokePath (ring, PathStrokeType (wdt));
@@ -4637,10 +4639,11 @@ private:
     Image menuPreview (int which)
     {
         captureOnly = true; captured = {};
-        if (which == 200) tuningMenu(); else if (which < 100) footswitchMenu (which); else blockMenu (which - 100);
+        if (which >= 300) pedalMenu(); else if (which == 200) tuningMenu(); else if (which < 100) footswitchMenu (which); else blockMenu (which - 100);
         captureOnly = false;
         PopupMenu main = captured; captured = {};
-        const String openPrefix = which == 200 ? "" : which < 100 ? "STOMP : blocks" : "Assign";
+        const String openPrefix = which == 300 ? "Glow intensity" : which == 301 ? "MIDI" : which == 302 ? "Plugin size"
+                                : which == 200 ? "" : which < 100 ? "STOMP : blocks" : "Assign";
 
         struct Row { const PopupMenu::Item* it; int h; };
         const int bd = menuLnf.getPopupMenuBorderSize();
@@ -4716,15 +4719,17 @@ private:
     void midiSubmenu (PopupMenu& m)
     {
         PopupMenu midi;
+        midi.addSectionHeader ("MIDI LEARN");
         for (int t = 0; t < OctopusEngine::fsE; ++t)                  // E / F : CC de A+B / C+D, pas de learn à part
         {
             const int c = eng.ccOf (t);
-            midi.addItem (500 + t, "Learn : " + OctopusEngine::targetName (t) + " (" + (c >= 0 ? "CC " + String (c) : String ("none")) + ")", true, eng.learnTarget == t);
+            midi.addItem (500 + t, "Learn: " + OctopusEngine::targetName (t) + "  (" + (c >= 0 ? "CC " + String (c) : String ("not assigned")) + ")", true, eng.learnTarget == t);
         }
         midi.addSeparator();
-        if (eng.learnTarget >= 0) midi.addItem (600, "Cancel MIDI learn");
+        midi.addItem (600, "Cancel MIDI learn", eng.learnTarget >= 0);
+        midi.addItem (602, "Clear all MIDI assignments");
+        midi.addSeparator();
         midi.addItem (601, "Program Change 1-64 = presets 1A-16D", true, eng.programChange);
-        midi.addItem (602, "Reset MIDI (all unassigned)");
         midi.addSeparator();
         midi.addItem (603, "Parameters fsA-fsD, bankDown, bankUp, mode can also use REAPER's MIDI learn", false);
         m.addSeparator();
@@ -4750,10 +4755,20 @@ private:
     void pedalMenu()
     {
         PopupMenu m;
+        menuHeader (m, MenuStyle::Badge::ofUi (MenuStyle::icoPedal), "Octopus", "fx chain controller  v" + String (JucePlugin_VersionString));
+        m.addItem (2, "Save the chain...");
+        m.addItem (3, "Banks...");
         midiSubmenu (m);
         addSizeMenu (m);
         SafePointer<PedalView> sp (this);
-        styled (m).showMenuAsync (PopupMenu::Options(), [sp] (int r) { if (sp != nullptr && ! sp->handleMidi (r)) sp->handleSize (r); });
+        if (captureOnly) { captured = m; return; }
+        styled (m).showMenuAsync (PopupMenu::Options(), [sp] (int r)
+        {
+            if (sp == nullptr) return;
+            if (r == 2) sp->saveMenu();
+            else if (r == 3) sp->openBanks();
+            else if (! sp->handleMidi (r)) sp->handleSize (r);
+        });
     }
 
     void addSizeMenu (PopupMenu& m)
@@ -4769,16 +4784,31 @@ private:
         }
         sub.addSeparator();
         sub.addSubMenu ("Default size (new windows)", defM);
-        m.addSeparator();
-        m.addSubMenu ("Plugin size", sub);
-        PopupMenu glowM;                                  // opacité du halo des lettres et du symbole de l'accordeur
+        PopupMenu glowM;                                  // opacité du halo des lettres et du symbole de l'accordeur (réglage propre à Octopus)
         for (int i = 0; i < kNumHalo; ++i)
             glowM.addItem (930 + i, kHalo[i] == 0 ? String ("Off (0 %)") : String (kHalo[i]) + " %" + (kHalo[i] == 100 ? "  (default)" : ""), true, haloPc == kHalo[i]);
+        m.addSeparator();
         m.addSubMenu ("Letter glow (halo opacity)", glowM);
+        // tronc commun des pédales : Plugin size puis Glow intensity, en dernier
+        m.addSeparator();
+        m.addSubMenu ("Plugin size", sub);
+        PopupMenu fsGlow;                                 // Glow intensity : halo des anneaux des footswitchs, 25 / 50 / 75 / 100 %
+        for (int pc = 25; pc <= 100; pc += 25)
+            fsGlow.addItem (940 + pc / 25, "Glow " + String (pc) + " %" + (pc == 100 ? "  (default)" : ""), true, glowPc == pc);
+        m.addSubMenu ("Glow intensity", fsGlow);
     }
     static constexpr int kNumHalo = 9;
     static constexpr int kHalo[kNumHalo] = { 0, 25, 50, 75, 100, 125, 150, 175, 200 };
     int haloPc = OctoSettings::haloPercent();
+    int glowPc = OctoSettings::glowPercent();             // halo des anneaux des footswitchs (Glow intensity)
+    double lastGlowReadMs = 0.0;
+    void setGlow (int pc, bool tell = true)
+    {
+        glowPc = jlimit (25, 100, pc);
+        OctoSettings::setGlowPercent (glowPc);
+        if (tell) { OctoSettings::flush(); eng.say ("Glow  " + String (glowPc) + " %"); }
+        repaint();
+    }
     void setHalo (int pc, bool tell = true)
     {
         haloPc = jlimit (0, 200, pc);
@@ -4792,6 +4822,7 @@ private:
         auto* ed = findParentComponentOfClass<OctopusEditor>();
         if (ed == nullptr) return;
         if (r >= 930 && r < 930 + kNumHalo) { setHalo (kHalo[r - 930]); return; }
+        if (r >= 941 && r <= 944) { setGlow ((r - 940) * 25); return; }
         if (r >= 910 && r < 910 + L::kNumSizes) ed->setScaleIndex (r - 910);
         else if (r >= 920 && r < 920 + L::kNumSizes)
         {
@@ -4807,6 +4838,11 @@ private:
         const double now = Time::getMillisecondCounterHiRes();
         auto* ed = findParentComponentOfClass<OctopusEditor>();
         if (ed != nullptr) ed->checkRenderer();
+        if (now - lastGlowReadMs > 2000.0)                    // Glow intensity réglé dans une autre fenêtre d'Octopus
+        {
+            lastGlowReadMs = now;
+            if (const int gp = OctoSettings::glowPercent(); gp != glowPc) { glowPc = gp; repaint(); }
+        }
         if (overlay == Overlay::browser && hoverItem >= 0 && ! tipShown && now - hoverItemMs >= kTipDelayMs)
         {
             tipShown = true;                                   // 0,8 s sur la même ligne : la bulle apparaît
@@ -4960,6 +4996,22 @@ void OctopusEditor::trackHostWindow()
             hostLock.attach (handle, [top] { return top != nullptr ? top->getWidth() : 0; });
             hostLock.enforceNow();
         }
+        // plein écran / fenêtre agrandie : l'hôte ne redimensionne pas toujours la vue du plugin (REAPER la laisse
+        // en haut à gauche) ; Octopus prend alors toute la place libre et s'y centre à la taille choisie
+        if (hostLock.hostMaximized())
+        {
+            int aw = 0, ah = 0;
+            if (hostLock.hostAvailableSize (aw, ah) && aw >= L::kMinW && (std::abs (aw - getWidth()) > 2 || std::abs (ah - getHeight()) > 2))
+            {
+                fillingHost = true;
+                setSize (aw, ah);
+            }
+        }
+        else if (fillingHost)
+        {
+            fillingHost = false;                                   // retour en fenêtre normale : taille choisie
+            setScaleIndex (proc.uiScaleIdx.load());
+        }
         if (getWidth() < L::kMinW - 2 || getHeight() < (int) std::lround ((double) L::kMinW * kH / kW) - 2) hostLock.enforceNow();
     }
     else hostLock.detach();
@@ -5036,6 +5088,7 @@ void OctopusEditor::showScreen (int which, int arg)
         case 13: view->recGlowPc = arg; view->askRepaint (view->screenPx()); break;   // rendus : glow de l'effet record
         case 14: view->recColourMenu(); break;
         case 21: if (arg != 0) view->startHeaderRename(); else view->headerNameEd.setVisible (false); break;   // rendus : renommer le preset (en-tête)
+        case 24: view->setGlow (arg, false); break;   // rendus : Glow intensity des footswitchs
         case 23: view->firstRow = jlimit (0, view->maxFirstRow(), arg); view->askRepaint (view->screenPx()); break;   // rendus : page de la grille
         case 22: view->drumBgStyle = arg; view->askRepaint (view->screenPx()); break;   // rendus : fond du tambour (essais)
         case 20: if (arg != 0) view->openInsertDrum(); else view->closeInsertDrum(); break;   // rendus : tambour de l'emplacement

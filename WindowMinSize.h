@@ -40,6 +40,10 @@ namespace wiga
         // fenêtre du DAW agrandie (plein écran) : la taille de la pédale ne doit pas la redimensionner
         bool hostMaximized() const;
 
+        // place disponible pour le plugin dans la fenêtre du DAW (de son coin haut gauche au bas droit
+        // de la zone client), en points JUCE : sert à remplir la fenêtre en plein écran
+        bool hostAvailableSize (int& logicalW, int& logicalH) const;
+
         struct Impl;
     private:
         Impl* impl = nullptr;

@@ -57,6 +57,21 @@ namespace OctoSettings
         stage (x);
     }
 
+    // halo des anneaux lumineux des footswitchs (Glow intensity), 25 / 50 / 75 / 100 %, commun à toutes les fenêtres
+    inline int glowPercent()
+    {
+        if (auto x = current())
+            return juce::jlimit (25, 100, x->getIntAttribute ("glowPercent", 100));
+        return 100;
+    }
+    inline void setGlowPercent (int pc)
+    {
+        juce::XmlElement x ("OctopusSettings");
+        if (auto old = current()) x = *old;
+        x.setAttribute ("glowPercent", juce::jlimit (25, 100, pc));
+        stage (x);
+    }
+
     // symbole de l'accordeur (B+C) : couleur (0 = vert de CHROMA) et opacité de son halo en %
     inline juce::uint32 tunerColour()
     {

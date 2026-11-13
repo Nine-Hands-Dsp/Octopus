@@ -145,6 +145,15 @@ int main (int argc, char** argv)
     e.save (3); e.rename (3, "Doom Drop G");
     e.load (0);
     shot ("octopus_preset");
+    {   // Glow intensity des footswitchs (25 / 50 / 75 / 100 %) et menu clic droit de la pédale (tronc commun)
+        for (int pc : { 25, 50, 75, 100 }) { ed->showScreen (24, pc); pump (3); shot ("octopus_fsglow_" + String (pc)); }
+        for (int w : { 300, 301, 302 })
+        {
+            auto img = ed->menuPreview (w);
+            File f (out + (w == 300 ? "/octopus_menu_pedal_glow.png" : w == 301 ? "/octopus_menu_pedal_midi.png" : "/octopus_menu_pedal_size.png")); f.deleteFile();
+            FileOutputStream os (f); PNGImageFormat().writeImageToStream (img, os);
+        }
+    }
     // piste armée : IN / OUT / REC rouges (clignotants si armée, fixes en enregistrement)
     for (int v = 1; v <= 3; ++v) { ed->showScreen (12, v); pump (4); shot (v == 1 ? "octopus_rec_armed" : v == 2 ? "octopus_rec_recording_off" : "octopus_rec_recording"); }
     ed->showScreen (12, 3);

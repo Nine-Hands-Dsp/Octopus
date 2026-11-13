@@ -40,6 +40,7 @@ private:
     void resetRenderer();
     void* lastPeer = nullptr;
     double lastRendererCheckMs = 0.0;
+    bool fillingHost = false;            // la fenêtre du DAW est agrandie : Octopus en remplit toute la place libre
     wiga::WindowMinSize hostLock;        // fenetre du DAW : jamais sous 60 %, jamais au-dela de la taille maximale
     void trackHostWindow();
     OctopusProcessor& proc;

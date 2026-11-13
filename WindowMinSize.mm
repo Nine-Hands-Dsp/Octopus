@@ -109,6 +109,18 @@ namespace wiga
         return ([impl->window styleMask] & NSWindowStyleMaskFullScreen) != 0 || [impl->window isZoomed];
     }
 
+    bool WindowMinSize::hostAvailableSize (int& logicalW, int& logicalH) const
+    {
+        if (impl->view == nil || impl->window == nil) return false;
+        const NSRect inWin   = [impl->view convertRect: [impl->view bounds] toView: nil];
+        const NSSize content = [impl->window contentRectForFrameRect: [impl->window frame]].size;
+        const CGFloat left = std::max ((CGFloat) 0, inWin.origin.x);
+        const CGFloat top  = std::max ((CGFloat) 0, content.height - (inWin.origin.y + inWin.size.height));
+        logicalW = (int) (content.width - left);
+        logicalH = (int) (content.height - top);
+        return logicalW > 0 && logicalH > 0;
+    }
+
     void WindowMinSize::enforceNow()
     {
         NSSize m;

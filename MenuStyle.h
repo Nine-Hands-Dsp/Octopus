@@ -18,7 +18,7 @@ namespace MenuStyle
 
     // petites icônes des commandes, dessinées sur une grille de 16 (choisies d'après le texte de la commande)
     enum Ico { icoNone = 0, icoSave, icoLoad, icoStomp, icoClear, icoMidi, icoLatch, icoColour, icoAdd, icoBanks, icoSize, icoParams,
-               icoWindow, icoSplit, icoMove, icoRemove, icoBypass, icoMix, icoSwap, icoPreset };
+               icoWindow, icoSplit, icoMove, icoRemove, icoBypass, icoMix, icoSwap, icoPreset, icoGlow, icoPedal };
 
     inline int iconFor (const String& t)
     {
@@ -29,6 +29,7 @@ namespace MenuStyle
         if (s.startsWith ("stomp") || s.startsWith ("assign") || s.startsWith ("footswitch")) return icoStomp;
         if (s.contains ("latching")) return icoLatch;
         if (s.startsWith ("midi") || s.startsWith ("learn") || s.startsWith ("program change")) return icoMidi;
+        if (s.startsWith ("glow")) return icoGlow;
         if (s.contains ("color") || s.contains ("colour") || s.contains ("glow")) return icoColour;
         if (s.startsWith ("add") || s.startsWith ("insert")) return icoAdd;
         if (s.startsWith ("bank")) return icoBanks;
@@ -77,6 +78,11 @@ namespace MenuStyle
             case icoMix:    line (4, 2.5f, 4, 13.5f); line (8, 2.5f, 8, 13.5f); line (12, 2.5f, 12, 13.5f); rect (2.5f, 9, 3, 2, 0.5f); rect (6.5f, 5, 3, 2, 0.5f); rect (10.5f, 10, 3, 2, 0.5f); break;
             case icoSwap:   line (3, 5.5f, 13, 5.5f); line (10, 2.5f, 13, 5.5f); line (13, 10.5f, 3, 10.5f); line (6, 13.5f, 3, 10.5f); break;
             case icoPreset: rect (3, 2.5f, 10, 11, 1.5f); line (5.5f, 6, 10.5f, 6); line (5.5f, 9, 9, 9); break;
+            case icoGlow:   circ (8, 8, 2.6f);
+                            for (int i = 0; i < 8; ++i) { const float a = (float) i * MathConstants<float>::pi / 4.0f;
+                                                          line (8 + 4.4f * std::cos (a), 8 + 4.4f * std::sin (a), 8 + 6.3f * std::cos (a), 8 + 6.3f * std::sin (a)); }
+                            break;
+            case icoPedal:  rect (3.5f, 1.5f, 9, 13, 1.8f); circ (8, 5.5f, 1.6f); circ (8, 11, 1.8f); break;
             default: break;
         }
         g.setColour (c);

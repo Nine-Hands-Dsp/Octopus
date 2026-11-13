@@ -152,6 +152,24 @@ namespace wiga
         return impl->root != nullptr && IsWindow (impl->root) && IsZoomed (impl->root);
     }
 
+    bool WindowMinSize::hostAvailableSize (int& logicalW, int& logicalH) const
+    {
+        HWND c = impl->child, r = impl->root;
+        if (c == nullptr || r == nullptr || ! IsWindow (c) || ! IsWindow (r)) return false;
+        RECT cw {}, rc {};
+        GetWindowRect (c, &cw);
+        GetClientRect (r, &rc);
+        POINT br { rc.right, rc.bottom };
+        ClientToScreen (r, &br);
+        const int lw = impl->logicalWidth ? impl->logicalWidth() : 0;
+        const int pw = (int) (cw.right - cw.left);
+        if (lw <= 0 || pw <= 0) return false;
+        const double ratio = (double) pw / (double) lw;          // pixels physiques par point JUCE
+        logicalW = (int) ((double) (br.x - cw.left) / ratio);
+        logicalH = (int) ((double) (br.y - cw.top) / ratio);
+        return logicalW > 0 && logicalH > 0;
+    }
+
     void WindowMinSize::enforceNow()
     {
         int w = 0, h = 0;
@@ -190,5 +208,6 @@ namespace wiga
     void WindowMinSize::setMaximumSize (int, int) {}
     void WindowMinSize::enforceNow() {}
     bool WindowMinSize::hostMaximized() const { return false; }
+    bool WindowMinSize::hostAvailableSize (int&, int&) const { return false; }
 }
 #endif
