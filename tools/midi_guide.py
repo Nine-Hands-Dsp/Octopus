@@ -14,7 +14,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHOTS, OUT = sys.argv[1], sys.argv[2]
-VERSION = "1.18.73"
+VERSION = "1.18.74"
 TMP = os.path.join(os.path.dirname(os.path.abspath(OUT)), "midi_guide_tmp"); os.makedirs(TMP, exist_ok=True)
 for n, f in (("Pop", "Poppins-Regular"), ("PopM", "Poppins-Medium"), ("PopB", "Poppins-Bold")):
     pdfmetrics.registerFont(TTFont(n, os.path.join(ROOT, "fonts", f + ".ttf")))
