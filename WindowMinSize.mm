@@ -103,6 +103,12 @@ namespace wiga
         impl->apply();
     }
 
+    bool WindowMinSize::hostMaximized() const
+    {
+        if (impl->window == nil) return false;
+        return ([impl->window styleMask] & NSWindowStyleMaskFullScreen) != 0 || [impl->window isZoomed];
+    }
+
     void WindowMinSize::enforceNow()
     {
         NSSize m;

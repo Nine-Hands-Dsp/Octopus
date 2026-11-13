@@ -18,6 +18,8 @@ public:
     OctopusProcessor& getProc() noexcept { return proc; }
 
     // outil de rendu / tests : ouvre une fenêtre de l'écran (0 = aucune, 1 = ajout d'effet, 2 = paramètres, 3 = banks, 4 = presets du plugin)
+    juce::Rectangle<int> pedalArea() const;   // zone d'Octopus dans la fenêtre (taille choisie, centrée en plein écran)
+    int chosenWidth() const;                  // largeur de la taille choisie (Plugin size)
     void showScreen (int which, int arg = 0);
     void screenSearch (const juce::String& text, int chip);
     void screenPick (int visibleIndex);

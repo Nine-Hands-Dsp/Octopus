@@ -4900,8 +4900,9 @@ OctopusEditor::OctopusEditor (OctopusProcessor& p) : AudioProcessorEditor (&p), 
     setResizable (true, true);
     const int minW = L::kMinW;                                                    // jamais plus petit que 60 %
     const int maxW = L::kMaxW;
-    setResizeLimits (minW, (int) std::lround ((double) minW * kH / kW), maxW, (int) std::lround ((double) maxW * kH / kW));
-    getConstrainer()->setFixedAspectRatio ((double) kW / (double) kH);
+    // v1.18.72 : la fenêtre du DAW peut être plus grande (plein écran, fenêtre agrandie) ou d'une autre forme :
+    // Octopus garde ses proportions, ne dépasse pas 100 % et reste centré, le reste est noir
+    setResizeLimits (minW, (int) std::lround ((double) minW * kH / kW), 16384, 16384);
     hostLock.setMinimumSize (minW, (int) std::lround ((double) minW * kH / kW));
     hostLock.setMaximumSize (maxW, (int) std::lround ((double) maxW * kH / kW));
     setOpaque (true);
@@ -4959,7 +4960,7 @@ void OctopusEditor::trackHostWindow()
             hostLock.attach (handle, [top] { return top != nullptr ? top->getWidth() : 0; });
             hostLock.enforceNow();
         }
-        if (getWidth() < L::kMinW - 2) hostLock.enforceNow();
+        if (getWidth() < L::kMinW - 2 || getHeight() < (int) std::lround ((double) L::kMinW * kH / kW) - 2) hostLock.enforceNow();
     }
     else hostLock.detach();
 }
@@ -4977,15 +4978,30 @@ void OctopusEditor::visibilityChanged()      { useSoftwareRenderer(); if (isShow
 
 void OctopusEditor::resized()
 {
-    view->setBounds (getLocalBounds());   // jamais de setSize ici (boucle avec l'hôte à 125 / 150 %)
+    view->setBounds (pedalArea());        // jamais de setSize ici (boucle avec l'hôte à 125 / 150 %)
     for (auto* c : getChildren())                                  // la taille change : le nuancier se ferme
         if (auto* l = dynamic_cast<OctoPickerLayer*> (c); l != nullptr && l->getBounds() != getLocalBounds() && l->isVisible()) l->dismiss();
 }
 
+// zone d'Octopus dans la fenêtre : à la taille choisie (Plugin size), centrée quand la fenêtre est plus grande
+// (plein écran, fenêtre agrandie) ; réduite seulement si la fenêtre est plus petite que cette taille
+int OctopusEditor::chosenWidth() const
+{
+    const int idx = proc.uiScaleIdx.load();
+    return L::kWidths[jlimit (1, L::kNumSizes - 1, idx < 0 ? OctoSettings::defaultSize() : idx)];
+}
+
+Rectangle<int> OctopusEditor::pedalArea() const
+{
+    const double fit = jmin ((double) getWidth() / kW, (double) getHeight() / kH, (double) chosenWidth() / kW);
+    const int w = jmax (1, (int) std::lround (kW * fit)), h = jmax (1, (int) std::lround (kH * fit));
+    return { (getWidth() - w) / 2, (getHeight() - h) / 2, w, h };
+}
+
 int OctopusEditor::getScaleIndex() const
 {
-    for (int i = 0; i < L::kNumSizes; ++i) if (std::abs (getWidth() - L::kWidths[i]) <= 3) return i;
-    return -1;
+    const int idx = proc.uiScaleIdx.load();
+    return idx < 0 ? OctoSettings::defaultSize() : jlimit (1, L::kNumSizes - 1, idx);
 }
 
 void OctopusEditor::setScaleIndex (int idx)
@@ -4994,7 +5010,9 @@ void OctopusEditor::setScaleIndex (int idx)
     if (idx == 0) idx = 1;                                  // ancien 50 % : minimum 60 %
     proc.uiScaleIdx = idx;                                  // -1 : suit la taille par défaut choisie dans le menu
     const int w = L::kWidths[idx < 0 ? OctoSettings::defaultSize() : idx];
+    if (hostLock.hostMaximized()) { resized(); repaint(); return; }   // plein écran : la fenêtre reste, Octopus se recentre à la nouvelle taille
     setSize (w, (int) std::lround ((double) w * kH / kW));
+    resized();
     hostLock.enforceNow();
 }
 

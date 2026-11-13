@@ -147,6 +147,11 @@ namespace wiga
         impl->maxH = logicalH;
     }
 
+    bool WindowMinSize::hostMaximized() const
+    {
+        return impl->root != nullptr && IsWindow (impl->root) && IsZoomed (impl->root);
+    }
+
     void WindowMinSize::enforceNow()
     {
         int w = 0, h = 0;
@@ -184,5 +189,6 @@ namespace wiga
     void WindowMinSize::setMinimumSize (int, int) {}
     void WindowMinSize::setMaximumSize (int, int) {}
     void WindowMinSize::enforceNow() {}
+    bool WindowMinSize::hostMaximized() const { return false; }
 }
 #endif

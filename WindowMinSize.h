@@ -37,6 +37,9 @@ namespace wiga
         // agrandit tout de suite la fenêtre du DAW si elle est plus petite que le minimum
         void enforceNow();
 
+        // fenêtre du DAW agrandie (plein écran) : la taille de la pédale ne doit pas la redimensionner
+        bool hostMaximized() const;
+
         struct Impl;
     private:
         Impl* impl = nullptr;
