@@ -217,6 +217,13 @@ int main (int argc, char** argv)
         e.addFx ({ "JS: Volume Adjustment", "" }, e.laneEndBlock (0, 2));
         check (e.groups()[0].lanes.size() == 3, "voie C ajoutée");
         shot ("octopus_split_3paths");
+        {   // split à 3 voies en 2e rangée : il ne tient pas sous la 1re, ni lignes ni voies fantômes (v1.18.72)
+            for (int k = 0; k < 7; ++k) e.addFx ({ "JS: Volume Adjustment", "" }, 0);
+            pump (3);
+            shot ("octopus_split_row2_hidden");
+            for (int k = 0; k < 7; ++k) e.remove (e.blocks()[0]);
+            pump (3);
+        }
         e.toggle (e.groups()[0].split);
         shot ("octopus_split_off");
         e.load (0);

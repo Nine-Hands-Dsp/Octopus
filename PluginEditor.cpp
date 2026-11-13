@@ -994,6 +994,7 @@ private:
         const int rows = totalRows();
         for (int r = 0; r < rows; ++r)
         {
+            if (r >= firstRow && ! rowVisible (r)) break;          // rangée qui ne tient pas : ni ligne ni voies (v1.18.72)
             const float cy = rowCy (r);
             const bool lastRow = r == rows - 1;
             path.startNewSubPath (P (xL, cy));
@@ -1012,7 +1013,7 @@ private:
         // voies des groupes dépliés : du point Y au point M
         for (auto& gg : gGroups)
         {
-            if (gg.folded) continue;
+            if (gg.folded || (gg.row >= firstRow && ! rowVisible (gg.row))) continue;
             const auto y0 = nodeY (gg), m0 = nodeM (gg);
             for (int l = 1; l < gg.lanes; ++l)
             {
