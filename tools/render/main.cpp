@@ -221,6 +221,9 @@ int main (int argc, char** argv)
             for (int k = 0; k < 7; ++k) e.addFx ({ "JS: Volume Adjustment", "" }, 0);
             pump (3);
             shot ("octopus_split_row2_hidden");
+            ed->showScreen (23, 1); pump (2); shot ("octopus_split_row2_page2");
+            ed->showScreen (23, 2); pump (2); shot ("octopus_split_row2_page3");
+            ed->showScreen (23, 0); pump (2);
             for (int k = 0; k < 7; ++k) e.remove (e.blocks()[0]);
             pump (3);
         }

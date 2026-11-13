@@ -5018,6 +5018,7 @@ void OctopusEditor::showScreen (int which, int arg)
         case 13: view->recGlowPc = arg; view->askRepaint (view->screenPx()); break;   // rendus : glow de l'effet record
         case 14: view->recColourMenu(); break;
         case 21: if (arg != 0) view->startHeaderRename(); else view->headerNameEd.setVisible (false); break;   // rendus : renommer le preset (en-tête)
+        case 23: view->firstRow = jlimit (0, view->maxFirstRow(), arg); view->askRepaint (view->screenPx()); break;   // rendus : page de la grille
         case 22: view->drumBgStyle = arg; view->askRepaint (view->screenPx()); break;   // rendus : fond du tambour (essais)
         case 20: if (arg != 0) view->openInsertDrum(); else view->closeInsertDrum(); break;   // rendus : tambour de l'emplacement
         case 19: if (arg != 0) view->openModeDrum(); else view->closeModeDrum(); break;   // rendus : tambour du mode de CHROMA
