@@ -6,7 +6,7 @@ if(APPLE)
   set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "" FORCE)
 endif()
 
-project(WigaOctopus VERSION 1.18.74)
+project(WigaOctopus VERSION 1.18.75)
 
 include(FetchContent)
 FetchContent_Declare(JUCE
