@@ -147,10 +147,10 @@ int main (int argc, char** argv)
     shot ("octopus_preset");
     {   // Glow intensity des footswitchs (25 / 50 / 75 / 100 %) et menu clic droit de la pédale (tronc commun)
         for (int pc : { 25, 50, 75, 100 }) { ed->showScreen (24, pc); pump (3); shot ("octopus_fsglow_" + String (pc)); }
-        for (int w : { 300, 301, 302 })
+        for (int w : { 300, 301, 302, 303 })
         {
             auto img = ed->menuPreview (w);
-            File f (out + (w == 300 ? "/octopus_menu_pedal_glow.png" : w == 301 ? "/octopus_menu_pedal_midi.png" : "/octopus_menu_pedal_size.png")); f.deleteFile();
+            File f (out + (w == 300 ? "/octopus_menu_pedal_glow.png" : w == 301 ? "/octopus_menu_pedal_midi.png" : w == 302 ? "/octopus_menu_pedal_size.png" : "/octopus_menu_screen_glow.png")); f.deleteFile();
             FileOutputStream os (f); PNGImageFormat().writeImageToStream (img, os);
         }
     }

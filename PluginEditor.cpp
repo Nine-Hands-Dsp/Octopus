@@ -254,7 +254,7 @@ public:
             if (L::drawFsSprite) g.drawImage (fsOff.get(), fr);
             if (L::drawFsSprite && ledLevel[f] > 0.003f)       // flanc de l'écrou tourné vers la LED
             {
-                g.setOpacity (jmin (1.0f, ledLevel[f]) * 0.35f * (float) glowPc / 100.0f);   // reflet sur l'écrou, dosé par Glow intensity
+                g.setOpacity (jmin (1.0f, ledLevel[f]) * 0.35f * jmin (1.5f, (float) haloPc / 100.0f));   // reflet sur l'écrou, dosé par le glow commun
                 g.drawImage (fsOn.get(), fr);
                 g.setOpacity (1.0f);
             }
@@ -658,7 +658,7 @@ private:
         const float rx = L::ringRx[f] * s, ry = L::ringRy[f] * s, wdt = L::ringW * s;
         Path ring;
         ring.addEllipse (c.x - rx, c.y - ry, rx * 2.0f, ry * 2.0f);
-        const float gk = (float) glowPc / 100.0f;                         // Glow intensity (25-100 %) : ne dose que le halo
+        const float gk = (float) haloPc / 100.0f;                         // glow commun (lettres + anneaux) : ne dose que le halo
         const float hk = L::ringRx[f] / 33.2f;                            // halo de la règle des pédales : traits de 20 à 3 x (rayon / 33,2)
         for (float hw = 20.0f; hw >= 3.0f; hw -= 1.5f)                   // de plus en plus larges et transparents, 0,075 x Glow x niveau
         {
@@ -4570,6 +4570,7 @@ private:
         m.addItem (2, "Save the chain...");
         m.addItem (3, "Banks...");
         addSizeMenu (m);
+        if (captureOnly) { captured = m; return; }
         SafePointer<PedalView> sp (this);
         styled (m).showMenuAsync (PopupMenu::Options(), [sp, blockPos] (int r)
         {
@@ -4641,10 +4642,10 @@ private:
     Image menuPreview (int which)
     {
         captureOnly = true; captured = {};
-        if (which >= 300) pedalMenu(); else if (which == 200) tuningMenu(); else if (which < 100) footswitchMenu (which); else blockMenu (which - 100);
+        if (which == 303) gridMenu (0); else if (which >= 300) pedalMenu(); else if (which == 200) tuningMenu(); else if (which < 100) footswitchMenu (which); else blockMenu (which - 100);
         captureOnly = false;
         PopupMenu main = captured; captured = {};
-        const String openPrefix = which == 300 ? "Glow intensity" : which == 301 ? "MIDI" : which == 302 ? "Plugin size"
+        const String openPrefix = which == 300 || which == 303 ? "Glow intensity" : which == 301 ? "MIDI" : which == 302 ? "Plugin size"
                                 : which == 200 ? "" : which < 100 ? "STOMP : blocks" : "Assign";
 
         struct Row { const PopupMenu::Item* it; int h; };
@@ -4685,7 +4686,7 @@ private:
                 {
                     const bool hi = it.subMenu != nullptr && open == nullptr && it.text.startsWith (openPrefix);
                     if (hi) { open = it.subMenu.get(); openY = y; }
-                    menuLnf.drawPopupMenuItem (g, a, it.isSeparator, it.isEnabled, hi, it.isTicked, it.subMenu != nullptr, it.text, {}, nullptr, nullptr);
+                    menuLnf.drawPopupMenuItem (g, a, it.isSeparator, it.isEnabled, hi, it.isTicked, it.subMenu != nullptr, it.text, it.shortcutKeyDescription, nullptr, nullptr);
                 }
                 y += r.h;
             }
@@ -4786,36 +4787,34 @@ private:
         }
         sub.addSeparator();
         sub.addSubMenu ("Default size (new windows)", defM);
-        PopupMenu glowM;                                  // opacité du halo des lettres et du symbole de l'accordeur (réglage propre à Octopus)
-        for (int i = 0; i < kNumHalo; ++i)
-            glowM.addItem (930 + i, kHalo[i] == 0 ? String ("Off (0 %)") : String (kHalo[i]) + " %" + (kHalo[i] == 100 ? "  (default)" : ""), true, haloPc == kHalo[i]);
-        m.addSeparator();
-        m.addSubMenu ("Letter glow (halo opacity)", glowM);
         // tronc commun des pédales : Plugin size puis Glow intensity, en dernier
+        // v1.18.86 : un seul Glow intensity (25 / 50 / 75 / 100 %) pour le halo des lettres ET des anneaux des footswitchs ;
+        // plus de « Letter glow » séparé. Les lignes gardent l'icône du glow (MenuStyle : raccourci "ico:glow").
         m.addSeparator();
         m.addSubMenu ("Plugin size", sub);
-        PopupMenu fsGlow;                                 // Glow intensity : halo des anneaux des footswitchs, 25 / 50 / 75 / 100 %
+        PopupMenu fsGlow;
         for (int pc = 25; pc <= 100; pc += 25)
-            fsGlow.addItem (940 + pc / 25, "Glow " + String (pc) + " %" + (pc == 100 ? "  (default)" : ""), true, glowPc == pc);
+        {
+            PopupMenu::Item it (String (pc) + " %" + (pc == 100 ? "  (default)" : ""));
+            it.itemID = 940 + pc / 25;
+            it.isTicked = haloPc == pc;
+            it.shortcutKeyDescription = "ico:glow";
+            fsGlow.addItem (std::move (it));
+        }
         m.addSubMenu ("Glow intensity", fsGlow);
     }
     static constexpr int kNumHalo = 9;
     static constexpr int kHalo[kNumHalo] = { 0, 25, 50, 75, 100, 125, 150, 175, 200 };
     int haloPc = OctoSettings::haloPercent();
-    int glowPc = OctoSettings::glowPercent();             // halo des anneaux des footswitchs (Glow intensity)
     double lastGlowReadMs = 0.0;
-    void setGlow (int pc, bool tell = true)
-    {
-        glowPc = jlimit (25, 100, pc);
-        OctoSettings::setGlowPercent (glowPc);
-        if (tell) { OctoSettings::flush(); eng.say ("Glow  " + String (glowPc) + " %"); }
-        repaint();
-    }
+    // v1.18.86 : un seul glow (haloPc) pour le halo des lettres, des marquages, de l'accordeur et des anneaux des
+    // footswitchs ; réglé par Glow intensity (menus) ou par GLOW dans Color & Glow (footswitch, preset, accordeur)
+    void setGlow (int pc, bool tell = true) { setHalo (pc, tell); }
     void setHalo (int pc, bool tell = true)
     {
         haloPc = jlimit (0, 200, pc);
         OctoSettings::setHaloPercent (haloPc);
-        if (tell) { OctoSettings::flush(); eng.say ("Letter glow : " + String (haloPc) + " %"); }
+        if (tell) { OctoSettings::flush(); eng.say ("Glow : " + String (haloPc) + " %"); }
         askRepaint (getLocalBounds());
     }
 
@@ -4824,7 +4823,7 @@ private:
         auto* ed = findParentComponentOfClass<OctopusEditor>();
         if (ed == nullptr) return;
         if (r >= 930 && r < 930 + kNumHalo) { setHalo (kHalo[r - 930]); return; }
-        if (r >= 941 && r <= 944) { setGlow ((r - 940) * 25); return; }
+        if (r >= 941 && r <= 944) { setHalo ((r - 940) * 25); return; }
         if (r >= 910 && r < 910 + L::kNumSizes) ed->setScaleIndex (r - 910);
         else if (r >= 920 && r < 920 + L::kNumSizes)
         {
@@ -4843,7 +4842,7 @@ private:
         if (now - lastGlowReadMs > 2000.0)                    // Glow intensity réglé dans une autre fenêtre d'Octopus
         {
             lastGlowReadMs = now;
-            if (const int gp = OctoSettings::glowPercent(); gp != glowPc) { glowPc = gp; repaint(); }
+            if (const int gp = OctoSettings::haloPercent(); gp != haloPc) { haloPc = gp; repaint(); }
         }
         if (overlay == Overlay::browser && hoverItem >= 0 && ! tipShown && now - hoverItemMs >= kTipDelayMs)
         {
