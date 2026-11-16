@@ -2262,7 +2262,7 @@ private:
             { "darkbass",     "Bass preamp and overdrive in the spirit of the Darkglass Microtubes B7K Ultra: grit, blend and EQ." },
             { "impulse",      "Dual cabinet IR loader for guitar and bass: two impulse responses A and B with a MIX knob, and an IR library with TONE3000 sync." },
             { "screamer",     "Overdrive in the spirit of the Ibanez TS9 Tube Screamer: smooth mid-hump drive and boost." },
-            { "omi",          "Guitar to MIDI converter in the spirit of the Roland GI-20: turns single notes into MIDI notes, velocity and pitch bend to play a bass VST or a synth, tracking 7 and 8 strings down to A0 (SENS threshold, DYN, BEND, TRANS); in REAPER, a click on its screen creates the MIDI instrument track, low notes folded into the bass range." },
+            { "omi",          "Guitar to MIDI converter in the spirit of the Roland GI-20: turns single notes into MIDI notes, velocity and pitch bend to play a bass VST or a synth, tracking 7 and 8 strings down to A0 (SENS threshold, DYN, BEND, TRANS); fast string-to-string tracking; in REAPER it creates the MIDI instrument track on insert, low notes folded into the bass range." },
             { "coilmines",    "Pickup modeler: puts one of 58 measured pickups (Seymour Duncan, DiMarzio, EMG, Fishman Fluence, Bare Knuckle, Gibson, Fender) in place of the guitar's own pickup, neck, bridge or both, with A/B sets, Morph and a sweep calibration of your pickups." },
             { "stereo width", "Stereo width: from mono to wide stereo." } };
         const auto n = shortName.toLowerCase();
