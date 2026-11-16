@@ -161,7 +161,7 @@ namespace MenuStyle
         void drawPopupMenuItem (Graphics& g, const Rectangle<int>& area, bool isSeparator, bool isActive, bool isHighlighted, bool isTicked,
                                 bool hasSubMenu, const String& text, const String& shortcut, const Drawable* icon, const Colour* textColour) override
         {
-            ignoreUnused (shortcut, icon);
+            ignoreUnused (icon);
             const auto a = area.toFloat();
             if (isSeparator)
             {
@@ -177,7 +177,7 @@ namespace MenuStyle
             }
             const auto ib = Rectangle<float> (15.0f, 15.0f).withCentre ({ a.getX() + 22.0f, a.getCentreY() });
             if (isTicked) drawCheck (g, ib.expanded (1.0f), kAccent, 2.0f);
-            else drawIco (g, iconFor (text), ib, ! isActive ? kFaint : hi ? kAccent : kDim);
+            else drawIco (g, shortcut == "ico:glow" ? (int) icoGlow : iconFor (text), ib, ! isActive ? kFaint : hi ? kAccent : kDim);   // "ico:glow" : icône imposée
             auto tr = a.withTrimmedLeft (38.0f).withTrimmedRight (hasSubMenu ? 30.0f : 14.0f);
             g.setFont (getPopupMenuFont());
             g.setColour (textColour != nullptr ? *textColour : ! isActive ? kDim.withAlpha (0.55f) : hi ? Colours::white : kText);
