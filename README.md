@@ -153,6 +153,7 @@ v1.15.0 : fenêtre d'ajout : nombres des filtres sans pastille ; en A-Z la liste
 v1.16.0 : fenêtre d'ajout redessinée : emplacement cliquable à côté du titre (au début, avant un bloc, à la fin), tri A-Z / TYPE en interrupteur, « N selected ✕ » pour vider la sélection, ADD plein, rescan en icône, recherche pleine largeur avec loupe, filtres en onglets soulignés ; cases de même hauteur et même écart.
 v1.17.0 : menus clic droit redessinés (fond sombre arrondi, icônes, en-tête à pastille sur tous les menus) ; STOMP d'un footswitch en grille de blocs qui reste ouverte (plusieurs blocs cochés d'affilée, groupe en une tuile A <-> B, « N selected » + CLEAR) ; bandeau 5 plus bas, textes recentrés, BANK et flèches à la taille des autres, PRESET bleu / STOMP orange sans soulignement, badge plus petit ; REC seul en rouge sous IN (fixe quand la piste est armée, clignote pendant l'enregistrement) ; écran noir uni.
 v1.18.85 : Omi v1.0.8 pris en compte (attaque reconnue à la brillance du médiator, latence réduite).
+v1.18.86 : FM-9 v1.4.4 pris en compte (émulation des firmwares deux fois plus rapide, plus de saturation sur SHRUB).
 v1.18.84 : FM-9 v1.4.3 pris en compte (horloge Auto jusqu'à 60 MHz pour les firmwares les plus gourmands).
 v1.18.83 : Coilmines v1.2.0 pris en compte (description : guitares enregistrées et nommées).
 v1.18.82 : Omi v1.0.5 pris en compte (description : tenue d'octave).
