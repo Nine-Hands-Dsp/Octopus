@@ -154,7 +154,7 @@ v1.16.0 : fenêtre d'ajout redessinée : emplacement cliquable à côté du titr
 v1.17.0 : menus clic droit redessinés (fond sombre arrondi, icônes, en-tête à pastille sur tous les menus) ; STOMP d'un footswitch en grille de blocs qui reste ouverte (plusieurs blocs cochés d'affilée, groupe en une tuile A <-> B, « N selected » + CLEAR) ; bandeau 5 plus bas, textes recentrés, BANK et flèches à la taille des autres, PRESET bleu / STOMP orange sans soulignement, badge plus petit ; REC seul en rouge sous IN (fixe quand la piste est armée, clignote pendant l'enregistrement) ; écran noir uni.
 v1.18.74 : plein écran : plus de boucle avec REAPER (la fenêtre rétrécissait et vibrait) ; Octopus demande la place une seule fois par agrandissement, seulement pour grandir, et garde une marge en bas.
 v1.18.78 : Coilmines v1.0.0 ajouté (modélisation de micros : description dans la fenêtre ADD AN EFFECT, famille « special »).
-v1.18.78 : Omi v1.0.1 pris en compte (description : piste d'instrument REAPER en un clic, notes graves ramenées dans la tessiture de la basse).
+v1.18.79 : Omi v1.0.1 pris en compte (description : piste d'instrument REAPER en un clic, notes graves ramenées dans la tessiture de la basse).
 v1.18.77 : Omi v1.0.0 ajouté (convertisseur guitare → MIDI : description dans la fenêtre ADD AN EFFECT, famille « special »).
 v1.18.76 : FM-9 v1.4.2 pris en compte (description : clavier maître sur les touches de la FM-1 pour les firmwares qui n'écoutent pas le MIDI).
 v1.18.75 : Freeze Shimmer v1.5.3 (le son figé garde le niveau de la capture, correction de niveau du freeze spectral).
