@@ -1,0 +1,35 @@
+name: Relance des builds Mac
+
+# Les Mac de GitHub (Apple Silicon comme Intel) sont parfois saturés : un job macOS qui n'est pris par
+# aucune machine finit annulé ("not acquired by Runner"), et la Release ne sort pas.
+# Toutes les heures, si le dernier build de la branche principale a un job annulé, on le relance
+# en basculant sur l'autre type de Mac (macos-15 <-> macos-15-intel). Au plus 6 relances par 24 h.
+on:
+  schedule:
+    - cron: '41 * * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  retry:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Relancer le dernier build si un job Mac a été annulé
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          RUN=$(gh run list -R "$REPO" --workflow build.yml --branch "$BRANCH" --limit 1 --json databaseId,status -q '.[0] | select(.status=="completed") | .databaseId')
+          [ -z "$RUN" ] && { echo "aucun build termine"; exit 0; }
+          LABEL=$(gh api "repos/$REPO/actions/runs/$RUN/jobs" -q '[.jobs[] | select(.conclusion=="cancelled") | .labels[0]] | first // empty')
+          [ -z "$LABEL" ] && { echo "dernier build ($RUN) : aucun job annule"; exit 0; }
+          SINCE=$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)
+          N=$(gh run list -R "$REPO" --workflow build.yml --event workflow_dispatch --limit 50 --json createdAt -q "[.[] | select(.createdAt > \"$SINCE\")] | length")
+          [ "${N:-0}" -ge 6 ] && { echo "deja $N relances en 24 h : on attend"; exit 0; }
+          if [ "$LABEL" = "macos-15-intel" ]; then NEXT=macos-15; else NEXT=macos-15-intel; fi
+          echo "build $RUN : job annule sur $LABEL -> relance sur $NEXT"
+          gh workflow run build.yml -R "$REPO" --ref "$BRANCH" -f mac_runner="$NEXT"

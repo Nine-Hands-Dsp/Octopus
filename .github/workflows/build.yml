@@ -2,6 +2,10 @@ name: Build Windows + macOS
 on:
   push:
   workflow_dispatch:
+    inputs:
+      mac_runner:
+        description: 'Mac de GitHub : macos-15 (Apple Silicon) ou macos-15-intel'
+        default: 'macos-15'
 jobs:
   win:
     runs-on: windows-2022
@@ -18,7 +22,7 @@ jobs:
           path: build/Octopus_artefacts/Release/VST3/
 
   mac:
-    runs-on: macos-15-intel     # macos-14 retiré le 2 novembre 2026 ; les Mac arm64 de GitHub sont saturés (jobs jamais pris en charge)
+    runs-on: ${{ inputs.mac_runner || 'macos-15' }}   # Mac Apple Silicon par defaut (binaire universel) ; mac-retry.yml relance sur macos-15-intel si aucune machine n'est prise
     steps:
       - uses: actions/checkout@v5
       - name: Configure
