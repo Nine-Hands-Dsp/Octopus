@@ -101,7 +101,7 @@ namespace FxCat
         if (has ({ "whammy", "wharry", "octav", "pitch", "semitone", "harmoni", "capo", "transpos", "fog z", "pog" })
             || word ({ "fog" }))                                                                              return pitch;
         if (has ({ "crycat", "wah", "envelope", "filter", "autowah", "talk" }) || word ({ "cry" }))         return filter;
-        if (has ({ "delay", "echo", "tape" }))                                                               return delay;
+        if (has ({ "delay", "echo", "tape", "space sonar" }))                                                               return delay;
         if (has ({ "verb", "hall", "plate", "shimmer", "room", "space", "ambien" }))                         return reverb;
         if (has ({ "chorus", "flang", "phase", "phaser", "vibrato", "tremolo", "rotary", "leslie", "small tone",
                   "wack", "pipeline", "vibe", "ensemble", "modul", "doubler" }) || word ({ "trem", "uni" }))  return mod;
