@@ -42,7 +42,7 @@ private:
     double lastRendererCheckMs = 0.0;
     bool fillTried = false;              // une seule demande de place par agrandissement (pas de boucle avec l'hôte)
     bool fillingHost = false;            // la fenêtre du DAW est agrandie : Octopus en remplit toute la place libre
-    juce::Point<int> preFillSize;        // taille d'avant le plein écran, reprise au retour
+    juce::Point<int> preFillSize, lastClamp;        // taille d'avant le plein écran, reprise au retour
     int maxW = 16384, maxH = 16384;      // taille maximale : l'écran où se trouve Octopus
     void updateScreenLimits();
     void setFreeSize (int w);            // largeur libre, proportions gardées, entre 60 % et l'écran

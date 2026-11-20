@@ -705,6 +705,9 @@ int main (int argc, char** argv)
         ed->setSize (1400, (int) std::lround (1400.0 * 743.0 / 993.0)); pump (3);
         check (ed->pedalArea().getWidth() >= 1398 && ed->pedalArea().getX() <= 1, "coin tiré : Octopus remplit la fenêtre (" + ed->pedalArea().toString() + ")");
         check (ed->getScaleIndex() == -1, "coin tiré : aucune taille du menu cochée");
+        ed->setSize (1500, 900); pump (3);      // v1.18.97 : fenêtre d'une autre forme : Octopus entier dedans, centré, jamais rogné
+        check (ed->getLocalBounds().contains (ed->pedalArea()) && ed->pedalArea().getHeight() == 900
+               && std::abs (ed->pedalArea().getCentreX() - 750) <= 1, "autre forme : Octopus entier et centré (" + ed->pedalArea().toString() + ")");
     }
     {   // plein écran (fenêtre du DAW agrandie, 1920 x 1009) : taille choisie, centrée, proportions gardées
         ed->showScreen (25, 1);

@@ -4939,7 +4939,9 @@ OctopusEditor::OctopusEditor (OctopusProcessor& p) : AudioProcessorEditor (&p), 
     const int minW = L::kMinW;                                                    // jamais plus petit que 60 %
     // v1.18.95 : le coin bas droit agrandit Octopus (proportions gardées), entre 60 % et la taille de l'écran où il
     // se trouve ; le centrage (taille du menu Plugin size, noir autour) ne se fait qu'en plein écran
-    getConstrainer()->setFixedAspectRatio ((double) kW / kH);
+    // v1.18.97 : plus de proportions imposées à la fenêtre (REAPER et le constrainer se renvoyaient des tailles et la
+    // vue du plugin pouvait devenir plus grande que sa fenêtre : Octopus zoomé et rogné) ; Octopus s'inscrit dans la
+    // fenêtre en gardant ses proportions
     setResizeLimits (minW, (int) std::lround ((double) minW * kH / kW), 16384, 16384);
     hostLock.setMinimumSize (minW, (int) std::lround ((double) minW * kH / kW));
     setOpaque (true);
@@ -5015,8 +5017,7 @@ void OctopusEditor::trackHostWindow()
                 {
                     preFillSize = { getWidth(), getHeight() };
                     fillingHost = true;
-                    setResizeLimits (L::kMinW, minH, 16384, 16384);      // la place libre peut changer de forme
-                    getConstrainer()->setFixedAspectRatio (0.0);
+                    setResizeLimits (L::kMinW, minH, 16384, 16384);      // la place libre peut dépasser la limite d'écran
                     setSize (jmax (aw, getWidth()), jmax (ah, getHeight()));
                 }
             }
@@ -5027,10 +5028,21 @@ void OctopusEditor::trackHostWindow()
             if (fillingHost)
             {
                 fillingHost = false;                               // retour en fenêtre normale : taille d'avant
-                getConstrainer()->setFixedAspectRatio ((double) kW / kH);
+                maxW = maxH = 16384;                               // force la remise des limites d'écran
                 updateScreenLimits();
                 setFreeSize (preFillSize.x > 0 ? preFillSize.x : chosenWidth());
             }
+        }
+        // v1.18.97 : garde-fou, la vue ne doit jamais être plus grande que la place que lui laisse la fenêtre du DAW
+        // (sinon Octopus est rogné) : on la ramène une fois à cette place
+        if (! fillingHost && ! hostLock.hostMaximized())
+        {
+            int aw = 0, ah = 0;
+            if (hostLock.hostAvailableSize (aw, ah) && aw >= L::kMinW && ah >= minH && (getWidth() > aw + 4 || getHeight() > ah + 4))
+            {
+                if (lastClamp != Point<int> (aw, ah)) { lastClamp = { aw, ah }; setSize (jmin (getWidth(), aw), jmin (getHeight(), ah)); }
+            }
+            else lastClamp = {};
         }
         if (getWidth() < L::kMinW - 2 || getHeight() < (int) std::lround ((double) L::kMinW * kH / kW) - 2) hostLock.enforceNow();
     }
@@ -5062,7 +5074,7 @@ void OctopusEditor::updateScreenLimits()
     maxW = mw; maxH = mh2;
     setResizeLimits (L::kMinW, (int) std::lround ((double) L::kMinW * kH / kW), maxW, maxH);
     hostLock.setMaximumSize (maxW, maxH);
-    if (getWidth() > maxW + 2) setFreeSize (maxW);                 // passée sur un écran plus petit
+    if (getWidth() > maxW + 2 || getHeight() > maxH + 2) setFreeSize (maxW);   // passée sur un écran plus petit
 }
 
 void OctopusEditor::setFreeSize (int w)
