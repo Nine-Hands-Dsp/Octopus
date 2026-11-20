@@ -77,6 +77,7 @@ public:
     int  semitonesPreset() const noexcept { return semiIdx.load(); }
     void setSemitonesPreset (int i);
     juce::AudioProcessorValueTreeState apvts;
+    std::atomic<int> uiWidth { 0 };         // v1.18.95 : largeur libre (coin bas droit tiré), 0 = taille du menu
     std::atomic<int> uiScaleIdx { -1 };     // -1 = taille par défaut (réglage commun) ; 0..3 = 50 / 60 / 75 / 100 %
 
     static constexpr const char* kTokenId = "octoid";

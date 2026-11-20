@@ -675,24 +675,29 @@ int main (int argc, char** argv)
     check (ed->getWidth() == 993, "taille par défaut (60 % sans réglage) : " + String (ed->getWidth()));
     ed->setScaleIndex (3);
     shot ("octopus_100pc");
-    {   // plein écran (fenêtre du DAW agrandie, 1920 x 1009) : Octopus centré, proportions gardées (v1.18.72)
+    {   // v1.18.95 : coin bas droit tiré (fenêtre normale) : Octopus remplit sa fenêtre, à n'importe quelle taille
+        ed->setSize (1400, (int) std::lround (1400.0 * 743.0 / 993.0)); pump (3);
+        check (ed->pedalArea().getWidth() >= 1398 && ed->pedalArea().getX() <= 1, "coin tiré : Octopus remplit la fenêtre (" + ed->pedalArea().toString() + ")");
+        check (ed->getScaleIndex() == -1, "coin tiré : aucune taille du menu cochée");
+    }
+    {   // plein écran (fenêtre du DAW agrandie, 1920 x 1009) : taille choisie, centrée, proportions gardées
+        ed->showScreen (25, 1);
+        ed->setScaleIndex (3);
         ed->setSize (1920, 1009); pump (3);
         const auto a = ed->pedalArea();
-        check (std::abs (a.getCentreX() - 960) <= 1 && std::abs (a.getCentreY() - 504) <= 1 && a.getHeight() == 1009,
-               "plein écran : Octopus centré (" + a.toString() + ")");
+        check (std::abs (a.getCentreX() - 960) <= 1 && a.getHeight() == 993, "plein écran : Octopus centré (" + a.toString() + ")");
         auto img = ed->createComponentSnapshot (ed->getLocalBounds(), true, 1.0f);
         File f (out + "/octopus_fullscreen.png"); f.deleteFile();
         FileOutputStream os (f); PNGImageFormat().writeImageToStream (img, os);
-        ed->setSize (2400, 1100); pump (3);
-        check (ed->pedalArea().getWidth() == 1471 && ed->pedalArea().getX() == (2400 - 1471) / 2, "écran large : centré (" + ed->pedalArea().toString() + ")");
-        ed->setScaleIndex (1); ed->setSize (1920, 1009); pump (3);      // taille choisie 60 % : reste à 60 %, centrée
-        check (ed->pedalArea().getWidth() == 993 && std::abs (ed->pedalArea().getCentreX() - 960) <= 1
-               && std::abs (ed->pedalArea().getCentreY() - 504) <= 1, "plein écran à 60 % : taille gardée, centrée (" + ed->pedalArea().toString() + ")");
+        ed->setScaleIndex (1); pump (3);                                 // taille choisie 60 % : reste à 60 %, centrée
+        check (ed->getWidth() == 1920 && ed->pedalArea().getWidth() == 993 && std::abs (ed->pedalArea().getCentreX() - 960) <= 1,
+               "plein écran à 60 % : fenêtre gardée, Octopus à 60 % centré (" + ed->pedalArea().toString() + ")");
         {
-            auto img = ed->createComponentSnapshot (ed->getLocalBounds(), true, 1.0f);
-            File f (out + "/octopus_fullscreen_60.png"); f.deleteFile();
-            FileOutputStream os (f); PNGImageFormat().writeImageToStream (img, os);
+            auto img2 = ed->createComponentSnapshot (ed->getLocalBounds(), true, 1.0f);
+            File f2 (out + "/octopus_fullscreen_60.png"); f2.deleteFile();
+            FileOutputStream os2 (f2); PNGImageFormat().writeImageToStream (img2, os2);
         }
+        ed->showScreen (25, 0);
         ed->setScaleIndex (3); pump (3);
         check (ed->pedalArea() == ed->getLocalBounds(), "retour à 100 % : Octopus remplit la fenêtre");
     }

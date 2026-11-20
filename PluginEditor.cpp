@@ -4937,14 +4937,14 @@ OctopusEditor::OctopusEditor (OctopusProcessor& p) : AudioProcessorEditor (&p), 
     addAndMakeVisible (*view);
     setResizable (true, true);
     const int minW = L::kMinW;                                                    // jamais plus petit que 60 %
-    const int maxW = L::kMaxW;
-    // v1.18.72 : la fenêtre du DAW peut être plus grande (plein écran, fenêtre agrandie) ou d'une autre forme :
-    // Octopus garde ses proportions, ne dépasse pas 100 % et reste centré, le reste est noir
+    // v1.18.95 : le coin bas droit agrandit Octopus (proportions gardées), entre 60 % et la taille de l'écran où il
+    // se trouve ; le centrage (taille du menu Plugin size, noir autour) ne se fait qu'en plein écran
+    getConstrainer()->setFixedAspectRatio ((double) kW / kH);
     setResizeLimits (minW, (int) std::lround ((double) minW * kH / kW), 16384, 16384);
     hostLock.setMinimumSize (minW, (int) std::lround ((double) minW * kH / kW));
-    hostLock.setMaximumSize (maxW, (int) std::lround ((double) maxW * kH / kW));
     setOpaque (true);
-    setScaleIndex (jlimit (-1, L::kNumSizes - 1, proc.uiScaleIdx.load()));
+    if (proc.uiWidth.load() >= minW) setFreeSize (proc.uiWidth.load());
+    else setScaleIndex (jlimit (-1, L::kNumSizes - 1, proc.uiScaleIdx.load()));
     view->initCaches();
 }
 
@@ -5004,6 +5004,7 @@ void OctopusEditor::trackHostWindow()
         // fenêtre (bordures hors écran) et la zone libre rapetisse de quelques pixels : la redemander à chaque tic
         // faisait rétrécir la fenêtre en boucle (elle « vibrait » jusqu'à une bande de 120 px).
         const int minH = (int) std::lround ((double) L::kMinW * kH / kW);
+        if (! fillingHost) updateScreenLimits();
         if (hostLock.hostMaximized())
         {
             if (! fillTried)
@@ -5012,7 +5013,10 @@ void OctopusEditor::trackHostWindow()
                 int aw = 0, ah = 0;
                 if (hostLock.hostAvailableSize (aw, ah) && aw >= L::kMinW && ah >= minH && (aw > getWidth() + 2 || ah > getHeight() + 2))
                 {
+                    preFillSize = { getWidth(), getHeight() };
                     fillingHost = true;
+                    setResizeLimits (L::kMinW, minH, 16384, 16384);      // la place libre peut changer de forme
+                    getConstrainer()->setFixedAspectRatio (0.0);
                     setSize (jmax (aw, getWidth()), jmax (ah, getHeight()));
                 }
             }
@@ -5022,8 +5026,10 @@ void OctopusEditor::trackHostWindow()
             fillTried = false;
             if (fillingHost)
             {
-                fillingHost = false;                               // retour en fenêtre normale : taille choisie
-                setScaleIndex (proc.uiScaleIdx.load());
+                fillingHost = false;                               // retour en fenêtre normale : taille d'avant
+                getConstrainer()->setFixedAspectRatio ((double) kW / kH);
+                updateScreenLimits();
+                setFreeSize (preFillSize.x > 0 ? preFillSize.x : chosenWidth());
             }
         }
         if (getWidth() < L::kMinW - 2 || getHeight() < (int) std::lround ((double) L::kMinW * kH / kW) - 2) hostLock.enforceNow();
@@ -5042,9 +5048,41 @@ void OctopusEditor::paint (Graphics& g) { g.fillAll (Colours::black); }
 void OctopusEditor::parentHierarchyChanged() { useSoftwareRenderer(); trackHostWindow(); }
 void OctopusEditor::visibilityChanged()      { useSoftwareRenderer(); if (isShowing()) repaint(); }
 
+// taille maximale = l'écran où se trouve Octopus (zone utile, moins la barre de titre et les bords de la fenêtre du DAW)
+void OctopusEditor::updateScreenLimits()
+{
+    if (getPeer() == nullptr) return;
+    const auto* d = Desktop::getInstance().getDisplays().getDisplayForRect (getScreenBounds());
+    if (d == nullptr) return;
+    const auto ua = d->userArea;
+    const int mh = jmax ((int) std::lround ((double) L::kMinW * kH / kW), ua.getHeight() - 60);
+    const int mw = jmax (L::kMinW, jmin (ua.getWidth() - 16, (int) ((double) mh * kW / kH)));
+    const int mh2 = (int) std::lround ((double) mw * kH / kW);
+    if (mw == maxW && mh2 == maxH) return;
+    maxW = mw; maxH = mh2;
+    setResizeLimits (L::kMinW, (int) std::lround ((double) L::kMinW * kH / kW), maxW, maxH);
+    hostLock.setMaximumSize (maxW, maxH);
+    if (getWidth() > maxW + 2) setFreeSize (maxW);                 // passée sur un écran plus petit
+}
+
+void OctopusEditor::setFreeSize (int w)
+{
+    w = jlimit (L::kMinW, jmax (L::kMinW, maxW), w);
+    setSize (w, (int) std::lround ((double) w * kH / kW));
+    resized();
+    hostLock.enforceNow();
+}
+
 void OctopusEditor::resized()
 {
     view->setBounds (pedalArea());        // jamais de setSize ici (boucle avec l'hôte à 125 / 150 %)
+    if (! fillingHost && getWidth() >= L::kMinW)                   // coin tiré : largeur gardée avec le projet
+    {
+        int match = -1;
+        for (int i = 1; i < L::kNumSizes; ++i) if (std::abs (getWidth() - L::kWidths[i]) <= 3) match = i;
+        proc.uiWidth = match >= 0 ? 0 : getWidth();
+        if (match >= 0 && proc.uiScaleIdx.load() != match && proc.uiScaleIdx.load() >= 0) proc.uiScaleIdx = match;
+    }
     for (auto* c : getChildren())                                  // la taille change : le nuancier se ferme
         if (auto* l = dynamic_cast<OctoPickerLayer*> (c); l != nullptr && l->getBounds() != getLocalBounds() && l->isVisible()) l->dismiss();
 }
@@ -5060,13 +5098,20 @@ int OctopusEditor::chosenWidth() const
 Rectangle<int> OctopusEditor::pedalArea() const
 {
     const int avH = fillingHost ? getHeight() - 16 : getHeight();   // plein écran : marge pour le bas que l'hôte peut rogner
-    const double fit = jmin ((double) getWidth() / kW, (double) avH / kH, (double) chosenWidth() / kW);
+    // plein écran : taille choisie (Plugin size), centrée ; sinon Octopus remplit sa fenêtre (coin bas droit)
+    const double cap = fillingHost ? (double) chosenWidth() / kW : 1.0e9;
+    const double fit = jmin ((double) getWidth() / kW, (double) avH / kH, cap);
     const int w = jmax (1, (int) std::lround (kW * fit)), h = jmax (1, (int) std::lround (kH * fit));
     return { (getWidth() - w) / 2, (avH - h) / 2, w, h };
 }
 
 int OctopusEditor::getScaleIndex() const
 {
+    if (! fillingHost)                                      // fenêtre tirée au coin : coche seulement si une taille du menu
+    {
+        for (int i = 1; i < L::kNumSizes; ++i) if (std::abs (getWidth() - L::kWidths[i]) <= 3) return i;
+        return -1;
+    }
     const int idx = proc.uiScaleIdx.load();
     return idx < 0 ? OctoSettings::defaultSize() : jlimit (1, L::kNumSizes - 1, idx);
 }
@@ -5077,10 +5122,9 @@ void OctopusEditor::setScaleIndex (int idx)
     if (idx == 0) idx = 1;                                  // ancien 50 % : minimum 60 %
     proc.uiScaleIdx = idx;                                  // -1 : suit la taille par défaut choisie dans le menu
     const int w = L::kWidths[idx < 0 ? OctoSettings::defaultSize() : idx];
-    if (hostLock.hostMaximized()) { resized(); repaint(); return; }   // plein écran : la fenêtre reste, Octopus se recentre à la nouvelle taille
-    setSize (w, (int) std::lround ((double) w * kH / kW));
-    resized();
-    hostLock.enforceNow();
+    if (fillingHost || hostLock.hostMaximized()) { resized(); repaint(); return; }   // plein écran : la fenêtre reste, Octopus se recentre à la nouvelle taille
+    proc.uiWidth = 0;
+    setFreeSize (w);
 }
 
 void OctopusEditor::showScreen (int which, int arg)
@@ -5103,7 +5147,8 @@ void OctopusEditor::showScreen (int which, int arg)
         case 13: view->recGlowPc = arg; view->askRepaint (view->screenPx()); break;   // rendus : glow de l'effet record
         case 14: view->recColourMenu(); break;
         case 21: if (arg != 0) view->startHeaderRename(); else view->headerNameEd.setVisible (false); break;   // rendus : renommer le preset (en-tête)
-        case 24: view->setGlow (arg, false); break;   // rendus : Glow intensity des footswitchs
+        case 24: view->setGlow (arg, false); break;
+        case 25: fillingHost = arg != 0; resized(); break;   // rendus : simule le plein écran   // rendus : Glow intensity des footswitchs
         case 23: view->firstRow = jlimit (0, view->maxFirstRow(), arg); view->askRepaint (view->screenPx()); break;   // rendus : page de la grille
         case 22: view->drumBgStyle = arg; view->askRepaint (view->screenPx()); break;   // rendus : fond du tambour (essais)
         case 20: if (arg != 0) view->openInsertDrum(); else view->closeInsertDrum(); break;   // rendus : tambour de l'emplacement
