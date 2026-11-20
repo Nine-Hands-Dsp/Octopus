@@ -675,6 +675,32 @@ int main (int argc, char** argv)
     check (ed->getWidth() == 993, "taille par défaut (60 % sans réglage) : " + String (ed->getWidth()));
     ed->setScaleIndex (3);
     shot ("octopus_100pc");
+    {   // v1.18.96 : planche des icônes des plugins NINE HANDS | DSP (nouvelles icônes pour ceux qui avaient la prise)
+        const char* names[] = { "509", "Ampire", "Anode", "Arc", "Backdraft", "Chroma", "Coilmines", "CompMix", "Crycat", "Darkbass",
+                                "Doorn", "Echoflex", "Eight Echo", "Fantomine", "FM-9", "Fog Z", "FreakOut", "Freeze Shimmer", "Grinder",
+                                "Holyverb", "Impulse", "Lascaux", "LMix", "LoudMix", "MasterMix", "Ngate", "Omi", "Peachy", "Phase 90",
+                                "Pipeline", "PreMix", "QMix", "Ring Think", "Screamer", "Semitones", "Small Tone", "Space Sonar 209",
+                                "Spindeck", "Strong Pickle", "Synthetika", "Textural", "Timeless", "Tolana", "Wack'd", "Wharry" };
+        const int n = (int) (sizeof (names) / sizeof (names[0])), cols = 5, cw = 300, rh = 64;
+        Image img (Image::ARGB, cols * cw + 20, ((n + cols - 1) / cols) * rh + 20, true);
+        Graphics g (img);
+        g.fillAll (Colour (0xff0b0d10));
+        for (int i = 0; i < n; ++i)
+        {
+            const String full = String ("VST3: ") + names[i] + " (NINE HANDS | DSP)";
+            const int kind = FxCat::classify (full), ic = FxCat::iconOf (full);
+            const float x = 10.0f + (float) (i % cols) * cw, y = 10.0f + (float) (i / cols) * rh;
+            const auto col = FxCat::colour (kind);
+            Rectangle<float> t (x + 6.0f, y + 6.0f, 52.0f, 52.0f);
+            g.setColour (col.withAlpha (0.18f)); g.fillRoundedRectangle (t, 9.0f);
+            g.setColour (col.withAlpha (0.9f)); g.drawRoundedRectangle (t, 9.0f, 2.0f);
+            FxCat::drawIcon (g, kind, t.reduced (11.0f), col.brighter (0.35f), 2.4f, ic);
+            g.setColour (Colours::white); g.setFont (FontOptions (20.0f));
+            g.drawText (names[i], (int) x + 70, (int) y + 6, cw - 76, 52, Justification::centredLeft);
+        }
+        File f (out + "/octopus_icons_nh.png"); f.deleteFile();
+        FileOutputStream os (f); PNGImageFormat().writeImageToStream (img, os);
+    }
     {   // v1.18.95 : coin bas droit tiré (fenêtre normale) : Octopus remplit sa fenêtre, à n'importe quelle taille
         ed->setSize (1400, (int) std::lround (1400.0 * 743.0 / 993.0)); pump (3);
         check (ed->pedalArea().getWidth() >= 1398 && ed->pedalArea().getX() <= 1, "coin tiré : Octopus remplit la fenêtre (" + ed->pedalArea().toString() + ")");

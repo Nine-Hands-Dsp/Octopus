@@ -94,33 +94,41 @@ namespace FxCat
         if (has ({ "tuner", "chroma", "polytune" }) || word ({ "tune" }))                                     return tuner;
         if (has ({ "cabinet", "impulse", "reacab", "cab sim" }) || word ({ "cab", "ir", "irs" }))            return cab;
         if (has ({ "ampire", "neural", "archetype", "ampli", "preamp", "guitar rig", "s-gear", "tonex",
-                  "bias fx", "amplitube", "mesa", "marshall", "fortin", "nameless", "helix", "anode" })
+                  "bias fx", "amplitube", "mesa", "marshall", "fortin", "nameless", "helix", "anode", "premix" })
             || word ({ "amp", "nam", "head", "stack" }))                                                     return amp;
         if (has ({ "ring think", "textur", "freeze", "ebow", "fantomine", "theremin", "granular", "synth",
-                  "sitar", "jawari", "freakout", "freqout", "feedback", "infinite", "fm-9", "to midi", "coilmines", "pickup" }) || word ({ "arc", "ring", "omi" })) return special;
+                  "sitar", "jawari", "freakout", "freqout", "feedback", "infinite", "fm-9", "to midi", "coilmines", "pickup", "spindeck" }) || word ({ "arc", "ring", "omi" })) return special;
         if (has ({ "whammy", "wharry", "octav", "pitch", "semitone", "harmoni", "capo", "transpos", "fog z", "pog" })
             || word ({ "fog" }))                                                                              return pitch;
         if (has ({ "crycat", "wah", "envelope", "filter", "autowah", "talk" }) || word ({ "cry" }))         return filter;
-        if (has ({ "delay", "echo", "tape", "space sonar" }))                                                               return delay;
-        if (has ({ "verb", "hall", "plate", "shimmer", "room", "space", "ambien" }))                         return reverb;
+        if (has ({ "delay", "echo", "tape", "space sonar", "timeless" }))                                                               return delay;
+        if (has ({ "verb", "hall", "plate", "shimmer", "room", "space", "ambien", "lascaux", "backdraft" }))                         return reverb;
         if (has ({ "chorus", "flang", "phase", "phaser", "vibrato", "tremolo", "rotary", "leslie", "small tone",
                   "wack", "pipeline", "vibe", "ensemble", "modul", "doubler" }) || word ({ "trem", "uni" }))  return mod;
         if (has ({ "drive", "distort", "fuzz", "screamer", "doorn", "peachy", "darkbass", "thorn", "saturat", "crush", "pickle",
-                  "klon", "muff", "boost", "tube", "overdrive", "exciter" }) || word ({ "od", "rat", "dist", "sat" })) return drive;
-        if (has ({ "compress", "gate", "limit", "expander", "transient", "dynamic", "reacomp", "squeez", "sustain" })
-            || word ({ "comp", "ngate" }))                                                                   return dynamics;
-        if (has ({ "equaliz", "reaeq", "graphic", "parametric", "tone stack" }) || word ({ "eq" }))          return eq;
+                  "klon", "muff", "boost", "tube", "overdrive", "exciter", "tolana" }) || word ({ "od", "rat", "dist", "sat" })) return drive;
+        if (has ({ "compress", "gate", "limit", "expander", "transient", "dynamic", "reacomp", "squeez", "sustain", "grinder", "lmix" })
+            || word ({ "comp", "ngate", "509" }))                                                                   return dynamics;
+        if (has ({ "equaliz", "reaeq", "graphic", "parametric", "tone stack", "qmix", "mastermix" }) || word ({ "eq" }))          return eq;
         if (has ({ "volume", "utility", "meter", "analy", "scope", "stereo", "width", "routing", "spectr",
-                  "gain", "pan", "polarity", "loudness", "mixer", "channel" }))                               return utility;
+                  "gain", "pan", "polarity", "loudness", "loudmix", "mixer", "channel" }))                               return utility;
         return other;
     }
 
     // icônes propres à un plugin (sinon celle de sa famille)
-    enum Icon { iconFamily = 0, iconTube, iconBassHead };
+    // v1.18.96 : une icône pour chaque plugin NINE HANDS | DSP qui avait la prise « effet inconnu »
+    enum Icon { iconFamily = 0, iconTube, iconBassHead, iconLunchbox, iconRiser, iconGear, iconCave, iconCeiling, iconVu,
+                iconDisc, iconFader, iconEqCurve, iconTurntable, iconHourglass, iconCassette };
     inline int iconOf (const juce::String& fullName)
     {
         const auto n = shortName (fullName).toLowerCase();
-        return n.contains ("anode") ? iconTube : n.contains ("darkbass") ? iconBassHead : iconFamily;
+        static const std::pair<const char*, int> k[] = {
+            { "anode", iconTube }, { "darkbass", iconBassHead }, { "509", iconLunchbox }, { "backdraft", iconRiser },
+            { "grinder", iconGear }, { "lascaux", iconCave }, { "lmix", iconCeiling }, { "loudmix", iconVu },
+            { "mastermix", iconDisc }, { "premix", iconFader }, { "qmix", iconEqCurve }, { "spindeck", iconTurntable },
+            { "timeless", iconHourglass }, { "tolana", iconCassette }, { "audiotape", iconCassette } };
+        for (auto& x : k) if (n.contains (x.first)) return x.second;
+        return iconFamily;
     }
 
     // icône vectorielle du bloc (dans le carré r) ; icon : iconOf (nom du plugin)
@@ -142,6 +150,110 @@ namespace FxCat
             g.strokePath (p, st);
             g.drawRoundedRectangle (Rectangle<float> (P (20, 52), P (52, 61)), 2.0f * k, stroke);
             return;
+        }
+        if (icon >= iconLunchbox)       // icônes propres dessinées sur une grille 24 x 24
+        {
+            g.setColour (c);
+            const float k = r.getWidth() / 24.0f;
+            auto P = [&] (float x, float y) { return Point<float> (r.getX() + x * k, r.getY() + y * k); };
+            auto R = [&] (float x, float y, float w, float h) { return Rectangle<float> (r.getX() + x * k, r.getY() + y * k, w * k, h * k); };
+            auto dot = [&] (float x, float y, float d) { g.fillEllipse (Rectangle<float> (d * k, d * k).withCentre (P (x, y))); };
+            PathStrokeType st (stroke, PathStrokeType::curved, PathStrokeType::rounded);
+            Path p;
+            switch (icon)
+            {
+                case iconLunchbox:      // 509 : châssis série 500, 4 modules avec potard et curseur
+                    g.drawRoundedRectangle (R (2.5f, 4.0f, 19.0f, 16.0f), 1.6f * k, stroke);
+                    for (float x : { 7.25f, 12.0f, 16.75f }) { p.startNewSubPath (P (x, 4.0f)); p.lineTo (P (x, 20.0f)); }
+                    for (float x : { 4.9f, 9.6f, 14.4f, 19.1f }) { dot (x, 8.5f, 2.6f); p.startNewSubPath (P (x, 12.5f)); p.lineTo (P (x, 17.0f)); }
+                    g.strokePath (p, st); return;
+                case iconRiser:         // Backdraft : montée (soufflet de crescendo) vers un mur
+                    p.startNewSubPath (P (20.0f, 5.0f)); p.lineTo (P (3.0f, 12.0f)); p.lineTo (P (20.0f, 19.0f));
+                    p.startNewSubPath (P (21.5f, 4.0f)); p.lineTo (P (21.5f, 20.0f));
+                    g.strokePath (p, st);
+                    for (int i = 0; i < 3; ++i) { const float x = 9.0f + 4.0f * (float) i, hh = 1.2f + 1.5f * (float) i;
+                                                  Path b; b.startNewSubPath (P (x, 12.0f - hh)); b.lineTo (P (x, 12.0f + hh)); g.strokePath (b, st); }
+                    return;
+                case iconGear:          // Grinder : roue dentée (8 dents)
+                {
+                    for (int i = 0; i < 8; ++i)
+                    {
+                        const float a = MathConstants<float>::twoPi * (float) i / 8.0f;
+                        p.startNewSubPath (P (12.0f + 6.6f * std::cos (a), 12.0f + 6.6f * std::sin (a)));
+                        p.lineTo (P (12.0f + 9.4f * std::cos (a), 12.0f + 9.4f * std::sin (a)));
+                    }
+                    g.strokePath (p, PathStrokeType (stroke * 1.6f, PathStrokeType::curved, PathStrokeType::rounded));
+                    g.drawEllipse (R (5.4f, 5.4f, 13.2f, 13.2f), stroke);
+                    g.drawEllipse (R (9.5f, 9.5f, 5.0f, 5.0f), stroke);
+                    return;
+                }
+                case iconCave:          // Lascaux : voûte de grotte, échos à l'intérieur, sol
+                    p.startNewSubPath (P (2.5f, 20.0f)); p.lineTo (P (21.5f, 20.0f));
+                    p.startNewSubPath (P (4.0f, 20.0f)); p.cubicTo (P (4.0f, 6.0f), P (20.0f, 6.0f), P (20.0f, 20.0f));
+                    g.strokePath (p, st);
+                    { Path q; q.startNewSubPath (P (8.5f, 20.0f)); q.cubicTo (P (8.5f, 12.0f), P (15.5f, 12.0f), P (15.5f, 20.0f));
+                      g.setColour (c.withMultipliedAlpha (0.6f)); g.strokePath (q, st); g.setColour (c); }
+                    dot (12.0f, 17.5f, 2.2f);
+                    return;
+                case iconCeiling:       // LMix : plafond, la forme d'onde vient s'écraser dessous
+                    p.startNewSubPath (P (2.5f, 6.0f)); p.lineTo (P (21.5f, 6.0f));
+                    g.strokePath (p, st);
+                    { Path w; w.startNewSubPath (P (3.0f, 18.0f)); w.lineTo (P (6.0f, 8.5f)); w.lineTo (P (9.0f, 8.5f)); w.lineTo (P (11.0f, 16.0f));
+                      w.lineTo (P (14.0f, 8.5f)); w.lineTo (P (17.0f, 8.5f)); w.lineTo (P (19.0f, 14.0f)); w.lineTo (P (21.0f, 11.0f)); g.strokePath (w, st); }
+                    return;
+                case iconVu:            // LoudMix : vumètre (cadran, graduations, aiguille)
+                    g.drawRoundedRectangle (R (2.5f, 5.0f, 19.0f, 14.0f), 1.6f * k, stroke);
+                    p.addCentredArc (P (12.0f, 18.0f).x, P (12.0f, 18.0f).y, 8.0f * k, 8.0f * k, 0.0f, -1.0f, 1.0f, true);
+                    p.startNewSubPath (P (12.0f, 17.0f)); p.lineTo (P (15.8f, 9.6f));
+                    g.strokePath (p, st);
+                    dot (12.0f, 17.0f, 2.2f);
+                    return;
+                case iconDisc:          // MasterMix : disque (gravure, étiquette, axe)
+                    g.drawEllipse (R (2.5f, 2.5f, 19.0f, 19.0f), stroke);
+                    g.setColour (c.withMultipliedAlpha (0.55f));
+                    g.drawEllipse (R (5.5f, 5.5f, 13.0f, 13.0f), stroke * 0.7f);
+                    g.setColour (c);
+                    g.drawEllipse (R (9.0f, 9.0f, 6.0f, 6.0f), stroke);
+                    dot (12.0f, 12.0f, 1.6f);
+                    return;
+                case iconFader:         // PreMix : tranche de console (potards et fader)
+                    dot (7.0f, 5.0f, 3.0f); dot (7.0f, 10.0f, 3.0f);
+                    p.startNewSubPath (P (15.0f, 3.0f)); p.lineTo (P (15.0f, 21.0f));
+                    p.startNewSubPath (P (7.0f, 14.0f)); p.lineTo (P (7.0f, 21.0f));
+                    g.strokePath (p, st);
+                    g.fillRoundedRectangle (R (12.0f, 12.0f, 6.0f, 3.6f), 0.8f * k);
+                    return;
+                case iconEqCurve:       // QMix : courbe d'égaliseur et ses points
+                    p.startNewSubPath (P (2.5f, 15.0f)); p.cubicTo (P (6.0f, 15.0f), P (6.0f, 6.5f), P (9.5f, 6.5f));
+                    p.cubicTo (P (13.0f, 6.5f), P (12.0f, 17.5f), P (16.0f, 17.5f)); p.cubicTo (P (19.0f, 17.5f), P (19.0f, 11.0f), P (21.5f, 11.0f));
+                    g.strokePath (p, st);
+                    dot (9.5f, 6.5f, 3.0f); dot (16.0f, 17.5f, 3.0f);
+                    return;
+                case iconTurntable:     // Spindeck : platine (plateau et bras)
+                    g.drawEllipse (R (2.5f, 4.0f, 15.0f, 15.0f), stroke);
+                    dot (10.0f, 11.5f, 2.4f);
+                    p.startNewSubPath (P (20.5f, 3.5f)); p.lineTo (P (20.5f, 13.0f)); p.lineTo (P (15.5f, 17.0f));
+                    g.strokePath (p, st);
+                    dot (20.5f, 3.5f, 2.6f);
+                    return;
+                case iconHourglass:     // Timeless : sablier
+                    p.startNewSubPath (P (6.0f, 3.5f)); p.lineTo (P (18.0f, 3.5f));
+                    p.startNewSubPath (P (6.0f, 20.5f)); p.lineTo (P (18.0f, 20.5f));
+                    p.startNewSubPath (P (7.5f, 3.5f)); p.cubicTo (P (7.5f, 9.0f), P (12.0f, 10.0f), P (12.0f, 12.0f)); p.cubicTo (P (12.0f, 14.0f), P (7.5f, 15.0f), P (7.5f, 20.5f));
+                    p.startNewSubPath (P (16.5f, 3.5f)); p.cubicTo (P (16.5f, 9.0f), P (12.0f, 10.0f), P (12.0f, 12.0f)); p.cubicTo (P (12.0f, 14.0f), P (16.5f, 15.0f), P (16.5f, 20.5f));
+                    g.strokePath (p, st);
+                    { Path s; s.startNewSubPath (P (9.0f, 19.6f)); s.lineTo (P (12.0f, 16.5f)); s.lineTo (P (15.0f, 19.6f)); s.closeSubPath(); g.fillPath (s); }
+                    return;
+                case iconCassette:      // Tolana : cassette (deux bobines, fenêtre, bas trapézoïdal)
+                    g.drawRoundedRectangle (R (2.0f, 5.0f, 20.0f, 14.0f), 1.6f * k, stroke);
+                    g.drawEllipse (R (5.5f, 8.0f, 4.6f, 4.6f), stroke);
+                    g.drawEllipse (R (13.9f, 8.0f, 4.6f, 4.6f), stroke);
+                    p.startNewSubPath (P (10.1f, 10.3f)); p.lineTo (P (13.9f, 10.3f));
+                    p.startNewSubPath (P (6.5f, 19.0f)); p.lineTo (P (7.8f, 15.6f)); p.lineTo (P (16.2f, 15.6f)); p.lineTo (P (17.5f, 19.0f));
+                    g.strokePath (p, st);
+                    return;
+                default: break;
+            }
         }
         if (icon == iconBassHead)       // Darkbass : tête de basse, 4 mécaniques (2 + 2), manche et cordes ; grille 24 x 24
         {
